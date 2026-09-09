@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__tempoperatingtemperaturesummary",
   "schema": [
     {
@@ -20,7 +20,10 @@
     "hourDayID",
     "tankTemperatureGroupID"
   ],
-  "row_count": 96,
-  "float_decimals": 12,
-  "content_sha256": "672953f53079f81f75e54f18e41c34b2a5f4b9da55f256a04e925450a5c5f879"
+  "row_count": 48,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "d012b1d29d94f69ffa781358f88fff332abf6dbe91dda54eb44d68d0c4cddd94"
 }

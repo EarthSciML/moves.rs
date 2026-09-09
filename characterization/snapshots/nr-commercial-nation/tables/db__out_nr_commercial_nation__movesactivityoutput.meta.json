@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_nr_commercial_nation__movesactivityoutput",
   "schema": [
     {
@@ -101,6 +101,9 @@
   ],
   "natural_key": [],
   "row_count": 908,
-  "float_decimals": 12,
-  "content_sha256": "28cee6bb493437ec3d7521da08feada60bbed97cf5b1b7789dcfaf20e5265a9d"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "53841e166ed8320bba8870c63344801e842044f6b0fda3caf953f14589952c32"
 }

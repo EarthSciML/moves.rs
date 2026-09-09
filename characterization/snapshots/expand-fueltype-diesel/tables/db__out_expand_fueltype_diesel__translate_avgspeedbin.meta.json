@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_expand_fueltype_diesel__translate_avgspeedbin",
   "schema": [
     {
@@ -19,6 +19,9 @@
     "avgSpeedBinID"
   ],
   "row_count": 16,
-  "float_decimals": 12,
-  "content_sha256": "fa61164f8f72583ab30b198e955ccdf0b176404ce72aad3e828bdc3deac31dea"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "ade6bb948e1d3ec341e6bb101223b63771e230d4b4b5b11407a3f952f3626ee9"
 }

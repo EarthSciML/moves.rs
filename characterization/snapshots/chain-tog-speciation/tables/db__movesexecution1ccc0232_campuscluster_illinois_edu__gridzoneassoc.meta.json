@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__gridzoneassoc",
   "schema": [
     {
@@ -20,6 +20,9 @@
     "gridID"
   ],
   "row_count": 0,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "5d9bcf62ec455df7f58c7f8dbefcceb8a621eb1482eb21cda03e1cfaa8c7fd06"
 }

@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__surrogateregionactivitytotal",
   "schema": [
     {
@@ -20,6 +20,9 @@
     "fuelYearID"
   ],
   "row_count": 1,
-  "float_decimals": 12,
-  "content_sha256": "d80ee480dd22d1bf710c781a3d24e3bf9db866e593964234ec8417e57fdb2108"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "aadfd8edc1167edd1a8aff2dd38c7d50cd8317916bd105e26644e4cd26155915"
 }

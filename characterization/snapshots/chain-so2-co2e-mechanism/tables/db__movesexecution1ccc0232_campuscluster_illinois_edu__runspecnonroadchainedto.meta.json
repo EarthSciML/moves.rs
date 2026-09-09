@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__runspecnonroadchainedto",
   "schema": [
     {
@@ -29,6 +29,9 @@
   ],
   "natural_key": [],
   "row_count": 21,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "531a0e6629c3be99902e9426bf4551a80b6a8d2f21fe0fd6a96ced08b071a12b"
 }

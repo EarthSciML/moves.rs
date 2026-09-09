@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_nr_industrial_county__translate_state",
   "schema": [
     {
@@ -19,6 +19,9 @@
     "stateID"
   ],
   "row_count": 53,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "a5d3b9fdfa47380b6f99aebad99af40e5a730b9129dd15760ea1b755c8eb77ec"
 }

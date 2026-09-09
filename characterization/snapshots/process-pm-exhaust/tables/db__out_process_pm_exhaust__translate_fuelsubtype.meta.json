@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_process_pm_exhaust__translate_fuelsubtype",
   "schema": [
     {
@@ -19,6 +19,9 @@
     "fuelSubtypeID"
   ],
   "row_count": 17,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "87f80f747cee9c27263433d9523e269ec79492a28826100aeeb915073b9822a3"
 }

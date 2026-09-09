@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_process_crankcase_running__translate_regclass",
   "schema": [
     {
@@ -19,6 +19,9 @@
     "regClassID"
   ],
   "row_count": 9,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "456b52cb6ce5bafaa215dcc6eceb2b8e55851badd7c09c5627449b0f3bc60f82"
 }

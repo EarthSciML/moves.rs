@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_process_evap_leaks__temporaryoutputimport",
   "schema": [
     {
@@ -104,7 +104,10 @@
     }
   ],
   "natural_key": [],
-  "row_count": 128,
-  "float_decimals": 12,
-  "content_sha256": "7031b63a0a26b52e75b4837bf11c40c5381ed679b9b623bda7448b93e94b8678"
+  "row_count": 64,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "72c1ae8e7e154908e0d744150b298e011b5f52bf2e3598b5c8a8637449cb2380"
 }

@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__hotellinghours",
   "schema": [
     {
@@ -48,7 +48,10 @@
     "ageID",
     "zoneID"
   ],
-  "row_count": 246,
-  "float_decimals": 12,
-  "content_sha256": "b8e5cef66e378cb253d5457835be58b40a063e5117c4d80d3f7f3279eb0cda1a"
+  "row_count": 123,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "1a7c9917dc242c5ff055d24842216cd2d4b29e846cfa3e08885a50df730b18ec"
 }

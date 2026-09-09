@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__nrevapemissionrate",
   "schema": [
     {
@@ -48,6 +48,9 @@
     "engTechID"
   ],
   "row_count": 718,
-  "float_decimals": 12,
-  "content_sha256": "57e98ab16186c6d535a5222d6b2ac66523b06c69203734724d46390b78059962"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "467d7db209183112b10c0716b665739252a7803dc8099fc602fd8eb14b57bb06"
 }

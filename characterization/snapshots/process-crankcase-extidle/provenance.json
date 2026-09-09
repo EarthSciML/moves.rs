@@ -2,10 +2,10 @@
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "process-crankcase-extidle",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
-  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/process-crankcase-extidle.xml",
-  "runspec_sha256": "0b2e528afb13af0c59c24db08b6e1d48672cf0436b1b58c7c6232b94ea726656",
-  "snapshot_aggregate_sha256": "89635f10ae1584d01a9627c433c712bd62c707eef9ed45e4b985b2045cd1f8ad",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixtures/process-crankcase-extidle.xml",
+  "runspec_sha256": "75d2e19ed9f17d057a7af493cf1e91eecdfe2de09c2f1fa5f2eef32bc0af7da9",
+  "snapshot_aggregate_sha256": "9018c3a7e2fee27ef1ce1269c5b846e8339330644acd3eacc10d06c79fec4406",
   "output_database": "out_process_crankcase_extidle",
   "scale_input_database": null
 }

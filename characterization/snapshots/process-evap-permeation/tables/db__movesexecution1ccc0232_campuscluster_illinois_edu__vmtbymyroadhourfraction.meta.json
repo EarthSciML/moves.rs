@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__vmtbymyroadhourfraction",
   "schema": [
     {
@@ -48,7 +48,10 @@
     "dayID",
     "hourID"
   ],
-  "row_count": 7872,
-  "float_decimals": 12,
-  "content_sha256": "c20d27c51a5f58d458a1580a77b9e4087e88e72dbc1138f13e7995c867789932"
+  "row_count": 3936,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "11082b5b034fac72f2ed77a8b316bd63290750f62f81ddb38705a362c9ec0401"
 }

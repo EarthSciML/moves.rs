@@ -2,10 +2,10 @@
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "nr-lawn-garden-county",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
-  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/nr-lawn-garden-county.xml",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixtures/nr-lawn-garden-county.xml",
   "runspec_sha256": "14c8e87babf9a4912a256f46f96bca0335a973deab9d9c5ae719a47efefd7167",
-  "snapshot_aggregate_sha256": "e96272c6ac2006dd3b0b9ac8523be8b542e3a68c4262af18bb8e82ed54b5e665",
+  "snapshot_aggregate_sha256": "9d0c09fbf2e0a3f06e0aae76ec35267a8816d63e1ab5bd41095032d5ebff3dd7",
   "output_database": "out_nr_lawn_garden_county",
   "scale_input_database": null
 }

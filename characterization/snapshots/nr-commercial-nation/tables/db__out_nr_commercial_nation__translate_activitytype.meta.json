@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_nr_commercial_nation__translate_activitytype",
   "schema": [
     {
@@ -19,6 +19,9 @@
     "activityTypeID"
   ],
   "row_count": 14,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "fd60ce595356b8f74aa079343d2a0eb9728608c0948a505882770c668f4bc0be"
 }

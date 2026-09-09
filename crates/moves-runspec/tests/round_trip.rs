@@ -157,6 +157,11 @@ macro_rules! per_fixture_round_trip {
                 round_trip_fixture($file);
             }
         )*
+
+        /// Every fixture named by the macro above, so the coverage test can
+        /// compare the covered set against the directory listing by name
+        /// instead of against a hand-maintained count (issue #58).
+        const COVERED_FIXTURES: &[&str] = &[$($file),*];
     };
 }
 
@@ -210,6 +215,12 @@ per_fixture_round_trip! {
     fixture_expand_multiyear => "expand-multiyear.xml",
     fixture_expand_roadtypes => "expand-roadtypes.xml",
     fixture_rates_minimal => "rates-minimal.xml",
+    // Fixtures for the last three unreached onroad calculators, and the
+    // NONROAD air-toxics fixture — all previously missing from this macro
+    // (issue #58; the count assertion could not name them).
+    fixture_chain_so2_co2e_mechanism => "chain-so2-co2e-mechanism.xml",
+    fixture_chain_so2_co2e_mechanism_control => "chain-so2-co2e-mechanism-control.xml",
+    fixture_nr_airtoxics_lawn_garden_county => "nr-airtoxics-lawn-garden-county.xml",
     // SINGLE-scale process variants:
     fixture_process_apu_single => "process-apu-single.xml",
     fixture_process_crankcase_extidle_single => "process-crankcase-extidle-single.xml",
@@ -222,7 +233,15 @@ fn every_fixture_is_covered_by_a_per_fixture_test() {
     // Defensive: the per-fixture macro is hand-maintained. If a new fixture
     // appears under characterization/fixtures, this test fails so we
     // remember to add it.
-    let mut found = 0usize;
+    //
+    // Issue #58: this used to assert a hardcoded fixture *count*, which went
+    // stale twice (here and in `full_suite_regression::fixture_catalogue_size`)
+    // because adding a fixture failed an unrelated count rather than naming the
+    // fixture nobody had covered. Compare the covered set against the directory
+    // listing by name instead: adding a fixture without a per-fixture test now
+    // fails with the fixture's own filename in the message, and no constant has
+    // to be bumped when the catalogue grows.
+    let mut on_disk = std::collections::BTreeSet::new();
     for entry in std::fs::read_dir(fixtures_dir()).expect("read fixtures dir") {
         let path = entry.expect("entry").path();
         let name = path.file_name().unwrap().to_string_lossy().into_owned();
@@ -230,15 +249,23 @@ fn every_fixture_is_covered_by_a_per_fixture_test() {
         // round-tripped; they are excluded from the per-fixture coverage and
         // gated separately in full_suite_regression.rs.
         if path.extension().and_then(|e| e.to_str()) == Some("xml") && !name.starts_with("error-") {
-            found += 1;
+            on_disk.insert(name);
         }
     }
-    assert_eq!(
-        found, 48,
-        "expected 48 round-trippable XML fixtures; bump the per_fixture_round_trip! macro \
-         when adding one (37 prior + 6 Task-148 valid + 4 SINGLE-scale variants + \
-         mixed-onroad/nr-mixed-nonroad less the retired mixed-onroad-nonroad; \
-         `error-*` negative fixtures excluded)"
+    let covered: std::collections::BTreeSet<String> =
+        COVERED_FIXTURES.iter().map(|s| (*s).to_owned()).collect();
+
+    let uncovered: Vec<&String> = on_disk.difference(&covered).collect();
+    assert!(
+        uncovered.is_empty(),
+        "these round-trippable fixtures have no per-fixture test — add them to the \
+         per_fixture_round_trip! macro: {uncovered:?}"
+    );
+    let missing: Vec<&String> = covered.difference(&on_disk).collect();
+    assert!(
+        missing.is_empty(),
+        "the per_fixture_round_trip! macro names fixtures that no longer exist under \
+         characterization/fixtures — remove them: {missing:?}"
     );
 }
 

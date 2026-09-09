@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_nr_pleasure_craft_state__temporaryoutputimport",
   "schema": [
     {
@@ -105,6 +105,9 @@
   ],
   "natural_key": [],
   "row_count": 440,
-  "float_decimals": 12,
-  "content_sha256": "1bc8538f1455876f97be6b3438bdb7b5ef9011eae75ba8b310363c4549be4316"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "a239959a8ec49b50d4cf0763dd8d6895c2c1779e88da088fa5d9b76a9845bb9c"
 }

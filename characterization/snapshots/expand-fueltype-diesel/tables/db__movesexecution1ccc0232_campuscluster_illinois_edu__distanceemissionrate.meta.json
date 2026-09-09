@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__distanceemissionrate",
   "schema": [
     {
@@ -39,6 +39,9 @@
     "avgSpeedBinID"
   ],
   "row_count": 0,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "13a5ab5e0e2817bf4ee078b92248b00a6f1423af118ada680a6381a2aacba1d4"
 }

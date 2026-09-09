@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_process_pm_exhaust__baserateunits",
   "schema": [
     {
@@ -33,6 +33,9 @@
   ],
   "natural_key": [],
   "row_count": 7,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "3e3a9f62c7b59a8626b4be25a9e59d6a659c460034210430870758a7a5514d7e"
 }

@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__sourceusetypephysics",
   "schema": [
     {
@@ -46,6 +46,9 @@
     "endModelYearID"
   ],
   "row_count": 178,
-  "float_decimals": 12,
-  "content_sha256": "073eec484e7f923745f996c7047d678c4c819d1dad198f329817eaf91cfc2ae9"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "0411a48c659bcdc0357782e52a64c61bf2915b0587f0d404cc4cf4c13bdff590"
 }

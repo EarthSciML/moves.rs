@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_nr_commercial_nation__movestablesused",
   "schema": [
     {
@@ -33,6 +33,9 @@
   ],
   "natural_key": [],
   "row_count": 147,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "4f01ea26272ef7da365db76fe942249faa39364f8a3e74c9e81caf395f27df89"
 }

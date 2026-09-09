@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__nrmetalemissionrate",
   "schema": [
     {
@@ -47,6 +47,9 @@
     "nrHPCategory"
   ],
   "row_count": 0,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "b105cf2d997c828bb1b5cea3d15443be7276cf6be7cb7481aa88194c75d90090"
 }

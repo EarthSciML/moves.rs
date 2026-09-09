@@ -2,10 +2,10 @@
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "nr-railroad-support-nation",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
-  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/nr-railroad-support-nation.xml",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixtures/nr-railroad-support-nation.xml",
   "runspec_sha256": "7592d266cba9a6ef2bdce28b06dd386f74d22f044e36bbce377dc9d3a3c9637f",
-  "snapshot_aggregate_sha256": "fba445f53036945537986366cc98f69ca2d85a4b6e2afe42ca62612d3a37ea5e",
+  "snapshot_aggregate_sha256": "4f8880153afc135aa96916246dafa77f5fdfb9f45e616900ddc93806aab1d0de",
   "output_database": "out_nr_railroad_support_nation",
   "scale_input_database": null
 }

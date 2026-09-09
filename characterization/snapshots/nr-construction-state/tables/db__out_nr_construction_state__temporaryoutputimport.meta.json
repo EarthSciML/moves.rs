@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_nr_construction_state__temporaryoutputimport",
   "schema": [
     {
@@ -105,6 +105,9 @@
   ],
   "natural_key": [],
   "row_count": 2355,
-  "float_decimals": 12,
-  "content_sha256": "fca60f52ef36ad064b3f1b4b81e3cb0548e782023f85310510b02f053d7e9796"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "a3675e339e4de7b928d7132e78f9c4d80901d7e88ecfb510920e27280a1ed54f"
 }

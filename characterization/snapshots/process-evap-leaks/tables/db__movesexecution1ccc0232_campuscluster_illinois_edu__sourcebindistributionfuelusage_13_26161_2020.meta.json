@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__sourcebindistributionfuelusage_13_26161_2020",
   "schema": [
     {
@@ -33,6 +33,9 @@
     "sourceBinID"
   ],
   "row_count": 125,
-  "float_decimals": 12,
-  "content_sha256": "e77fc7f56de6bf4f852ee02eded2d9a9c266b0db22c47ef69d2c86ee7f83dafa"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "b471a935efd18839d1a4ad3d0a5709201a0619b0453b94bde4dc9364c7dedeb4"
 }

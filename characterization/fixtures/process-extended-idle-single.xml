@@ -19,7 +19,7 @@ MOVES 5.0.1 against a county input DB containing hotellingHoursPerDay.]]></descr
 	<timespan>
 		<year key="2020"/>
 		<month key="7"/>
-		<day key="5"/>
+		<day id="5"/>
 		<beginhour key="7"/>
 		<endhour key="7"/>
 	</timespan>

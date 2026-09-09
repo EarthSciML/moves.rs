@@ -258,7 +258,26 @@ trap cleanup_incomplete EXIT
 
 # ant's <java> task for MOVES has no failonerror="true", so these markers in
 # the run log are the only evidence that MOVES failed.
+#
+# `ERROR: Error:` is the general one and is deliberately first: MOVES's own
+# logger emits a fatal as `<timestamp> ERROR: Error: <message>`, so this catches
+# the whole class rather than one incident's spelling. It was added after
+# `process-apu-single` — a SINGLE-domain fixture run without its county input
+# database — logged
+#
+#     [java] ERROR: Error: The database does not have the required county.
+#
+# and then exited 0 through ant, so scan_moves_log printed "MOVES run OK" over a
+# run that produced no output databases at all. The zero-table belt below caught
+# it, but the log scan is supposed to be the *first* line of defence and named
+# only three literal strings.
+#
+# False-positive risk was measured, not assumed: across 13 successful captures
+# of this suite (chain-*, expand-*, mixed-onroad, process-*), the string `ERROR`
+# does not appear in the run log at all. A legitimate fixture that trips this is
+# therefore itself a finding.
 MOVES_FAILURE_MARKERS=(
+    'ERROR: Error:'
     'BUILD FAILED'
     'The specified runspec file does not exist'
     'ERROR: A runspec was not provided'

@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__atbaseemissions",
   "schema": [
     {
@@ -24,6 +24,9 @@
     "monthGroupID"
   ],
   "row_count": 5,
-  "float_decimals": 12,
-  "content_sha256": "fecf31f95134d6c12c248ee9de32a1baca91e7e337dbe3ba4a3cd43aa384b934"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "88e2defa266133b3e066c0aee19848d28009f601a0de8e1796a7bdcdb67d122b"
 }

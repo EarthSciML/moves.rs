@@ -2,7 +2,7 @@
   "trace_version": "moves-fixture-capture/v1",
   "fixture_name": "expand-day",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "runspec_sha256": "c238a1969d13be0596a92828b0a4b140d9646a5eaba4e0de7fee9c49f96ea8fd",
+  "runspec_sha256": "4cca058da77410f3cc7c4b7812433765116b274c880164d63370f6834bd5013c",
   "java_classes": [
     {
       "name": "gov.epa.otaq.moves.common.BundleManifest",
@@ -262,10 +262,6 @@
     },
     {
       "name": "gov.epa.otaq.moves.common.expression.IVariableSource",
-      "kind": "common"
-    },
-    {
-      "name": "gov.epa.otaq.moves.common.expression.Optimizer",
       "kind": "common"
     },
     {
@@ -597,14 +593,6 @@
       "kind": "master"
     },
     {
-      "name": "gov.epa.otaq.moves.master.implementation.ghg.BaseRateByAgeHelper$OutputRecord",
-      "kind": "master"
-    },
-    {
-      "name": "gov.epa.otaq.moves.master.implementation.ghg.BaseRateByAgeHelper$SBWeightedEmissionRateByAge",
-      "kind": "master"
-    },
-    {
       "name": "gov.epa.otaq.moves.master.implementation.ghg.BaseRateCalculator",
       "kind": "master"
     },
@@ -629,19 +617,7 @@
       "kind": "master"
     },
     {
-      "name": "gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator$FuelFormulation",
-      "kind": "master"
-    },
-    {
       "name": "gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator$FuelUsageEntry",
-      "kind": "master"
-    },
-    {
-      "name": "gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator$GeneralFuelRatioExpression",
-      "kind": "master"
-    },
-    {
-      "name": "gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator$IntegerPair",
       "kind": "master"
     },
     {
@@ -762,6 +738,6 @@
   "worker_bundles": [],
   "sources": {
     "worker_sql_files": 0,
-    "class_load_log_files": 8
+    "class_load_log_files": 2
   }
 }

@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_nr_railroad_support_nation__unitconvertafter",
   "schema": [
     {
@@ -105,6 +105,9 @@
   ],
   "natural_key": [],
   "row_count": 23108,
-  "float_decimals": 12,
-  "content_sha256": "585744000e50d111a504398f01deae2c627855671cbedbebac3f4814c1e321e9"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "d6ffeeef266f796ffd5ef4d9a4f156940d680a86ff88b7c5f421b62b3a3f640e"
 }

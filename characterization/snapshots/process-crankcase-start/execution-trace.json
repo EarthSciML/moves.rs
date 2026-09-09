@@ -2,7 +2,7 @@
   "trace_version": "moves-fixture-capture/v1",
   "fixture_name": "process-crankcase-start",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "runspec_sha256": "ef2920bfa60136442574eb1cf529aa996263d1fa0bd497ae498324de887ec488",
+  "runspec_sha256": "0740d6416b829ca3965e35889c18c63657441ba1a5208d8459fe471bff45e8d8",
   "java_classes": [
     {
       "name": "gov.epa.otaq.moves.common.BundleManifest$MasterFragment",
@@ -238,10 +238,6 @@
     },
     {
       "name": "gov.epa.otaq.moves.master.framework.HeartbeatDetectionThread",
-      "kind": "framework"
-    },
-    {
-      "name": "gov.epa.otaq.moves.master.framework.HeartbeatDetectionThread$ObservedFileStamp",
       "kind": "framework"
     },
     {
@@ -554,6 +550,6 @@
   "worker_bundles": [],
   "sources": {
     "worker_sql_files": 0,
-    "class_load_log_files": 4
+    "class_load_log_files": 2
   }
 }

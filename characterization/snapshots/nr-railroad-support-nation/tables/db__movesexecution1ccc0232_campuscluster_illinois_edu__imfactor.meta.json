@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__imfactor",
   "schema": [
     {
@@ -45,6 +45,9 @@
     "ageGroupID"
   ],
   "row_count": 378,
-  "float_decimals": 12,
-  "content_sha256": "9c07d3fbe2f6431de4654dc5a0c2a55105c55fb8862cd6db0eb87b17cee3b5f1"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "9711df56174a64198c8dbf53fc4f9053bf5dffc0d59cee65a90f74582521f069"
 }

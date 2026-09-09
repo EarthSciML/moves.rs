@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_expand_criteria__baserateoutput",
   "schema": [
     {
@@ -76,7 +76,10 @@
     }
   ],
   "natural_key": [],
-  "row_count": 744,
-  "float_decimals": 12,
-  "content_sha256": "28f8bc952810371a04242cfef9de11930bc642afe1dbc2b0f697e5be40c89b9d"
+  "row_count": 372,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "0c6e16f62eabeb4c17884c888a1c3f0c8d8d0ad131f788e13f073c4a282776f9"
 }

@@ -2,10 +2,10 @@
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "expand-day",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
-  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/expand-day.xml",
-  "runspec_sha256": "c238a1969d13be0596a92828b0a4b140d9646a5eaba4e0de7fee9c49f96ea8fd",
-  "snapshot_aggregate_sha256": "3bbd347342d8974131db57b4bf496fa2fc3ed169ec879741124cc8189dc24ce6",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixtures/expand-day.xml",
+  "runspec_sha256": "4cca058da77410f3cc7c4b7812433765116b274c880164d63370f6834bd5013c",
+  "snapshot_aggregate_sha256": "b1c6c783510667392cc8cf49d78a6cd861a7f55287d9e6f2fd66f9e362f25899",
   "output_database": "out_expand_day",
   "scale_input_database": null
 }

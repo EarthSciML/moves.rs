@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_nr_recreational_county__temporaryactivityoutputimport",
   "schema": [
     {
@@ -101,6 +101,9 @@
   ],
   "natural_key": [],
   "row_count": 808,
-  "float_decimals": 12,
-  "content_sha256": "5a9bfad150bc157f37d99a87aeca66e864fcde47808bbb1984bc2ffcd95b701c"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "d1b8b997ad74a3afa0c1126ab404f6185add8f66cbcfb42d255f00c765917dad"
 }

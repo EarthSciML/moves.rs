@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_process_airtoxics__movestablesused",
   "schema": [
     {
@@ -33,6 +33,9 @@
   ],
   "natural_key": [],
   "row_count": 152,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "1eb1b96f993e44881c5eccf816475b073661b38f210affa56297318b6aff1334"
 }

@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__fuelsupply",
   "schema": [
     {
@@ -34,6 +34,9 @@
     "fuelFormulationID"
   ],
   "row_count": 20,
-  "float_decimals": 12,
-  "content_sha256": "fc2a254227fdbcfe023f88429f95a953f1a0608cd2f53264fe5c4ddf25e8011a"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "afa60e7734f3bae04155809f698ae9951f8fd150f18d2d256b59af87a23f56c8"
 }

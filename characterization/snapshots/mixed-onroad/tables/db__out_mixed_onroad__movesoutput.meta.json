@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_mixed_onroad__movesoutput",
   "schema": [
     {
@@ -104,7 +104,10 @@
     }
   ],
   "natural_key": [],
-  "row_count": 250,
-  "float_decimals": 12,
-  "content_sha256": "cdf00f43eff66bc0cfd8f5cf43ebac5fa9052a12dcc5bd41d0719415fc23152a"
+  "row_count": 125,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "71f9dd3f6b1bc7542b7bbe296060693a4974eb63d7b7f5196efc1a1cd755d514"
 }

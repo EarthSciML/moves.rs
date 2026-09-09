@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_mixed_onroad__translate_sourcetype",
   "schema": [
     {
@@ -19,6 +19,9 @@
     "sourceTypeID"
   ],
   "row_count": 13,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "c27fc2474a34746c7fddc7827c468bccaa562acd899b7277117a6a7f3e788fe0"
 }

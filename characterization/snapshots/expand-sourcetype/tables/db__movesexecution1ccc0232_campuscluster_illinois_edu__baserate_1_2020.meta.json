@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__baserate_1_2020",
   "schema": [
     {
@@ -98,7 +98,10 @@
     "regClassID",
     "opModeID"
   ],
-  "row_count": 1234,
-  "float_decimals": 12,
-  "content_sha256": "d74bc4fe4c0bcfa7aabe229baa7b387e0f69a8fb0d23d9953983b523ceaafdf1"
+  "row_count": 617,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "e6b058b50c0dedcc2a83f9495a9e9179571a7ddee8c2c8f90c79ac476dfb002f"
 }

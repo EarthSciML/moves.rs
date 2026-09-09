@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_nr_agriculture_state__temporaryactivityoutputimport",
   "schema": [
     {
@@ -101,6 +101,9 @@
   ],
   "natural_key": [],
   "row_count": 21120,
-  "float_decimals": 12,
-  "content_sha256": "90172af6d32f47861a1c325a0920f95b8c0bc9818c189ca6cb8d4cab06ba174c"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "bb8f4b18468beae3430d2a789f3f15fd032b77905379781ce3a1248fd0e81752"
 }

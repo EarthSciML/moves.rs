@@ -2,7 +2,7 @@
   "trace_version": "moves-fixture-capture/v1",
   "fixture_name": "chain-tog-speciation",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "runspec_sha256": "5a80e99eb245f67005e643a34a26a3e6c6bc75e05edbc07f923a07e8d89c3159",
+  "runspec_sha256": "6122fd8474efc64b223e362b0deff69761e887b3f3e66d5ad9ff601a413c66b9",
   "java_classes": [
     {
       "name": "gov.epa.otaq.moves.common.BundleManifest",
@@ -750,6 +750,6 @@
   "worker_bundles": [],
   "sources": {
     "worker_sql_files": 0,
-    "class_load_log_files": 6
+    "class_load_log_files": 2
   }
 }

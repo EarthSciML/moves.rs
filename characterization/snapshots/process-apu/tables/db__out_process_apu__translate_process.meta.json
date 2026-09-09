@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_process_apu__translate_process",
   "schema": [
     {
@@ -19,6 +19,9 @@
     "processID"
   ],
   "row_count": 25,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "4cf4f5ef9372595b921d3342689d0a440138f893aa91f552505c82d189c8b3d3"
 }

@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__hcpermeationcoeff",
   "schema": [
     {
@@ -33,6 +33,9 @@
     "fuelMYGroupID"
   ],
   "row_count": 120,
-  "float_decimals": 12,
-  "content_sha256": "c2cfd99548996a21cdf872825cd11354fa9a8aa2ba9e97186307dbc6cf19c5de"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "c4c88cd5ee561a7ab91754da316f831631b590926eee94cf266bcaf4b24f457c"
 }

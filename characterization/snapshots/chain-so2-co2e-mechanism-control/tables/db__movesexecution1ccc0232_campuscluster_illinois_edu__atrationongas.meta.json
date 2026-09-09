@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__atrationongas",
   "schema": [
     {
@@ -38,6 +38,9 @@
     "modelYearGroupID"
   ],
   "row_count": 650,
-  "float_decimals": 12,
-  "content_sha256": "8686eaf3f3d5d16c8998c6cd90285ef2247e3ce12e76c8b534d49e88de0f99ca"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "6a43b595aa9b83b7bc2233655ead9296b9299ddfef646819121df37a9b01a64c"
 }

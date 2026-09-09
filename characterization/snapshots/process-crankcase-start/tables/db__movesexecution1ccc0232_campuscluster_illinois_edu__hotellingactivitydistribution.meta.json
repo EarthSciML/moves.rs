@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__hotellingactivitydistribution",
   "schema": [
     {
@@ -35,6 +35,9 @@
     "opModeID"
   ],
   "row_count": 36,
-  "float_decimals": 12,
-  "content_sha256": "9d838731ae6577eb528001a9c9735644c0eb1109a6f8945d160a000c4b0c3d93"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "ac0bec4e317840dfb21a4afd34bef0333d0c8364fc77270ca23ed072c5770e72"
 }

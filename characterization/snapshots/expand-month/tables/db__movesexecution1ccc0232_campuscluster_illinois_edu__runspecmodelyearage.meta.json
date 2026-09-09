@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__runspecmodelyearage",
   "schema": [
     {
@@ -21,6 +21,9 @@
     "ageID"
   ],
   "row_count": 41,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "485b0a02a1c66a0e3867e6d2d9d29738513fa1c22983b453e78293cfff4f27ff"
 }

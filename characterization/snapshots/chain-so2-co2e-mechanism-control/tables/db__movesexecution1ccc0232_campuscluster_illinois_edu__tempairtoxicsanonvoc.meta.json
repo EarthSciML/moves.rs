@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__tempairtoxicsanonvoc",
   "schema": [
     {
@@ -49,6 +49,9 @@
   ],
   "natural_key": [],
   "row_count": 164,
-  "float_decimals": 12,
-  "content_sha256": "517842eb0e89aca1f1b35be124822df91d3877018e993c0b7a3f6f3e0aa90821"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "ecb1c0ca648b7f9b8fa03a790b74d77209e4f49a5854489c2c7ed0e99c8892c7"
 }

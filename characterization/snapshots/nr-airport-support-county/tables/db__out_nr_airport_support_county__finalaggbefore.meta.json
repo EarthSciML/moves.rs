@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_nr_airport_support_county__finalaggbefore",
   "schema": [
     {
@@ -105,6 +105,9 @@
   ],
   "natural_key": [],
   "row_count": 21068,
-  "float_decimals": 12,
-  "content_sha256": "81fe3a5f0188bfd62954dfaee9a9bcef2a114175b3a9c6d5fa9fc6581c649935"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "6806d1e661071059d0e2d56a8b01dbacec74ea3e1a4160595449fbf468ab03ca"
 }

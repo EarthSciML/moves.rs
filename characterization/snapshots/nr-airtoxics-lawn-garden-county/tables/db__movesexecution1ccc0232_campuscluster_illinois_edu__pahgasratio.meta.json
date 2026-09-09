@@ -1,0 +1,41 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__pahgasratio",
+  "schema": [
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "atRatio",
+      "kind": "float64"
+    },
+    {
+      "name": "atRatioCV",
+      "kind": "float64"
+    },
+    {
+      "name": "dataSourceId",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "polProcessID",
+    "fuelTypeID",
+    "modelYearGroupID"
+  ],
+  "row_count": 4,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "5c3a692379294c1307d4bcc8285b75d9cd22c5b43462c0779d3a212e4ff24407"
+}

@@ -2,7 +2,7 @@
   "trace_version": "moves-fixture-capture/v1",
   "fixture_name": "process-nox-speciation",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "runspec_sha256": "4d6db0bb430c8538716f44c1521ba6b46503c27f7a16b51859866248426790ca",
+  "runspec_sha256": "ca783d165c89fb785bc39b1d2cc3f232963cc7793e2da7d2ebb4f8510a0f4052",
   "java_classes": [
     {
       "name": "gov.epa.otaq.moves.common.BundleManifest",
@@ -750,6 +750,6 @@
   "worker_bundles": [],
   "sources": {
     "worker_sql_files": 0,
-    "class_load_log_files": 6
+    "class_load_log_files": 2
   }
 }

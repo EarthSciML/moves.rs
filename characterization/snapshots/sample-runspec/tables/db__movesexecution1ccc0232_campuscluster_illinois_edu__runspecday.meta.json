@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__runspecday",
   "schema": [
     {
@@ -11,6 +11,9 @@
     "dayID"
   ],
   "row_count": 1,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "e660f9234d76577a2766fa5c8543e3ad1d238de73e8c6083ccb8c3bb314f3fce"
 }

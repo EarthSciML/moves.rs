@@ -2,10 +2,10 @@
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "chain-so2-co2e-mechanism-control",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/runspecs/characterization/fixture-image.lock",
-  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/runspecs/characterization/fixtures/chain-so2-co2e-mechanism-control.xml",
-  "runspec_sha256": "5fa61a76a4f769eb51d0ec4baf0895169905762595ff875f3fa603d7f851a32c",
-  "snapshot_aggregate_sha256": "27f25f26c05551be7c100c100d54985c9e525e372cdc44d17335426e208d94da",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixtures/chain-so2-co2e-mechanism-control.xml",
+  "runspec_sha256": "3f14e617a368ba09c2c9ac584861b761bf9ec714b0d79fa4eacd822729413e59",
+  "snapshot_aggregate_sha256": "59b1f93fadbe23e50651fd7f0c198afadac13db63574091bea139fa2e97d21a5",
   "output_database": "out_chain_so2_co2e_mechanism_control",
   "scale_input_database": null
 }

@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__junittestoutput__movesoutput",
   "schema": [
     {
@@ -105,6 +105,9 @@
   ],
   "natural_key": [],
   "row_count": 84,
-  "float_decimals": 12,
-  "content_sha256": "5d16634c834609c0ba5bb898effbd2f5f2baac212697400b779b0bfd09d391d0"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "259fa570f54e3c69a4b8a096f38d449762eb4e02eb4c31de3fae71cbbb4ad1ef"
 }

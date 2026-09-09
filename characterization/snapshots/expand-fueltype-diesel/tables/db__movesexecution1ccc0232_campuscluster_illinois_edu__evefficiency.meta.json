@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__evefficiency",
   "schema": [
     {
@@ -44,6 +44,9 @@
     "endModelYearID"
   ],
   "row_count": 21,
-  "float_decimals": 12,
-  "content_sha256": "621d0634803f0ae10df71259457262f7ca58db43cb9afc698c3abf3e169ba249"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "d1b8097a5f1c53a94ef93d3ff2201b66e5ffeb949f6541d496586bbe1c953131"
 }

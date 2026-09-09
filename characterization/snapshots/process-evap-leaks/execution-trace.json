@@ -2,7 +2,7 @@
   "trace_version": "moves-fixture-capture/v1",
   "fixture_name": "process-evap-leaks",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "runspec_sha256": "96a1b40185f44c61d01401b595a684939109541de1d9824c39615e3b185845e8",
+  "runspec_sha256": "4be82e9c2e89a6c8bb8524eeb431d84ad0f4e8400f3691fbb2a55ddaaa4f56db",
   "java_classes": [
     {
       "name": "gov.epa.otaq.moves.common.BundleManifest",
@@ -722,6 +722,6 @@
   "worker_bundles": [],
   "sources": {
     "worker_sql_files": 0,
-    "class_load_log_files": 6
+    "class_load_log_files": 2
   }
 }

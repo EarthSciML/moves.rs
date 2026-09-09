@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__nrscc",
   "schema": [
     {
@@ -23,6 +23,9 @@
     "SCC"
   ],
   "row_count": 214,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "018689834aedf40826c7f28c7396e397d04c2de69fd544cabb71c90c3a9fb5bd"
 }

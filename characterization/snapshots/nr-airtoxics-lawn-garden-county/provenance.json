@@ -2,10 +2,10 @@
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "nr-airtoxics-lawn-garden-county",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.esm/.moves/nr-airtoxics-runspec/characterization/fixture-image.lock",
-  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.esm/.moves/nr-airtoxics-runspec/characterization/fixtures/nr-airtoxics-lawn-garden-county.xml",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixtures/nr-airtoxics-lawn-garden-county.xml",
   "runspec_sha256": "98d24d271334f4247d220c9790847e67dae6735429b96a9ebb9641486217e460",
-  "snapshot_aggregate_sha256": "7a31c379f1680d91bab3f02440b0d564a546e1e1fdb838cd24f225d2c117af72",
+  "snapshot_aggregate_sha256": "d31cc1aec7088756238db7e91a8e6c5c7d75073bfe029bf9439f933d66018938",
   "output_database": "out_nr_airtoxics_lawn_garden_county",
   "scale_input_database": null
 }

@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__evaprvptemperatureadjustment",
   "schema": [
     {
@@ -37,6 +37,9 @@
     "RVP"
   ],
   "row_count": 8,
-  "float_decimals": 12,
-  "content_sha256": "8500b51b7255be355710a903b3a28f35ab4bcb831809a32272c9a68934bc5576"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "fba49a852e6e9567a44fc08bbf7ce21309c34f07ed7145ef110bcd4c128607a5"
 }

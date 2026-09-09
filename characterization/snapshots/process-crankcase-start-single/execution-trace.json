@@ -2,7 +2,7 @@
   "trace_version": "moves-fixture-capture/v1",
   "fixture_name": "process-crankcase-start-single",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "runspec_sha256": "f47fcd7a2cec3e235f7f463a956dde8428660c99d9c9f081a68ab1ce13e47b3c",
+  "runspec_sha256": "509baff9aff420bb3c14d302b24a245bcb6d0943089f3f3c4e5e17f307ec8f7c",
   "java_classes": [
     {
       "name": "gov.epa.otaq.moves.common.BundleManifest$MasterFragment",

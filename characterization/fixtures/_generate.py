@@ -20,8 +20,8 @@ Catalogue drift
 ---------------
 The committed fixture set has outgrown this table: several XMLs were
 hand-edited after capture (carrier pollutants added, NONROAD process IDs
-corrected from the non-existent "40" to the real Running Exhaust "1",
-`<day key=>` changed to `<day id=>`), and a second wave of fixtures
+corrected from the non-existent "40" to the real Running Exhaust "1"),
+and a second wave of fixtures
 (`nr-mixed-nonroad`, `mixed-onroad`, `chain-nonhaptog`, the `*-single`
 county fixtures, the `error-bad-*` fixtures, ...) was added to the
 directory without a spec entry here. Regenerating those XMLs would
@@ -204,10 +204,16 @@ class TimeSpan:
     aggregate_by: Optional[str] = None     # "Hour"/"Day"/"Month"/"Year"
     # `<day key=>` is an *index* into TimeSpan.allDays; `<day id=>` is the
     # dayID (see RunSpecXML.processTimeSpan -> getDayByIndex/getDayByID).
-    # allDays has two entries, so key="5" resolves to null and MOVES then
-    # falls back to every day; id="5" selects weekdays only. The nr-*.xml
-    # fixtures all use `id`, which is the cheaper (and intended) form.
-    day_attr: str = "key"                  # "key" (index) or "id" (dayID)
+    # allDays has two entries ordered by ascending dayID, so the only valid
+    # keys are 0 (-> dayID 2, weekend) and 1 (-> dayID 5, weekday). key="5"
+    # resolves to null, the day selection is left empty, and MOVES falls
+    # back to running every day.
+    #
+    # This defaulted to "key" until 2026-09-08, which silently made 26 of the
+    # 40 populated snapshots two-day runs -- measured in
+    # ../audit-results/20260908T1120-day-selection-audit.md. Always emit the
+    # dayID form.
+    day_attr: str = "id"                   # "id" (dayID) or "key" (index)
 
 @dataclass
 class FixtureSpec:
@@ -900,7 +906,7 @@ FIXTURES: list[FixtureSpec] = [
         road_types=(100,),
         pp_assocs=NR_AIRTOXICS,
         timespan=TimeSpan(year=2020, months=(7,), days=(5,),
-                          begin_hour=6, end_hour=6, day_attr="id"),
+                          begin_hour=6, end_hour=6),
     ),
 
     # ------- Second-wave fixtures caught up into the table (2026-09-08) ------

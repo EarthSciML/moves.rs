@@ -2,10 +2,10 @@
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "chain-nonhaptog",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
-  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/chain-nonhaptog.xml",
-  "runspec_sha256": "9c38b76a8d5ab5c98079a6a8bb12c01fa7a08684fd2532f65c5dc9790d4dde20",
-  "snapshot_aggregate_sha256": "0679855ebd3abe9f872ec7dfecfe6941be5ebd2cb75f1d1b66cf4a50caf1935d",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixtures/chain-nonhaptog.xml",
+  "runspec_sha256": "e95e56bd72b9b2ce3eb20ccbf582cea28e6a8054de720dbd8468dcb2def086c0",
+  "snapshot_aggregate_sha256": "93dfc4f3335fa4b06f109c1968b70ec3582b013df4853895441142b85ede8423",
   "output_database": "out_chain_nonhaptog",
   "scale_input_database": null
 }

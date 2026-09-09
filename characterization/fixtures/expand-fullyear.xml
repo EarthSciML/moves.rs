@@ -22,7 +22,7 @@
 		<month key="10"/>
 		<month key="11"/>
 		<month key="12"/>
-		<day key="5"/>
+		<day id="5"/>
 		<beginhour key="6"/>
 		<endhour key="6"/>
 		<aggregateBy key="Month"/>

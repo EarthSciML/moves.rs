@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_process_airtoxics__startspervehicle",
   "schema": [
     {
@@ -57,6 +57,9 @@
   ],
   "natural_key": [],
   "row_count": 0,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "78389752b43e6e3d7a9341cfaba51a80e3c00a6d4150d2416943c0fac4090aa9"
 }

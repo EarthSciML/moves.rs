@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__greetmanfanddisposal",
   "schema": [
     {
@@ -30,6 +30,9 @@
     "EmissionStage"
   ],
   "row_count": 0,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "370b56a45da25f695d99c39fbdaf1cccd6bf00eeaf1d55f173310723c1aeff2b"
 }

@@ -509,9 +509,14 @@ mod tests {
         let NormalizedColumn::Float64String(vs) = &table.columns()[1] else {
             panic!()
         };
-        assert_eq!(vs[0].as_deref(), Some("1.000000000000"));
+        // moves-snapshot/v2 spelling: the shortest correctly-rounded decimal
+        // that round-trips, in normalized scientific notation. Under v1 these
+        // read "1.000000000000" / "3.000000000000"; the assertion was not
+        // updated when the encoder changed, which is why it has been red on
+        // `main` since the v2 format landed.
+        assert_eq!(vs[0].as_deref(), Some("1e+00"));
         assert_eq!(vs[1].as_deref(), None); // NULL
-        assert_eq!(vs[2].as_deref(), Some("3.000000000000"));
+        assert_eq!(vs[2].as_deref(), Some("3e+00"));
     }
 
     #[test]

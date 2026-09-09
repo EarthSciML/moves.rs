@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_process_evap_leaks__translate_roadtype",
   "schema": [
     {
@@ -15,6 +15,9 @@
     "roadTypeID"
   ],
   "row_count": 6,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "61d480bf7aa719661e14bad538f4dd13c0d0e8566bad4a8afe42cecd88dd6cba"
 }

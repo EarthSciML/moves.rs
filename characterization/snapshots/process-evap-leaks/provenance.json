@@ -2,10 +2,10 @@
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "process-evap-leaks",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
-  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/process-evap-leaks.xml",
-  "runspec_sha256": "96a1b40185f44c61d01401b595a684939109541de1d9824c39615e3b185845e8",
-  "snapshot_aggregate_sha256": "e30be8210a7502636e5d1507a12477d1efe4022640c2afd16844ebaa00c0b556",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixtures/process-evap-leaks.xml",
+  "runspec_sha256": "4be82e9c2e89a6c8bb8524eeb431d84ad0f4e8400f3691fbb2a55ddaaa4f56db",
+  "snapshot_aggregate_sha256": "2f388ded1cc9d9e25a870056c3d6194a696f24d8649e34555e2ec677847fa3b3",
   "output_database": "out_process_evap_leaks",
   "scale_input_database": null
 }

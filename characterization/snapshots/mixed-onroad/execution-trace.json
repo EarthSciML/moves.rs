@@ -2,7 +2,7 @@
   "trace_version": "moves-fixture-capture/v1",
   "fixture_name": "mixed-onroad",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "runspec_sha256": "5559dcf0356c26b52df479cafefaa9a9de214a881eebac922de9f269075df718",
+  "runspec_sha256": "5cd1dc8a8b0756179cea555aac60eba3dad637f561548317329154395a90af56",
   "java_classes": [
     {
       "name": "gov.epa.otaq.moves.common.BundleManifest",

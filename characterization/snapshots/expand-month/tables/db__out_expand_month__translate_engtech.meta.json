@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_expand_month__translate_engtech",
   "schema": [
     {
@@ -19,6 +19,9 @@
     "engTechID"
   ],
   "row_count": 129,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "4dc9c248e5960fcba11e54f75d9db58cfb40430d8eb63d2391776c7f377d9a96"
 }

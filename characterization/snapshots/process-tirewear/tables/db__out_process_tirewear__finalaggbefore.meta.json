@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_process_tirewear__finalaggbefore",
   "schema": [
     {
@@ -104,7 +104,10 @@
     }
   ],
   "natural_key": [],
-  "row_count": 750,
-  "float_decimals": 12,
-  "content_sha256": "7c247f6d7bba5d6504b5d26834fa72da95581253217b098144d60b0dc9bdd414"
+  "row_count": 375,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "6206a643f6b91bb8b16b39f2dafdbf48c289e42020daeafaede40339563f1fa1"
 }

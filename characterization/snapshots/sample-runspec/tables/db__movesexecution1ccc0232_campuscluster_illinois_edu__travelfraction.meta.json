@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__travelfraction",
   "schema": [
     {
@@ -25,6 +25,9 @@
     "ageID"
   ],
   "row_count": 533,
-  "float_decimals": 12,
-  "content_sha256": "795c293a9d82c12f1bd97973e9af9f2cf0c60209593e7d967eee74e794162494"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "1e8b1487ba6a6794d5263da84e789f2ef3568e95eb3125d05f29e038ea727c2c"
 }

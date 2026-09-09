@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__tempairtoxicsa",
   "schema": [
     {
@@ -45,6 +45,9 @@
   ],
   "natural_key": [],
   "row_count": 41,
-  "float_decimals": 12,
-  "content_sha256": "b3ab3210d4b4934c5f62f10bbc33ff2f8fe3e3de02c220aa44e5ac70d9f17656"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "19bde06adff424958932bfdfc3192f04bf38b921937beab1a4908f4a757fa7a4"
 }

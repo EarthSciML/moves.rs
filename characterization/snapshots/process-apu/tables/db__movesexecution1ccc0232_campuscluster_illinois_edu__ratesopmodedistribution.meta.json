@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__ratesopmodedistribution",
   "schema": [
     {
@@ -51,7 +51,10 @@
     "polProcessID",
     "opModeID"
   ],
-  "row_count": 6,
-  "float_decimals": 12,
-  "content_sha256": "baa03fdd1ec5e7f5cd53eed9397f06f2dc1e001e01bb5f38a775b62b32495fc6"
+  "row_count": 3,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "94e3aad9102eccfd29a6e1854cc7492a4ff09d827a2f53011a1aa0a084c44a7b"
 }

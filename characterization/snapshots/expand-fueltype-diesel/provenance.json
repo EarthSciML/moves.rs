@@ -2,10 +2,10 @@
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "expand-fueltype-diesel",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
-  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/expand-fueltype-diesel.xml",
-  "runspec_sha256": "1dd7eee18889e5a53020df6eda01b6694c50ada2062c652ab2593d45a2d47924",
-  "snapshot_aggregate_sha256": "db1a85e96dedaccf9e53871c1379df558558272ef44c3eb490cb566f47f7c96d",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixtures/expand-fueltype-diesel.xml",
+  "runspec_sha256": "b598068d014c9d59b1968a9cb8b4d36a0acd3d417c53a66eb61bba3a55320ed3",
+  "snapshot_aggregate_sha256": "88de9b6a222f42b139ae1a8bb203e2deda2385fc961730ae42978046d41c9419",
   "output_database": "out_expand_fueltype_diesel",
   "scale_input_database": null
 }

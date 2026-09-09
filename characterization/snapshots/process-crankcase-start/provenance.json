@@ -2,10 +2,10 @@
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "process-crankcase-start",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
-  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/process-crankcase-start.xml",
-  "runspec_sha256": "ef2920bfa60136442574eb1cf529aa996263d1fa0bd497ae498324de887ec488",
-  "snapshot_aggregate_sha256": "eb62488927f2789e1311a8ea7c8e41bf0e2c45685035e862f547a050bd0e2a3f",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixtures/process-crankcase-start.xml",
+  "runspec_sha256": "0740d6416b829ca3965e35889c18c63657441ba1a5208d8459fe471bff45e8d8",
+  "snapshot_aggregate_sha256": "fbed6ce351cf5d8793c04f480246d536760b34537561373be5a8a22fdca6f18b",
   "output_database": "out_process_crankcase_start",
   "scale_input_database": null
 }

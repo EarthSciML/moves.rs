@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_process_nox_speciation__baserateoutput",
   "schema": [
     {
@@ -76,7 +76,10 @@
     }
   ],
   "natural_key": [],
-  "row_count": 872,
-  "float_decimals": 12,
-  "content_sha256": "eef7610e7bcbe6858d8d664664472715c7aa3f0b1a673b71dbb8db505991c8fb"
+  "row_count": 436,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "a4c82af299454abafd38fcb0c6ec771b8d0dad081f6408416c53ec70fd0c11cb"
 }

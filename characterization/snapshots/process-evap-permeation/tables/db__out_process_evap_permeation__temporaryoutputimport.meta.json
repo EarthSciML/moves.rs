@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_process_evap_permeation__temporaryoutputimport",
   "schema": [
     {
@@ -104,7 +104,10 @@
     }
   ],
   "natural_key": [],
-  "row_count": 128,
-  "float_decimals": 12,
-  "content_sha256": "db97a5f40c263c32e396dde0e5cefd79bb98b206bed39010f66858dd6891a439"
+  "row_count": 64,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "2a6cf0fdd89022413028d0fcedcd95fb2bf3935f788b3a67c64c6c862114fe00"
 }

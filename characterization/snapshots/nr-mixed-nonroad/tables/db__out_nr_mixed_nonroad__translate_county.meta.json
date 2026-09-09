@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_nr_mixed_nonroad__translate_county",
   "schema": [
     {
@@ -19,6 +19,9 @@
     "countyID"
   ],
   "row_count": 1,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "e141eae9deb18955513b41404b55fef25fc989243cf64b0e1b98638b834fbb72"
 }

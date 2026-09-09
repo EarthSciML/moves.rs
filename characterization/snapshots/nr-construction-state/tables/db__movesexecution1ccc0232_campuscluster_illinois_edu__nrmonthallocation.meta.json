@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__nrmonthallocation",
   "schema": [
     {
@@ -25,6 +25,9 @@
     "monthID"
   ],
   "row_count": 46428,
-  "float_decimals": 12,
-  "content_sha256": "7c7497ce4d80542aed0fb1ca318706118efa5b041657792d0429f836a80df94e"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "bffaf076f845be0dc9bdbb9e8534c1736908ec29d9873204109373350fe36e26"
 }

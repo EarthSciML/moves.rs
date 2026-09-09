@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_nr_pleasure_craft_state__movesactivityoutput",
   "schema": [
     {
@@ -101,6 +101,9 @@
   ],
   "natural_key": [],
   "row_count": 440,
-  "float_decimals": 12,
-  "content_sha256": "43dc3a24db4efc81f62fcf65a5864ff4e3456074102d82b3d173567733a741af"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "8611981885cfac6d889972e627261c274f92eb24f91004dca092ee71d3649160"
 }

@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__temperatureadjustment",
   "schema": [
     {
@@ -43,6 +43,9 @@
     "maxModelYearID"
   ],
   "row_count": 9,
-  "float_decimals": 12,
-  "content_sha256": "a38cbf74b7ab7c8f80911d9ee021eb80cc6d386b111678aad563e82ff590f0d0"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "9fe2faaac1781f13153c78c339d7a1f16dbceb913e8f65e9486e9372d1afa4c1"
 }

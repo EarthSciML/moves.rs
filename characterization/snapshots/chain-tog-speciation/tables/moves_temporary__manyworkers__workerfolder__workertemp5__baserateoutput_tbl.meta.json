@@ -1,0 +1,85 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "moves_temporary__manyworkers__workerfolder__workertemp5__baserateoutput_tbl",
+  "schema": [
+    {
+      "name": "col_0",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_1",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_2",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_3",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_4",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_5",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_6",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_7",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_8",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_9",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_10",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_11",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_12",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_13",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_14",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_15",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_16",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_17",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [],
+  "row_count": 540,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "70bf28bce96e08ca36bf8d01b48675771d0016bbd0d56ed57ffb36d8b20d95e6"
+}

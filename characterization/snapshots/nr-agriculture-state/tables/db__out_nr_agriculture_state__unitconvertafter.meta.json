@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_nr_agriculture_state__unitconvertafter",
   "schema": [
     {
@@ -105,6 +105,9 @@
   ],
   "natural_key": [],
   "row_count": 21120,
-  "float_decimals": 12,
-  "content_sha256": "f2539b4d3f37cc39c28a0ba61b283ea1cda0e4d15a40c6e8fca7d55320b45762"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "518e40d688025681082c2e5f2b2ded6e3d4e96678cfcf92e900e33a7f9a70f1e"
 }
