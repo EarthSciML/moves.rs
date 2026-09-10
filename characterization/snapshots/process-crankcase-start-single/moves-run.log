@@ -1,0 +1,109 @@
+INFO:    User not listed in /etc/subuid, trying root-mapped namespace
+INFO:    Using fakeroot command combined with root-mapped namespace
+[init-mariadb] /var/lib/mysql already populated; skipping seed.
+[start-mariadb-bg] mariadbd ready (PID 1375804).
+Picked up JAVA_TOOL_OPTIONS: -Xlog:class+load=info:file=/opt/moves/MOVESTemporary/instrumentation/class-load-%p.log
+Buildfile: /opt/moves/build.xml
+
+main1worker:
+    [mkdir] Created dir: /opt/moves/manyworkers
+    [mkdir] Created dir: /opt/moves/manyworkers/workerfolder
+     [echo] MySQL is already running and will not be automatically shutdown by this instance.
+     [echo] Launching MOVES, which will launch a worker...
+     [java] Picked up JAVA_TOOL_OPTIONS: -Xlog:class+load=info:file=/opt/moves/MOVESTemporary/instrumentation/class-load-%p.log
+     [java] 9/10/26, 3:39 PM INFO: Loading system configuration...
+     [java] 9/10/26, 3:39 PM INFO: System configuration setting up the instance counter...
+     [java] 9/10/26, 3:39 PM INFO: System configuration clearing prior IDs...
+     [java] 9/10/26, 3:39 PM INFO: System configuration reading computer ID...
+     [java] 9/10/26, 3:39 PM INFO: Using alternate master configuration file: maketodo.txt
+     [java] 9/10/26, 3:39 PM INFO: Using master configuration file: maketodo.txt
+     [java] 9/10/26, 3:39 PM INFO: System configuration loading configuration files...
+     [java] 9/10/26, 3:39 PM INFO: System configuration setting up temporary files...
+     [java] 9/10/26, 3:39 PM INFO: Folder for temporary files: /opt/moves/MOVESTemporary
+     [java] 9/10/26, 3:39 PM INFO: System configuration acquiring distributed master ID...
+     [java] 9/10/26, 3:39 PM INFO: Done loading system configuration.
+     [java] 9/10/26, 3:39 PM INFO: Using alternate worker configuration file: manyworkers.txt
+     [java] 9/10/26, 3:39 PM INFO: Initializing default database connections...
+     [java] 9/10/26, 3:39 PM INFO: Reading default database table definitions...
+     [java] 9/10/26, 3:39 PM INFO: Done initializing database connections.
+     [java] 9/10/26, 3:39 PM WARNING: Added missing vehicle selection: Passenger Car - Diesel Fuel
+     [java] 9/10/26, 3:39 PM WARNING: Added missing vehicle selection: Passenger Car - Ethanol (E-85)
+     [java] 9/10/26, 3:39 PM WARNING: Added missing vehicle selection: Passenger Car - Electricity
+     [java] 9/10/26, 3:39 PM INFO: Performing compatibility checks between RunSpec and domain database...
+     [java] 9/10/26, 3:39 PM INFO: Done performing compatibility checks between RunSpec and domain database.
+     [java] 9/10/26, 3:39 PM WARNING: Skipping domain database validation.
+     [java] 9/10/26, 3:39 PM INFO: ***Starting MOVES run***
+     [java] 9/10/26, 3:39 PM INFO: Master Release: MOVES5.0.1
+     [java] 9/10/26, 3:39 PM INFO: Master Computer ID: ccc0232.campuscluster.illinois.edu
+     [java] 9/10/26, 3:39 PM INFO: Master ID: 4015164355900476371
+     [java] 9/10/26, 3:39 PM INFO: RunSpec: /scratch/ctessum/moves-county-fixture/process-crankcase-start-single/process-crankcase-start-single.xml
+     [java] 9/10/26, 3:39 PM INFO: Initializing output database connections...
+     [java] 9/10/26, 3:39 PM INFO: Done initializing database connections.
+     [java] 9/10/26, 3:39 PM INFO: Thread starting for class gov.epa.otaq.moves.master.framework.HeartbeatDetectionThread.
+     [java] 9/10/26, 3:39 PM INFO: HeartbeatDetectionThread !hasWorkerOnThisComputer
+     [java] 9/10/26, 3:39 PM INFO: Initializing default database connections...
+     [java] 9/10/26, 3:39 PM INFO: Database connections already established.
+     [java] 9/10/26, 3:39 PM INFO: Initializing MOVESExecution connections...
+     [java] 9/10/26, 3:39 PM INFO: Creating the execution database...
+     [java] 9/10/26, 3:39 PM INFO: Removing tables from the execution database...
+     [java] 9/10/26, 3:39 PM INFO: Creating empty tables in the execution database...
+     [java] 9/10/26, 3:39 PM INFO: Finalizing the execution database...
+     [java] 9/10/26, 3:39 PM INFO: Reading execution database table definitions...
+     [java] 9/10/26, 3:39 PM INFO: Done initializing database connections.
+     [java] 9/10/26, 3:39 PM INFO: Initializing output database connections...
+     [java] 9/10/26, 3:39 PM INFO: Database connections already established.
+     [java] 9/10/26, 3:39 PM INFO: Thread starting for class gov.epa.otaq.moves.master.framework.MasterLoop.
+     [java] 9/10/26, 3:39 PM INFO: Thread starting for class gov.epa.otaq.moves.master.framework.EmissionCalculatorInboundUnbundler.
+     [java] 9/10/26, 3:39 PM INFO: InputDataManager transferred all default tables.
+     [java] 9/10/26, 3:39 PM INFO: InputDataManager transferred all default tables.
+     [java] 9/10/26, 3:39 PM INFO: InputDataManager transferred all default tables.
+     [java] 9/10/26, 3:39 PM INFO: InputDataManager transferred all NonRoad tables.
+     [java] 9/10/26, 3:39 PM DEBUG: Starting WorkerCommandLine...
+     [java] 9/10/26, 3:39 PM INFO: testConnection = com.mysql.jdbc.JDBC4Connection@503dd2ea
+     [java] 9/10/26, 3:39 PM INFO: WorkerConfiguration loaded. distributedWorkerId = 15565939654417441970
+     [java] 9/10/26, 3:39 PM INFO: Worker Release: MOVES5.0.1
+     [java] 9/10/26, 3:39 PM INFO: Worker Computer ID: ccc0232.campuscluster.illinois.edu
+     [java] 9/10/26, 3:39 PM INFO: Worker ID: 15565939654417441970
+     [java] 9/10/26, 3:39 PM INFO: Thread starting for class gov.epa.otaq.moves.worker.framework.WorkerHeartbeatThread.
+     [java] 9/10/26, 3:39 PM INFO: Setting worker flag for 15565939654417441970 on port 13132
+     [java] 9/10/26, 3:39 PM INFO: Thread starting for class gov.epa.otaq.moves.worker.framework.RemoteEmissionsCalculator.
+     [java] 9/10/26, 3:39 PM INFO: InputDataManager transferred all default tables.
+     [java] 9/10/26, 3:40 PM INFO: InputDataManager transferred all NonRoad tables.
+     [java] 9/10/26, 3:40 PM RUN_ERROR: WARNING: Using default formulation 20 for Diesel Fuel in region 270000000, year 2020, month 8. Check your input FuelSupply table for errors.
+     [java] 9/10/26, 3:40 PM RUN_ERROR: WARNING: Using default formulation 50 for Ethanol (E-85) in region 270000000, year 2020, month 8. Check your input FuelSupply table for errors.
+     [java] 9/10/26, 3:40 PM RUN_ERROR: WARNING: Using default formulation 10 for Gasoline in region 270000000, year 2020, month 8. Check your input FuelSupply table for errors.
+     [java] 9/10/26, 3:40 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.BaseRateCalculator has been instantiated.
+     [java] 9/10/26, 3:40 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator has been instantiated.
+     [java] 9/10/26, 3:40 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.CrankcaseEmissionCalculatorNonPM has been instantiated.
+     [java] 9/10/26, 3:40 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.RatesOperatingModeDistributionGenerator has been instantiated.
+     [java] 9/10/26, 3:40 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator subscribed to Running Exhaust at YEAR/98
+     [java] 9/10/26, 3:40 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator subscribed to Start Exhaust at YEAR/98
+     [java] 9/10/26, 3:40 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator subscribed to Extended Idle Exhaust at YEAR/98
+     [java] 9/10/26, 3:40 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator subscribed to Auxiliary Power Exhaust at YEAR/98
+     [java] 9/10/26, 3:40 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator subscribed to Brakewear at YEAR/98
+     [java] 9/10/26, 3:40 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator subscribed to Tirewear at YEAR/98
+     [java] 9/10/26, 3:40 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.RatesOperatingModeDistributionGenerator subscribed to Running Exhaust at YEAR/100
+     [java] 9/10/26, 3:40 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.RatesOperatingModeDistributionGenerator subscribed to Extended Idle Exhaust at YEAR/100
+     [java] 9/10/26, 3:40 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.RatesOperatingModeDistributionGenerator subscribed to Auxiliary Power Exhaust at YEAR/100
+     [java] 9/10/26, 3:40 PM INFO: 0 bundles will be used.
+     [java] 9/10/26, 3:40 PM INFO: Thread starting for class gov.epa.otaq.moves.master.framework.MasterLoopableThread.
+     [java] 9/10/26, 3:40 PM INFO: Thread shutdown starting for class gov.epa.otaq.moves.master.framework.MasterLoop.
+     [java] 9/10/26, 3:40 PM INFO: Thread shutdown starting for class gov.epa.otaq.moves.master.framework.MasterLoopableThread.
+     [java] 9/10/26, 3:40 PM INFO: Thread shutdown complete for class gov.epa.otaq.moves.master.framework.MasterLoopableThread.
+     [java] 9/10/26, 3:40 PM INFO: Thread shutdown complete for class gov.epa.otaq.moves.master.framework.MasterLoop.
+     [java] 9/10/26, 3:40 PM INFO: Unbundler has detected completion conditions. Exiting.
+     [java] 9/10/26, 3:40 PM INFO: Generated bundles = 0 Retrieved bundles = 0
+     [java] 9/10/26, 3:40 PM INFO: Thread shutdown starting for class gov.epa.otaq.moves.master.framework.EmissionCalculatorInboundUnbundler.
+     [java] 9/10/26, 3:40 PM INFO: Thread shutdown complete for class gov.epa.otaq.moves.master.framework.EmissionCalculatorInboundUnbundler.
+     [java] 9/10/26, 3:40 PM INFO: Thread shutdown starting for class gov.epa.otaq.moves.master.framework.HeartbeatDetectionThread.
+     [java] 9/10/26, 3:40 PM INFO: Thread shutdown complete for class gov.epa.otaq.moves.master.framework.HeartbeatDetectionThread.
+     [java] MOVESCommandLine after runApplication
+     [java] 9/10/26, 3:40 PM INFO: Thread shutdown starting for class gov.epa.otaq.moves.worker.framework.WorkerHeartbeatThread.
+     [java] 9/10/26, 3:40 PM INFO: Thread shutdown starting for class gov.epa.otaq.moves.worker.framework.RemoteEmissionsCalculator.
+     [java] 9/10/26, 3:40 PM INFO: Thread shutdown complete for class gov.epa.otaq.moves.worker.framework.WorkerHeartbeatThread.
+     [java] 9/10/26, 3:40 PM INFO: Thread shutdown complete for class gov.epa.otaq.moves.worker.framework.RemoteEmissionsCalculator.
+     [echo] MOVES and 1 worker finished.
+     [echo] MOVES has been shutdown, but not MySQL since it was already running.
+
+BUILD SUCCESSFUL
+Total time: 19 seconds
