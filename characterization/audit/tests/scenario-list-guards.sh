@@ -77,10 +77,13 @@ check() {
 
 echo "=== run-comparison.sh scenario pre-flight guards (issue #63) ==="
 
-# 1. THE REPORTED BUG. The exact retired name, on the exact code path the CI
-#    job takes. Must be fatal, must be exit 2 (configuration), must name it.
+# 1. THE REPORTED BUG: the exact retired name. Paired with a name that DOES
+#    resolve, deliberately — with the dead name alone the list resolves to
+#    zero scenarios, and case 4's empty-list refusal would carry this case
+#    even if the stale-name refusal were downgraded back to a skip. The pair
+#    forces the refusal to come from the stale name itself.
 check dangling-name 2 'SCENARIO LIST IS STALE' \
-    --check-scenarios --fixtures mixed-onroad-nonroad
+    --check-scenarios --fixtures mixed-onroad-nonroad,SampleRunSpec
 if ! grep -q -- '- mixed-onroad-nonroad' "${TMP}/dangling-name.log"; then
     bad "dangling-name: banner did not name the offending scenario"
 else
@@ -91,7 +94,7 @@ fi
 #    different response from "the list is wrong". Conflating them is how the
 #    dead gate read as a numerical failure for months.
 check exit-code-is-config-not-regression 2 '' \
-    --check-scenarios --fixtures mixed-onroad-nonroad
+    --check-scenarios --fixtures mixed-onroad-nonroad,SampleRunSpec
 
 # 3. Every dead name in one pass, not one retirement at a time.
 check reports-all-missing 2 '3 name(s) do not resolve' \
