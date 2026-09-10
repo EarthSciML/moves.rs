@@ -422,78 +422,51 @@ def _size_bucket(rows):
     return "huge"
 
 
-def _column_set(table):
-    return {c["name"].lower() for c in table["columns"]}
-
-
 def _classify_partition(table):
-    """Decide partition strategy from the column composition and size bucket."""
-    rows = _estimate_row_count(table)
-    bucket = _size_bucket(rows)
-    cols = _column_set(table)
+    """Decide the partition strategy. Since Phase 7, that is monolithic.
 
-    has_year = "yearid" in cols
-    has_county = bool(cols & {"countyid", "stateid"})
-    has_zone = "zoneid" in cols
-    has_modelyear = "modelyearid" in cols
+    The original classifier sharded large tables by county, year x county,
+    or model year so a run could read only the geography it named. The
+    EarthSciAST equi-join gate (``28bda86ac``) removed the premise: a join
+    drives enumeration from the match set, so reading a national table and
+    joining it to the run's county selection costs the matches, not the
+    product. Partitioning then buys nothing and charges a Parquet footer
+    per file -- measured on ``IMCoverage``, 21,625 partition files came to
+    378 MB of which the data is 791,123 bytes (a 478x inflation).
 
-    # MOVES uses zoneID and countyID interchangeably at default scale.
-    geo = has_county or has_zone
+    So the only distinction that survives is data vs. no data:
 
-    # Empty / run-populated tables: schema only, no data partitioning required.
+    * ``empty`` bucket -> ``schema_only``: the table ships empty in the
+      default DB and the runtime populates it. No Parquet body, just a
+      ``*.schema.json`` sidecar.
+    * everything else -> ``monolithic``: one ``<Table>.parquet``.
+
+    The strategy vocabulary (``county``, ``year``, ``year_x_county``,
+    ``model_year``) is deliberately still understood by the converter --
+    see ``crates/moves-default-db-convert/src/partition.rs`` -- so a future
+    table that genuinely needs sharding can be assigned one here without
+    reinstating the machinery. Nothing in the shipped ``tables.json`` uses
+    them.
+
+    ``size_bucket`` is still recorded for every table; it just no longer
+    steers the layout.
+    """
+    bucket = _size_bucket(_estimate_row_count(table))
+
     if bucket == "empty":
         return {
             "strategy": "schema_only",
             "rationale": "ships empty in default DB; populated at run time",
         }
 
-    # Tables small enough to stay monolithic regardless of partition columns.
-    # The migration plan's threshold is "10k rows stays monolithic". We
-    # widen it to 1M because a 1M-row Parquet file is still cheap to scan
-    # and predicate pushdown over column statistics already prunes most
-    # of it on read.
-    if bucket in ("tiny", "small", "medium", "unknown"):
-        return {
-            "strategy": "monolithic",
-            "rationale": f"{bucket} band — single Parquet file is cheapest",
-        }
-
-    # No partition columns -> monolithic regardless of size.
-    if not (has_year or has_modelyear or geo):
-        return {
-            "strategy": "monolithic",
-            "rationale": "no temporal or geographic partition columns; load whole",
-        }
-
-    # Large, both year and geo -> partition by both.
-    if bucket in ("large", "huge") and has_year and geo:
-        return {
-            "strategy": "year_x_county",
-            "rationale": f"{bucket} band with both year and county/zone columns",
-        }
-
-    # Year-only large -> partition by year.
-    if has_year and bucket in ("large", "huge"):
-        return {
-            "strategy": "year",
-            "rationale": f"{bucket} band with yearID; partition by year",
-        }
-
-    # County-only large -> partition by county/zone.
-    if geo and bucket in ("large", "huge"):
-        return {
-            "strategy": "county",
-            "rationale": f"{bucket} band with county/zone but no year",
-        }
-
-    # Model-year dominated rate table -> shard by modelYear bucket.
-    if has_modelyear and bucket in ("large", "huge"):
-        return {
-            "strategy": "model_year",
-            "rationale": f"{bucket} band keyed by modelYearID",
-        }
-
-    return {"strategy": "monolithic", "rationale": "fallback"}
+    return {
+        "strategy": "monolithic",
+        "rationale": (
+            f"{bucket} band \u2014 one Parquet file per table; the equi-join gate "
+            "makes read cost track join matches, not table size, so "
+            "partitioning only adds per-file Parquet footer overhead"
+        ),
+    }
 
 
 def _filter_columns(table):

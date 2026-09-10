@@ -378,8 +378,8 @@
         "isuserinput"
       ],
       "partition": {
-        "strategy": "county",
-        "rationale": "large band with county/zone but no year"
+        "strategy": "monolithic",
+        "rationale": "large band \u2014 one Parquet file per table. Was 'county'; Phase 7 made every populated table monolithic because the EarthSciAST equi-join gate (28bda86ac) drives enumeration from the match set, so a national table joined to a run's selection costs the matches rather than the product. Partitioning bought nothing and charged a Parquet footer per file: IMCoverage's 21,625 partition files were 378 MB around 791,123 bytes of data."
       }
     },
     {
@@ -436,8 +436,8 @@
         "opmodeid"
       ],
       "partition": {
-        "strategy": "county",
-        "rationale": "huge band with county/zone but no year"
+        "strategy": "monolithic",
+        "rationale": "huge band \u2014 one Parquet file per table. Was 'county'; Phase 7 made every populated table monolithic because the EarthSciAST equi-join gate (28bda86ac) drives enumeration from the match set, so a national table joined to a run's selection costs the matches rather than the product. Partitioning bought nothing and charged a Parquet footer per file: IMCoverage's 21,625 partition files were 378 MB around 791,123 bytes of data."
       }
     },
     {
@@ -720,8 +720,8 @@
         "isuserinput"
       ],
       "partition": {
-        "strategy": "county",
-        "rationale": "huge band with county/zone but no year"
+        "strategy": "monolithic",
+        "rationale": "huge band \u2014 one Parquet file per table. Was 'county'; Phase 7 made every populated table monolithic because the EarthSciAST equi-join gate (28bda86ac) drives enumeration from the match set, so a national table joined to a run's selection costs the matches rather than the product. Partitioning bought nothing and charged a Parquet footer per file: IMCoverage's 21,625 partition files were 378 MB around 791,123 bytes of data."
       }
     },
     {
@@ -3184,8 +3184,8 @@
         "fuelsupplyfueltypeid"
       ],
       "partition": {
-        "strategy": "county",
-        "rationale": "large band with county/zone but no year"
+        "strategy": "monolithic",
+        "rationale": "large band \u2014 one Parquet file per table. Was 'county'; Phase 7 made every populated table monolithic because the EarthSciAST equi-join gate (28bda86ac) drives enumeration from the match set, so a national table joined to a run's selection costs the matches rather than the product. Partitioning bought nothing and charged a Parquet footer per file: IMCoverage's 21,625 partition files were 378 MB around 791,123 bytes of data."
       }
     },
     {
@@ -3526,8 +3526,8 @@
         "emissionstage"
       ],
       "partition": {
-        "strategy": "model_year",
-        "rationale": "large band keyed by modelYearID"
+        "strategy": "monolithic",
+        "rationale": "large band \u2014 one Parquet file per table. Was 'model_year'; Phase 7 made every populated table monolithic because the EarthSciAST equi-join gate (28bda86ac) drives enumeration from the match set, so a national table joined to a run's selection costs the matches rather than the product. Partitioning bought nothing and charged a Parquet footer per file: IMCoverage's 21,625 partition files were 378 MB around 791,123 bytes of data."
       }
     },
     {
@@ -3819,8 +3819,8 @@
         "opmodeid"
       ],
       "partition": {
-        "strategy": "county",
-        "rationale": "large band with county/zone but no year"
+        "strategy": "monolithic",
+        "rationale": "large band \u2014 one Parquet file per table. Was 'county'; Phase 7 made every populated table monolithic because the EarthSciAST equi-join gate (28bda86ac) drives enumeration from the match set, so a national table joined to a run's selection costs the matches rather than the product. Partitioning bought nothing and charged a Parquet footer per file: IMCoverage's 21,625 partition files were 378 MB around 791,123 bytes of data."
       }
     },
     {
@@ -4041,8 +4041,8 @@
         "zoneid"
       ],
       "partition": {
-        "strategy": "year_x_county",
-        "rationale": "huge band with both year and county/zone columns"
+        "strategy": "monolithic",
+        "rationale": "huge band \u2014 one Parquet file per table. Was 'year_x_county'; Phase 7 made every populated table monolithic because the EarthSciAST equi-join gate (28bda86ac) drives enumeration from the match set, so a national table joined to a run's selection costs the matches rather than the product. Partitioning bought nothing and charged a Parquet footer per file: IMCoverage's 21,625 partition files were 378 MB around 791,123 bytes of data."
       }
     },
     {
@@ -4652,8 +4652,8 @@
         "improgramid"
       ],
       "partition": {
-        "strategy": "year_x_county",
-        "rationale": "huge band with both year and county/zone columns"
+        "strategy": "monolithic",
+        "rationale": "huge band \u2014 one Parquet file per table. Was 'year_x_county'; Phase 7 made every populated table monolithic because the EarthSciAST equi-join gate (28bda86ac) drives enumeration from the match set, so a national table joined to a run's selection costs the matches rather than the product. Partitioning bought nothing and charged a Parquet footer per file: IMCoverage's 21,625 partition files were 378 MB around 791,123 bytes of data."
       }
     },
     {
@@ -6153,8 +6153,8 @@
         "engtechid"
       ],
       "partition": {
-        "strategy": "model_year",
-        "rationale": "huge band keyed by modelYearID"
+        "strategy": "monolithic",
+        "rationale": "huge band \u2014 one Parquet file per table. Was 'model_year'; Phase 7 made every populated table monolithic because the EarthSciAST equi-join gate (28bda86ac) drives enumeration from the match set, so a national table joined to a run's selection costs the matches rather than the product. Partitioning bought nothing and charged a Parquet footer per file: IMCoverage's 21,625 partition files were 378 MB around 791,123 bytes of data."
       }
     },
     {
@@ -6359,8 +6359,8 @@
         "engtechid"
       ],
       "partition": {
-        "strategy": "model_year",
-        "rationale": "huge band keyed by modelYearID"
+        "strategy": "monolithic",
+        "rationale": "huge band \u2014 one Parquet file per table. Was 'model_year'; Phase 7 made every populated table monolithic because the EarthSciAST equi-join gate (28bda86ac) drives enumeration from the match set, so a national table joined to a run's selection costs the matches rather than the product. Partitioning bought nothing and charged a Parquet footer per file: IMCoverage's 21,625 partition files were 378 MB around 791,123 bytes of data."
       }
     },
     {
@@ -6415,8 +6415,8 @@
         "engtechid"
       ],
       "partition": {
-        "strategy": "model_year",
-        "rationale": "huge band keyed by modelYearID"
+        "strategy": "monolithic",
+        "rationale": "huge band \u2014 one Parquet file per table. Was 'model_year'; Phase 7 made every populated table monolithic because the EarthSciAST equi-join gate (28bda86ac) drives enumeration from the match set, so a national table joined to a run's selection costs the matches rather than the product. Partitioning bought nothing and charged a Parquet footer per file: IMCoverage's 21,625 partition files were 378 MB around 791,123 bytes of data."
       }
     },
     {
@@ -6524,8 +6524,8 @@
         "engtechid"
       ],
       "partition": {
-        "strategy": "model_year",
-        "rationale": "huge band keyed by modelYearID"
+        "strategy": "monolithic",
+        "rationale": "huge band \u2014 one Parquet file per table. Was 'model_year'; Phase 7 made every populated table monolithic because the EarthSciAST equi-join gate (28bda86ac) drives enumeration from the match set, so a national table joined to a run's selection costs the matches rather than the product. Partitioning bought nothing and charged a Parquet footer per file: IMCoverage's 21,625 partition files were 378 MB around 791,123 bytes of data."
       }
     },
     {
@@ -7238,8 +7238,8 @@
         "monthid"
       ],
       "partition": {
-        "strategy": "county",
-        "rationale": "large band with county/zone but no year"
+        "strategy": "monolithic",
+        "rationale": "large band \u2014 one Parquet file per table. Was 'county'; Phase 7 made every populated table monolithic because the EarthSciAST equi-join gate (28bda86ac) drives enumeration from the match set, so a national table joined to a run's selection costs the matches rather than the product. Partitioning bought nothing and charged a Parquet footer per file: IMCoverage's 21,625 partition files were 378 MB around 791,123 bytes of data."
       }
     },
     {
@@ -7804,8 +7804,8 @@
         "surrogateyearid"
       ],
       "partition": {
-        "strategy": "county",
-        "rationale": "huge band with county/zone but no year"
+        "strategy": "monolithic",
+        "rationale": "huge band \u2014 one Parquet file per table. Was 'county'; Phase 7 made every populated table monolithic because the EarthSciAST equi-join gate (28bda86ac) drives enumeration from the match set, so a national table joined to a run's selection costs the matches rather than the product. Partitioning bought nothing and charged a Parquet footer per file: IMCoverage's 21,625 partition files were 378 MB around 791,123 bytes of data."
       }
     },
     {
@@ -7923,8 +7923,8 @@
         "monthid"
       ],
       "partition": {
-        "strategy": "county",
-        "rationale": "large band with county/zone but no year"
+        "strategy": "monolithic",
+        "rationale": "large band \u2014 one Parquet file per table. Was 'county'; Phase 7 made every populated table monolithic because the EarthSciAST equi-join gate (28bda86ac) drives enumeration from the match set, so a national table joined to a run's selection costs the matches rather than the product. Partitioning bought nothing and charged a Parquet footer per file: IMCoverage's 21,625 partition files were 378 MB around 791,123 bytes of data."
       }
     },
     {
@@ -9177,8 +9177,8 @@
         "fuelyearid"
       ],
       "partition": {
-        "strategy": "county",
-        "rationale": "huge band with county/zone but no year"
+        "strategy": "monolithic",
+        "rationale": "huge band \u2014 one Parquet file per table. Was 'county'; Phase 7 made every populated table monolithic because the EarthSciAST equi-join gate (28bda86ac) drives enumeration from the match set, so a national table joined to a run's selection costs the matches rather than the product. Partitioning bought nothing and charged a Parquet footer per file: IMCoverage's 21,625 partition files were 378 MB around 791,123 bytes of data."
       }
     },
     {
@@ -10168,8 +10168,8 @@
         "opmodeid"
       ],
       "partition": {
-        "strategy": "county",
-        "rationale": "huge band with county/zone but no year"
+        "strategy": "monolithic",
+        "rationale": "huge band \u2014 one Parquet file per table. Was 'county'; Phase 7 made every populated table monolithic because the EarthSciAST equi-join gate (28bda86ac) drives enumeration from the match set, so a national table joined to a run's selection costs the matches rather than the product. Partitioning bought nothing and charged a Parquet footer per file: IMCoverage's 21,625 partition files were 378 MB around 791,123 bytes of data."
       }
     },
     {

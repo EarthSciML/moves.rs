@@ -64,8 +64,124 @@ fn audit_tables_json_parses_cleanly() {
     let imc = plan.get("IMCoverage").expect("IMCoverage is in the audit");
     assert_eq!(
         imc.partition.strategy,
-        moves_default_db_convert::PartitionStrategy::YearXCounty
+        moves_default_db_convert::PartitionStrategy::Monolithic,
+        "IMCoverage was the flagship year_x_county table; Phase 7 made it monolithic"
     );
+}
+
+/// The shipped policy, asserted rather than described: every table in the
+/// audit is either `monolithic` (it has data) or `schema_only` (it ships
+/// empty). Nothing partitions.
+///
+/// This is a *policy* guard, not a *capability* guard. The converter still
+/// implements `county` / `year` / `year_x_county` / `model_year` and
+/// `partition.rs`'s unit tests still exercise them, so a future table that
+/// genuinely needs sharding can be assigned one in `tables.json` — that
+/// change just has to come with an update to this test and to
+/// `characterization/default-db-schema/partitioning-plan.md`, which is the
+/// point.
+#[test]
+fn shipped_audit_is_entirely_monolithic_or_schema_only() {
+    use moves_default_db_convert::PartitionStrategy;
+    let repo_root = repo_root();
+    let plan_path = repo_root
+        .join("characterization")
+        .join("default-db-schema")
+        .join("tables.json");
+    let bytes = std::fs::read(&plan_path).unwrap();
+    let plan = moves_default_db_convert::PartitionPlan::from_bytes(&plan_path, &bytes).unwrap();
+
+    let offenders: Vec<String> = plan
+        .tables
+        .iter()
+        .filter(|t| {
+            !matches!(
+                t.partition.strategy,
+                PartitionStrategy::Monolithic | PartitionStrategy::SchemaOnly
+            )
+        })
+        .map(|t| format!("{} = {}", t.name, t.partition.strategy.as_str()))
+        .collect();
+    assert!(
+        offenders.is_empty(),
+        "tables.json still partitions {} table(s): {}",
+        offenders.len(),
+        offenders.join(", ")
+    );
+
+    let monolithic = plan
+        .tables
+        .iter()
+        .filter(|t| t.partition.strategy == PartitionStrategy::Monolithic)
+        .count();
+    let schema_only = plan
+        .tables
+        .iter()
+        .filter(|t| t.partition.strategy == PartitionStrategy::SchemaOnly)
+        .count();
+    assert_eq!(
+        (monolithic, schema_only),
+        (237, 3),
+        "audit composition changed; re-measure and update the counts here \
+         and in partitioning-plan.md"
+    );
+}
+
+/// A monolithic table with zero rows still gets a Parquet file — an empty
+/// one carrying the schema. Under the old partitioned strategies a table
+/// that happened to be empty produced no partitions and therefore no file
+/// at all, so six tables in the shipped database had no readable artifact.
+#[test]
+fn monolithic_zero_row_table_still_writes_a_parquet_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let tsv_dir = dir.path().join("dump");
+    let out_dir = dir.path().join("out");
+    let plan_path = dir.path().join("tables.json");
+    std::fs::create_dir_all(&tsv_dir).unwrap();
+
+    let plan = br#"{
+        "schema_version": "moves-default-db-schema/v1",
+        "moves_commit": "deadbeef",
+        "table_count": 1,
+        "tables": [{
+            "name": "SoakActivityFraction",
+            "primary_key": ["zoneID"],
+            "columns": [
+                {"name": "zoneID", "type": "integer"},
+                {"name": "soakActivityFraction", "type": "double"}
+            ],
+            "indexes": [],
+            "size_bucket": "huge",
+            "partition": {"strategy": "monolithic", "rationale": "phase 7"}
+        }]
+    }"#;
+    std::fs::write(&plan_path, plan).unwrap();
+    std::fs::write(
+        tsv_dir.join("soakactivityfraction.schema.tsv"),
+        "zoneID\tint(11)\tPRI\nsoakActivityFraction\tdouble\t\n",
+    )
+    .unwrap();
+    std::fs::write(tsv_dir.join("soakactivityfraction.tsv"), "").unwrap();
+
+    let opts = moves_default_db_convert::ConvertOptions {
+        tsv_dir,
+        plan_path,
+        output_root: out_dir.clone(),
+        moves_db_version: "test".to_string(),
+        generated_at_utc: Some("2025-01-01T00:00:00Z".to_string()),
+        require_every_table: true,
+    };
+    let (manifest, _report) = moves_default_db_convert::convert(&opts).unwrap();
+
+    let parquet = out_dir.join("SoakActivityFraction.parquet");
+    assert!(
+        parquet.exists(),
+        "empty monolithic table must still produce {}",
+        parquet.display()
+    );
+    assert_eq!(count_parquet_rows(&parquet), 0);
+    assert_eq!(manifest.tables[0].partitions.len(), 1);
+    assert_eq!(manifest.tables[0].row_count, 0);
 }
 
 /// Each table-entry in the audit must resolve to a partition spec; if any
