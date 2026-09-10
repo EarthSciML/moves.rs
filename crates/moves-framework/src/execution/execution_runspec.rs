@@ -275,6 +275,16 @@ impl ExecutionRunSpec {
     /// empty for / 23 / 24 to fill in.
     #[must_use]
     pub fn new(run_spec: RunSpec) -> Self {
+        // Canonical `RunSpecXML.enforceConsistency()` — the load-time output
+        // breakdown invariants the GUI would have enforced. Notably, an onroad
+        // run that selects `onRoadSCC` has fuelType/sourceUseType/roadType/
+        // emissionProcess promoted to selected, because the SCC is built from
+        // those four columns.
+        let run_spec = {
+            let mut rs = run_spec;
+            rs.enforce_consistency();
+            rs
+        };
         let mut spec = Self {
             run_spec,
             will_run_calculators: true,

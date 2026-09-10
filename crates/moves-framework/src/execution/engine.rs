@@ -624,6 +624,19 @@ impl MOVESEngine {
             .domain_scale_excluded_omd_modules(is_project, is_mesoscale);
         names.retain(|n| !drop.contains(n));
 
+        // Domain total-activity swap (canonical `MOVESInstantiator` M1): the
+        // PROJECT domain replaces `TotalActivityGenerator` /
+        // `MesoscaleLookupTotalActivityGenerator` with `ProjectTAG`; every other
+        // domain never instantiates `ProjectTAG`. All of them write the same
+        // `SHO` scratch table, and `TotalActivityGenerator`'s insert clobbers
+        // `ProjectTAG`'s append, so running both silently substitutes the
+        // county HPMS/VMT activity (weighted by `TravelFraction`, which folds
+        // in `relativeMAR`) for the project link-volume activity.
+        let drop = self
+            .registry
+            .domain_excluded_total_activity_modules(is_project);
+        names.retain(|n| !drop.contains(n));
+
         // Canonical `MOVESInstantiator` DO_RATES_FIRST (released-MOVES default):
         // clear the legacy inventory emission calculators so only the
         // `BaseRateCalculator` + chained whitelist produce emissions. Without

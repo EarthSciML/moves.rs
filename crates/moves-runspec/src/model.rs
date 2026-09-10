@@ -50,6 +50,53 @@ pub struct RunSpec {
     pub output_factors: OutputFactors,
 }
 
+impl RunSpec {
+    /// Apply canonical MOVES' load-time consistency rules to the output
+    /// breakdown — the port of `RunSpecXML.enforceConsistency()`.
+    ///
+    /// The GUI enforces these invariants interactively; a RunSpec loaded
+    /// straight from XML has not been through the GUI, so MOVES re-applies
+    /// them on load. The one that changes emitted output:
+    ///
+    /// ```text
+    /// } else {   // !runSpec.models.contains(Model.NONROAD)
+    ///     // Enforce onroad SCC detail requirements. To create onroad SCC
+    ///     // output, MOVES requires several details to be enabled.
+    ///     if(runSpec.outputEmissionsBreakdownSelection.onRoadSCC) {
+    ///         runSpec.outputEmissionsBreakdownSelection.fuelType = true;
+    ///         runSpec.outputEmissionsBreakdownSelection.sourceUseType = true;
+    ///         runSpec.outputEmissionsBreakdownSelection.roadType = true;
+    ///         runSpec.outputEmissionsBreakdownSelection.emissionProcess = true;
+    ///     }
+    /// ```
+    ///
+    /// An onroad SCC is `concat('22', fuelTypeID, sourceTypeID, roadTypeID,
+    /// processID)` (`AggregationSQLGenerator.java`), so a run that asks for
+    /// SCC and *not* for those four dimensions would emit an SCC whose
+    /// subfields contradict the `NULL` columns beside it. Canonical resolves
+    /// that by promoting the four dimensions; without this the port emits
+    /// `sourceTypeID = NULL` where canonical emits the real source type
+    /// (measured on `scale-project`: canonical 21, port NULL, which made a
+    /// full-key join of the two `MOVESOutput` tables match 0 of 125 rows).
+    ///
+    /// Applied by `ExecutionRunSpec::new`, not by the XML/TOML parsers, so
+    /// the surface formats stay byte-round-trippable.
+    pub fn enforce_consistency(&mut self) {
+        if self.models.contains(&Model::Nonroad) {
+            // NONROAD runs take the `useNonroadRules` branch, whose only
+            // live statements concern `fuelSubType` (not modelled by
+            // `OutputBreakdown`) and `timeSpan.aggregateBy`.
+            return;
+        }
+        if self.output_breakdown.onroad_scc {
+            self.output_breakdown.fuel_type = true;
+            self.output_breakdown.source_use_type = true;
+            self.output_breakdown.road_type = true;
+            self.output_breakdown.emission_process = true;
+        }
+    }
+}
+
 /// `models > model[value]` — which engine the run drives.
 ///
 /// MOVES supports independent ONROAD (light/heavy on-highway vehicles) and
