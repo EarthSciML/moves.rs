@@ -13,10 +13,11 @@ asserted against canonical MOVES and **zero** are quarantined.
 ### The fixture suite
 
 `characterization/fixtures/` holds 51 RunSpec XML files. The canonical-diff gate
-asserts the **39** non-scale fixtures that have a populated snapshot directory
-(one per fixture under `characterization/snapshots/` carrying a `manifest.json`);
-the 3 `scale-*` fixtures (County-Scale, Project-Scale, Rates) require additional
-input databases not present in the default test environment and are excluded.
+covers the **42** non-scale fixtures that have a populated snapshot directory
+(one per fixture under `characterization/snapshots/` carrying a `manifest.json`):
+**41 asserted**, **1 quarantined** (§4.4). The 3 `scale-*` fixtures
+(County-Scale, Project-Scale, Rates) require additional input databases not
+present in the default test environment and are excluded.
 
 | Set | Pattern |
 |-----|---------|
@@ -35,7 +36,7 @@ It has two layers:
 - At least one calculator-graph module must be planned.
 
 **Canonical-diff gate** — `canonical_snapshot_diff`, **active** (the in-repo
-`characterization/snapshots/` tree is populated for all 39 asserted non-scale
+`characterization/snapshots/` tree is populated for all 42 covered non-scale
 fixtures; override the tree with `REGRESSION_SNAPSHOTS_DIR=<path>`):
 - Runs each fixture with `--snapshot`, so the calculators execute against the
  captured execution DB and the engine writes the real `MOVESOutput/` tree
@@ -49,9 +50,15 @@ fixtures; override the tree with `REGRESSION_SNAPSHOTS_DIR=<path>`):
  data-plane bug — it is OK for CI to be red while results are wrong. Masking a
  divergence with a widened tolerance is worse than no gate, so a quarantined
  fixture stays in the gate (failing CI) and graduates to the asserted set only
- once its data plane is actually fixed. As of 2026-06-15 the quarantine list
- (`QUARANTINED_FIXTURES`) is **empty** — every non-scale fixture has graduated
- (see §1b).
+ once its data plane is actually fixed. As of 2026-09-10 the quarantine list
+ (`QUARANTINED_FIXTURES`) holds exactly one fixture,
+ `nr-airtoxics-lawn-garden-county` (§4.4) — so `canonical_snapshot_diff` is
+ **red, deliberately**.
+- **Hard-fails as UNCLASSIFIED** on a fixture that is in neither list. This is
+ the state a newly captured snapshot lands in: it is a *triage gap*, not a
+ measurement. UNCLASSIFIED is never an acceptable resting state — classify the
+ fixture into one list or the other, with the evidence written into its
+ comment.
 
 ### Why per-pollutant sums, not a cell-level diff
 
@@ -77,18 +84,51 @@ snapshot, unchanged at `default_float_tolerance = 0.0`.)
 
 ---
 
-## 1b. Canonical-diff gate state (current — 2026-06-15)
+## 1b. Canonical-diff gate state (current — 2026-09-10)
 
-The gate is **green**: all **39** non-scale fixtures with a populated snapshot
-directory are **asserted** against canonical MOVES within the documented
-precision-only tolerances (§4.2), and `QUARANTINED_FIXTURES` is **empty** — there
-are no fixtures failing CI on a known data-plane bug. No tolerance was ever
-widened to absorb a bug; the only tolerances applied (`ONROAD_REL_TOL = 1e-3`,
-`NONROAD_REL_TOL = 1e-2`) cover sub-tolerance float-accumulation / `real*4`
-artifacts (§4.2). The authoritative list of asserted fixtures (with each one's
-per-pollutant residual) lives in `asserted_fixtures()` in
-`crates/moves-cli/tests/full_suite_regression.rs`; that file's per-fixture
-comments are the canonical, kept-current record of how each one was graduated.
+The gate is **red, by design, on exactly one fixture**. Of the **42** non-scale
+fixtures with a populated snapshot directory:
+
+| | count | |
+|---|---|---|
+| asserted (pass within §4.2 precision tolerance) | **41** | `asserted_fixtures()` |
+| quarantined (known data-plane bug, hard-fails CI) | **1** | `nr-airtoxics-lawn-garden-county`, §4.4 |
+| unclassified | **0** | — |
+
+`cargo test -p moves-cli --test full_suite_regression` therefore reports
+**8 passed, 1 failed**, the failure being `canonical_snapshot_diff` on the one
+quarantined fixture. Per the §1 policy that is the correct outcome: the port
+does not compute 27 of that fixture's 29 pollutants, so there is nothing a
+tolerance could legitimately absorb, and masking it would turn the gate into
+decoration.
+
+No tolerance was ever widened to absorb a bug; the only tolerances applied
+(`ONROAD_REL_TOL = 1e-3`, `NONROAD_REL_TOL = 1e-2`) cover sub-tolerance
+float-accumulation / `real*4` artifacts (§4.2). The authoritative list of
+asserted fixtures (with each one's per-pollutant residual) lives in
+`asserted_fixtures()` in `crates/moves-cli/tests/full_suite_regression.rs`;
+that file's per-fixture comments are the canonical, kept-current record of how
+each one was graduated.
+
+### Triage of 2026-09-08/09-10 snapshot additions
+
+Three snapshots were captured after the 2026-06-15 state above and were never
+classified, so the gate printed them as UNCLASSIFIED (a triage gap, not a
+measurement — see §1). All three were triaged on 2026-09-10:
+
+| fixture | canon/port rows | max_rel_diff | verdict |
+|---|---|---|---|
+| `chain-so2-co2e-mechanism` | 2767 / 2767 | -3.408e-4 | **asserted** — precision only |
+| `chain-so2-co2e-mechanism-control` | 2309 / 2309 | -3.408e-4 | **asserted** — precision only |
+| `nr-airtoxics-lawn-garden-county` | 14036 / 968 | -1.000e0 | **quarantined** — §4.4 |
+
+For the two `chain-so2-*` fixtures the pollutant key sets and the per-pollutant
+row counts are identical on both sides, and every pollutant agrees to ≤ 5e-7 —
+including the three trigger pollutants those fixtures exist to prove reachable:
+SO2 (31) -3.8e-7, Atmospheric CO2 (90) +1.5e-7, CO2 Equivalent (98) +1.2e-7.
+The whole of the reported -3.408e-4 is Total Energy Consumption (91), the same
+energy summation-drift class already carried by `expand-day` (-3.5e-4),
+`expand-month` (-3.8e-4) and `process-tirewear` (-3.4e-4).
 
 A handful of the start/idle/hotelling fixtures (`process-apu`,
 `process-crankcase-extidle`/`-start`, `process-extended-idle`, and their
@@ -326,13 +366,86 @@ is implemented.
 
 ### 4.4 Beyond tolerance: real bugs
 
-A small number of divergences may represent genuine port errors: incorrect
-sign, wrong factor, missed edge case. These are identified by being large
-(>> 1e-9), reproducible, and present in specific (pollutant, process) cells
-that the corresponding unit test did not cover.
+A small number of divergences represent genuine port errors: incorrect sign,
+wrong factor, missed edge case, or a calculator that never runs at all. These
+are identified by being large (>> 1e-9), reproducible, and present in specific
+(pollutant, process) cells that the corresponding unit test did not cover.
 
 **Resolution:** fix the bug in the calculator, update the unit test to cover
-the case, and verify the divergence disappears.
+the case, and verify the divergence disappears. Never a widened tolerance.
+
+#### 4.4.1 `nr-airtoxics-lawn-garden-county` — the NONROAD air-toxics chain emits nothing (open, measured 2026-09-10)
+
+The one fixture currently in `QUARANTINED_FIXTURES`, and the reason
+`canonical_snapshot_diff` is red.
+
+**Symptom.** The port emits **968 of canonical's 14036 rows** — 2 of 29
+pollutants, at 484 rows each:
+
+| | pollutants emitted | rows |
+|---|---|---|
+| canonical | 1, 5, 20, 21, 23, 24, 25, 26, 27, 45, 46, 60, 63, 65, 66, 67, 69, 79, 80, 86, 87, 88, 99, 100, 110, 131, 142, 169, 185 | 14036 |
+| port | 1, 100 | 968 |
+
+The two it does emit are right: THC (1) -8.6e-7, Primary Exhaust PM10 (100)
+-1.2e-6. Everything `NRHCSpeciationCalculator` and `NRAirToxicsCalculator`
+should contribute is absent, and so are the two `NonroadEmissionCalculator`
+outputs those calculators consume — total fuel consumption (99) and PM2.5
+(110). A pollutant that is missing entirely scores a relative difference of
+-1.0, which is the `max_rel_diff = -1.000e0` the gate prints.
+
+**Layer 1 — planner gap (isolated and confirmed).**
+`CalculatorRegistry::rates_first_excluded_calculators`
+(`crates/moves-framework/src/calculator/registry.rs`) mirrors canonical's
+`MOVESInstantiator` `DO_RATES_FIRST` behaviour by dropping every selected
+*calculator* that is not on a hard-coded `KEEP` whitelist. That whitelist
+carries `NonroadEmissionCalculator` but **not** `NRHCSpeciationCalculator` or
+`NRAirToxicsCalculator`, so neither is ever planned — confirmed by dumping
+`EngineOutcome::modules_planned` for this fixture, which lists neither name,
+and by adding both to `KEEP`, after which both appear in `modules_planned` and
+`modules_executed`.
+
+Canonical does instantiate both for this RunSpec. The captured
+`characterization/snapshots/nr-airtoxics-lawn-garden-county/execution-trace.json`
+lists `gov.epa.otaq.moves.master.implementation.ghg.NRAirToxicsCalculator` and
+`...NRHCSpeciationCalculator` (plus their `$ATRatioEntry` / `$HCEntry` inner
+classes) among the java classes MOVES loaded. Note the package: both live under
+`implementation.ghg`, not `master.nonroad`, so they are whitelist-governed the
+same way the onroad chained calculators are — and the onroad members of that
+chain (`HCSpeciationCalculator`, `AirToxicsCalculator`, `TOGSpeciationCalculator`)
+*are* on `KEEP`. The omission of the two NR names looks like an oversight in
+that list rather than a modelled exclusion.
+
+**Layer 2 — the calculators emit nothing anyway (data plane).** Adding both
+names to `KEEP` is *not* sufficient: with both planned and executed, output is
+still 968 rows and the same 2 pollutants. So there is a second, independent
+defect in the NONROAD chain — `NonroadEmissionCalculator` withholds pollutants
+99 and 110 for this RunSpec (it produces them for no fixture in the suite), and
+with no VOC (87) / PM2.5 (110) / fuel (99) inputs the two downstream NR
+calculators have nothing to scale. This is the fixture's whole purpose: it is
+the only fixture in the corpus that reaches `NRHCSpeciationCalculator` and
+`NRAirToxicsCalculator` at all (see `characterization/fixtures/coverage-matrix.md`),
+so nothing else in the suite guards them.
+
+**Explicitly not a tolerance question.** The port is not computing 27 of the 29
+pollutants, so no tolerance, `excluded_pollutants` scope exception, or storage
+quantum allowance can honestly clear this. Under the §1 policy the fixture stays
+in the gate and CI stays red until the data plane is fixed. When it is fixed,
+move the entry from `QUARANTINED_FIXTURES` to `asserted_fixtures()` at
+`NONROAD_REL_TOL` and delete this subsection.
+
+**Reproduce:**
+
+```sh
+cargo run -p moves-cli --bin moves -- run \
+  --runspec characterization/fixtures/nr-airtoxics-lawn-garden-county.xml \
+  --snapshot characterization/snapshots/nr-airtoxics-lawn-garden-county \
+  --output /tmp/nrat --max-parallel-chunks 1
+# port: 968 rows, pollutants {1, 100}
+# canonical: characterization/snapshots/nr-airtoxics-lawn-garden-county/tables/
+#            db__out_nr_airtoxics_lawn_garden_county__movesoutput.parquet
+#            14036 rows, 29 pollutants
+```
 
 ---
 

@@ -587,6 +587,22 @@ fn asserted_fixtures() -> &'static [(&'static str, f64, bool)] {
         // now matches canonical to f64 summation drift.
         ("chain-tog-speciation", ONROAD_REL_TOL, false), // HCSpeciation: 1/5/79/80/86 exact
         ("chain-nonhaptog", ONROAD_REL_TOL, false),      // HCSpeciation: 1/5/79/80/86 exact
+        // chain-so2-co2e-mechanism / -control: the pair that reaches the last
+        // three previously-unreached onroad calculators (SO2Calculator,
+        // CO2AERunningStartExtendedIdleCalculator, TOGSpeciationCalculator).
+        // Both snapshots landed 2026-09-08 and were never classified, so the
+        // gate reported them UNCLASSIFIED until 2026-09-10 — a triage gap, not
+        // a divergence. Measured with the fixture run against its own snapshot:
+        // identical pollutant key sets AND identical per-pollutant row counts
+        // (2767/2767 and 2309/2309), every pollutant within ~5e-7 — including
+        // the three trigger pollutants the fixtures exist to prove:
+        // SO2 (31) -3.8e-7, Atmospheric CO2 (90) +1.5e-7, CO2 Equivalent (98)
+        // +1.2e-7. The reported max_rel_diff of -3.408e-4 is Total Energy
+        // Consumption (91) alone, the same energy float-summation drift class
+        // carried by every other energy fixture here (expand-day -3.5e-4,
+        // expand-month -3.8e-4, process-tirewear -3.4e-4); §4.2.
+        ("chain-so2-co2e-mechanism", ONROAD_REL_TOL, false), // pol 91 -3.408e-4, rest <=5e-7
+        ("chain-so2-co2e-mechanism-control", ONROAD_REL_TOL, false), // pol 91 -3.408e-4, rest <=5e-7
         ("process-nox-speciation", ONROAD_REL_TOL, false), // NO/NO2/HONO: 3/32/33/34 exact
         ("process-crankcase-running", ONROAD_REL_TOL, false), // crankcase THC: 1/2/3 exact
         ("process-brakewear", ONROAD_REL_TOL, false),    // 91/106/116 exact
@@ -642,6 +658,40 @@ fn asserted_fixtures() -> &'static [(&'static str, f64, bool)] {
 /// data plane is fixed it should graduate from this list into
 /// [`asserted_fixtures`].
 const QUARANTINED_FIXTURES: &[&str] = &[
+    // nr-airtoxics-lawn-garden-county — the port emits 2 of canonical's 29
+    // pollutants (968 of 14036 rows). Snapshot landed 2026-09-10; the gate
+    // reported it UNCLASSIFIED until it was triaged on the same day.
+    //
+    // The two pollutants the port does emit are correct: THC (1) -8.6e-7 and
+    // Primary Exhaust PM10 (100) -1.2e-6, both 484/484 rows. Everything
+    // NRHCSpeciationCalculator and NRAirToxicsCalculator should add is
+    // missing outright (5/20/21/23/24/25/26/27/45/46/60/63/65/66/67/69/79/
+    // 80/86/87/88/110/131/142/169/185), and so are the NonroadEmission
+    // outputs those two calculators consume — total fuel consumption (99)
+    // and PM2.5 (110). A missing pollutant scores rel = -1.0, which is why
+    // the gate prints max_rel_diff = -1.000e0.
+    //
+    // Root cause is at least two layers deep; see docs/known-divergences.md
+    // §4.4. Layer 1 is a planner gap that has been isolated and confirmed:
+    // `CalculatorRegistry::rates_first_excluded_calculators` (crates/
+    // moves-framework/src/calculator/registry.rs) drops every calculator not
+    // on its DO_RATES_FIRST `KEEP` list, and that list carries
+    // `NonroadEmissionCalculator` but NOT `NRHCSpeciationCalculator` or
+    // `NRAirToxicsCalculator` — so neither ever enters the plan. Canonical
+    // DOES instantiate both for this RunSpec: the captured
+    // execution-trace.json lists
+    // gov.epa.otaq.moves.master.implementation.ghg.NRAirToxicsCalculator and
+    // ...NRHCSpeciationCalculator among its loaded java_classes.
+    // Layer 2: adding both names to `KEEP` puts them in the plan and they
+    // execute, but output is still 968 rows — they emit nothing, and
+    // NonroadEmissionCalculator still withholds 99/110. That is a data-plane
+    // bug in the NONROAD chain, not a gate or tolerance question.
+    //
+    // Per §1 this fixture stays in the gate and CI stays red until the data
+    // plane is fixed. Do NOT widen a tolerance or scope-except pollutants to
+    // clear it: the port is not computing these pollutants at all, so there
+    // is nothing for a tolerance to absorb.
+    "nr-airtoxics-lawn-garden-county",
     // expand-* energy fixtures — energy pollutants 91/92/93, activity weighting
     // applied, KJ→Million-BTU conversion wired. expand-criteria/expand-day/
     // expand-fueltype-diesel/expand-sourcetype GRADUATED to asserted_fixtures.
