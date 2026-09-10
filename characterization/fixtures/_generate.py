@@ -197,7 +197,22 @@ class Geo:
 @dataclass
 class TimeSpan:
     year: int = 2020
-    months: tuple[int, ...] = (7,)         # July
+    # `<month key=>` is a 0-based INDEX into TimeSpan.allMonths, NOT a monthID
+    # (RunSpecXML.java:501-509 -> TimeSpan.getMonthByIndex, TimeSpan.java:156-161)
+    # — exactly the trap `day_attr` documents below. So `months=(7,)` renders
+    # `<month key="7"/>` and selects allMonths[7] = **August**, monthID 8, not
+    # July. Verified against canonical output: the scale-project snapshot's
+    # `db__out_scale_project__movesoutput` carries monthID = 8 for a fixture
+    # written as month 7.
+    #
+    # All 54 committed fixtures use the `key` form, so all of them are shifted
+    # one month later than their spec entry reads. This is NOT corrected here:
+    # switching to `<month id=>` would change what canonical emits for every
+    # fixture and invalidate all 43 published snapshots, which is a recapture
+    # decision, not an editing one. Until that decision is taken, read
+    # `months=(N,)` as "monthID N+1" and write any month-keyed input-DB filter
+    # against N+1 (see ../county-inputs/washtenaw-project/setup-project.sql).
+    months: tuple[int, ...] = (7,)         # index 7 -> August (monthID 8)
     days: tuple[int, ...] = (5,)           # Weekdays
     begin_hour: int = 6                    # hour-of-day index per hourofanyday
     end_hour: int = 6

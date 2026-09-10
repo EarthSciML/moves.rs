@@ -1,5 +1,14 @@
 -- setup-project.sql — PROJECT-domain scale input database for Washtenaw County
--- (FIPS 26161, zone 261610, link 1, road type 4, July 2020, hour 8, day 5).
+-- (FIPS 26161, zone 261610, link 1, road type 4, AUGUST 2020, hour 8, day 5).
+--
+-- THE MONTH IS 8, NOT 7. The RunSpec says `<month key="7"/>`, but
+-- `key` is a 0-based INDEX into `TimeSpan.allMonths`, not a monthID
+-- (RunSpecXML.java:501-509 -> TimeSpan.getMonthByIndex, TimeSpan.java:156-161).
+-- Index 7 is August. Canonical's captured MOVESOutput confirms it: monthID = 8.
+-- This is the same trap as `<day key=>` vs `<day id=>`, which the 2026-09-08
+-- audit found had silently made 26 snapshots two-day runs. Every month-keyed
+-- filter below therefore uses monthID=8, so the input DB describes the month
+-- the run actually models. See the note in ../../fixtures/_generate.py.
 --
 -- Serves fixture: characterization/fixtures/scale-project.xml
 -- Loaded into database `washtenaw_cdb` by
@@ -106,10 +115,10 @@ CREATE TABLE IF NOT EXISTS hotellingHoursPerDay LIKE movesdb20241112.hotellingHo
 INSERT INTO hotellingHoursPerDay SELECT * FROM movesdb20241112.hotellingHoursPerDay WHERE zoneID=261610 AND yearID=2020;
 
 CREATE TABLE IF NOT EXISTS hotellingMonthAdjust LIKE movesdb20241112.hotellingMonthAdjust;
-INSERT INTO hotellingMonthAdjust SELECT * FROM movesdb20241112.hotellingMonthAdjust WHERE zoneID=261610 AND monthID=7;
+INSERT INTO hotellingMonthAdjust SELECT * FROM movesdb20241112.hotellingMonthAdjust WHERE zoneID=261610 AND monthID=8;
 
 CREATE TABLE IF NOT EXISTS hotellingHours LIKE movesdb20241112.hotellingHours;
-INSERT INTO hotellingHours SELECT * FROM movesdb20241112.hotellingHours WHERE zoneID=261610 AND yearID=2020 AND monthID=7;
+INSERT INTO hotellingHours SELECT * FROM movesdb20241112.hotellingHours WHERE zoneID=261610 AND yearID=2020 AND monthID=8;
 
 CREATE TABLE IF NOT EXISTS idleDayAdjust LIKE movesdb20241112.idleDayAdjust;
 INSERT INTO idleDayAdjust SELECT * FROM movesdb20241112.idleDayAdjust;
@@ -118,13 +127,13 @@ CREATE TABLE IF NOT EXISTS idleModelYearGrouping LIKE movesdb20241112.idleModelY
 INSERT INTO idleModelYearGrouping SELECT * FROM movesdb20241112.idleModelYearGrouping;
 
 CREATE TABLE IF NOT EXISTS idleMonthAdjust LIKE movesdb20241112.idleMonthAdjust;
-INSERT INTO idleMonthAdjust SELECT * FROM movesdb20241112.idleMonthAdjust WHERE monthID=7;
+INSERT INTO idleMonthAdjust SELECT * FROM movesdb20241112.idleMonthAdjust WHERE monthID=8;
 
 CREATE TABLE IF NOT EXISTS idleRegion LIKE movesdb20241112.idleRegion;
 INSERT INTO idleRegion SELECT * FROM movesdb20241112.idleRegion;
 
 CREATE TABLE IF NOT EXISTS totalIdleFraction LIKE movesdb20241112.totalIdleFraction;
-INSERT INTO totalIdleFraction SELECT * FROM movesdb20241112.totalIdleFraction WHERE monthID=7;
+INSERT INTO totalIdleFraction SELECT * FROM movesdb20241112.totalIdleFraction WHERE monthID=8;
 
 -- ===========================================================================
 -- I/M, retrofit
@@ -139,7 +148,7 @@ INSERT INTO onRoadRetrofit SELECT * FROM movesdb20241112.onRoadRetrofit;
 -- Starts
 -- ===========================================================================
 CREATE TABLE IF NOT EXISTS Starts LIKE movesdb20241112.Starts;
-INSERT INTO Starts SELECT * FROM movesdb20241112.Starts WHERE zoneID=261610 AND yearID=2020 AND monthID=7;
+INSERT INTO Starts SELECT * FROM movesdb20241112.Starts WHERE zoneID=261610 AND yearID=2020 AND monthID=8;
 
 CREATE TABLE IF NOT EXISTS startsAgeAdjustment LIKE movesdb20241112.startsAgeAdjustment;
 INSERT INTO startsAgeAdjustment SELECT * FROM movesdb20241112.startsAgeAdjustment;
@@ -148,7 +157,7 @@ CREATE TABLE IF NOT EXISTS startsHourFraction LIKE movesdb20241112.startsHourFra
 INSERT INTO startsHourFraction SELECT * FROM movesdb20241112.startsHourFraction;
 
 CREATE TABLE IF NOT EXISTS startsMonthAdjust LIKE movesdb20241112.startsMonthAdjust;
-INSERT INTO startsMonthAdjust SELECT * FROM movesdb20241112.startsMonthAdjust WHERE monthID=7;
+INSERT INTO startsMonthAdjust SELECT * FROM movesdb20241112.startsMonthAdjust WHERE monthID=8;
 
 CREATE TABLE IF NOT EXISTS startsOpModeDistribution LIKE movesdb20241112.startsOpModeDistribution;
 INSERT INTO startsOpModeDistribution SELECT * FROM movesdb20241112.startsOpModeDistribution;
@@ -170,22 +179,22 @@ INSERT INTO startsSourceTypeFraction SELECT * FROM movesdb20241112.startsSourceT
 -- activity comes from linkSourceTypeHour, not VMT)
 -- ===========================================================================
 CREATE TABLE IF NOT EXISTS HPMSVtypeDay LIKE movesdb20241112.HPMSVtypeDay;
-INSERT INTO HPMSVtypeDay SELECT * FROM movesdb20241112.HPMSVtypeDay WHERE yearID=2020 AND monthID=7;
+INSERT INTO HPMSVtypeDay SELECT * FROM movesdb20241112.HPMSVtypeDay WHERE yearID=2020 AND monthID=8;
 
 CREATE TABLE IF NOT EXISTS HPMSVtypeYear LIKE movesdb20241112.HPMSVtypeYear;
 INSERT INTO HPMSVtypeYear SELECT * FROM movesdb20241112.HPMSVtypeYear WHERE yearID=2020;
 
 CREATE TABLE IF NOT EXISTS MonthVMTFraction LIKE movesdb20241112.MonthVMTFraction;
-INSERT INTO MonthVMTFraction SELECT * FROM movesdb20241112.MonthVMTFraction WHERE monthID=7;
+INSERT INTO MonthVMTFraction SELECT * FROM movesdb20241112.MonthVMTFraction WHERE monthID=8;
 
 CREATE TABLE IF NOT EXISTS DayVMTFraction LIKE movesdb20241112.DayVMTFraction;
-INSERT INTO DayVMTFraction SELECT * FROM movesdb20241112.DayVMTFraction WHERE monthID=7;
+INSERT INTO DayVMTFraction SELECT * FROM movesdb20241112.DayVMTFraction WHERE monthID=8;
 
 CREATE TABLE IF NOT EXISTS HourVMTFraction LIKE movesdb20241112.HourVMTFraction;
 INSERT INTO HourVMTFraction SELECT * FROM movesdb20241112.HourVMTFraction;
 
 CREATE TABLE IF NOT EXISTS SourceTypeDayVMT LIKE movesdb20241112.SourceTypeDayVMT;
-INSERT INTO SourceTypeDayVMT SELECT * FROM movesdb20241112.SourceTypeDayVMT WHERE yearID=2020 AND monthID=7;
+INSERT INTO SourceTypeDayVMT SELECT * FROM movesdb20241112.SourceTypeDayVMT WHERE yearID=2020 AND monthID=8;
 
 CREATE TABLE IF NOT EXISTS SourceTypeYearVMT LIKE movesdb20241112.SourceTypeYearVMT;
 INSERT INTO SourceTypeYearVMT SELECT * FROM movesdb20241112.SourceTypeYearVMT WHERE yearID=2020;
