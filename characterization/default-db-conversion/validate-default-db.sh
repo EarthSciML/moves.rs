@@ -16,6 +16,11 @@
 #        • parquet row totals <-> source TSV line count
 #        • per-column numeric aggregates (count/min/max/scaled-sum) between
 #          TSV-parsed values and Parquet readback
+#        • per-column exact content digest, every column of every type,
+#          nulls included — catches string and sub-1e-9 float changes that
+#          the numeric aggregates are blind to
+#        • row-multiset digest per table: the Parquet body holds the same
+#          multiset of rows as the source TSV
 #        • monolithic tables: byte-by-byte first-row match
 #
 # Exit codes:
