@@ -17,6 +17,10 @@
 #                         Default: characterization/audit-results/<timestamp>.
 #   --refresh-canonical   Re-run canonical MOVES even when a snapshot already
 #                         exists under characterization/snapshots/.
+#   --check-scenarios     Resolve every name in the fixture list against
+#                         characterization/fixtures/ and exit without running
+#                         anything.  0 = every name resolves, 2 = at least one
+#                         does not.  Costs nothing: no cargo build, no MOVES.
 #   -h, --help            This message.
 #
 # Prerequisites:
@@ -25,8 +29,11 @@
 #   * For moves.rs runs: Rust toolchain installed (cargo build is run here).
 #
 # Exit codes:
-#   0 — report written
-#   1 — one or more fixtures failed
+#   0 — report written (or, with --check-scenarios, every name resolved)
+#   1 — one or more fixtures failed the comparison
+#   2 — configuration error: a bad argument, or a name in the fixture list
+#       that does not resolve to a fixture XML.  Kept distinct from 1 on
+#       purpose — see the pre-flight block below (issue #63).
 
 set -euo pipefail
 
@@ -40,6 +47,7 @@ SIF="${APPTAINER_DIR}/moves-fixture.sif"
 FIXTURES_ARG=""
 OUTPUT_DIR=""
 REFRESH_CANONICAL=0
+CHECK_ONLY=0
 FAILURES=0
 
 usage() {
@@ -51,6 +59,7 @@ while [ $# -gt 0 ]; do
         --fixtures)    FIXTURES_ARG="$2"; shift 2 ;;
         --output-dir)  OUTPUT_DIR="$2";   shift 2 ;;
         --refresh-canonical) REFRESH_CANONICAL=1; shift ;;
+        --check-scenarios)   CHECK_ONLY=1; shift ;;
         -h|--help)     usage; exit 0 ;;
         *) printf 'Unknown argument: %s\n' "$1" >&2; exit 2 ;;
     esac
@@ -58,14 +67,6 @@ done
 
 TIMESTAMP="$(date +%Y%m%dT%H%M%S)"
 OUTPUT_DIR="${OUTPUT_DIR:-${ROOT}/characterization/audit-results/${TIMESTAMP}}"
-mkdir -p "${OUTPUT_DIR}"
-
-# Build both binaries once up front.
-printf '[build] cargo build --release -p moves-cli -p moves-snapshot\n' >&2
-cargo build --release --manifest-path "${ROOT}/Cargo.toml" \
-    -p moves-cli -p moves-snapshot 2>&1 | grep -E '^(error|warning\[|Compiling|Finished)' >&2 || true
-MOVES_BIN="${ROOT}/target/release/moves"
-COMPARE_BIN="${ROOT}/target/release/compare-canonical"
 
 # Normalize: lowercase, strip non-alphanumeric.
 normalize() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9'; }
@@ -104,12 +105,96 @@ peak_mb_from_time_file() {
     fi
 }
 
-# Build the fixture list.
+# Build the fixture list. The on-disk list carries `#` comments and blank
+# lines; strip them here so the pre-flight below sees only real names.
+SCENARIO_FILE="${HERE}/typical-scenarios.txt"
 if [ -n "${FIXTURES_ARG}" ]; then
+    FIXTURE_SOURCE="--fixtures"
     IFS=',' read -ra FIXTURE_LIST <<< "${FIXTURES_ARG}"
 else
-    mapfile -t FIXTURE_LIST < "${HERE}/typical-scenarios.txt"
+    FIXTURE_SOURCE="${SCENARIO_FILE}"
+    if [ ! -f "${SCENARIO_FILE}" ]; then
+        printf 'FATAL: scenario list not found: %s\n' "${SCENARIO_FILE}" >&2
+        exit 2
+    fi
+    mapfile -t FIXTURE_LIST < <(grep -v '^[[:space:]]*\(#\|$\)' "${SCENARIO_FILE}")
 fi
+
+# ── Pre-flight: every named scenario must resolve to a fixture XML ───────────
+#
+# issue #63. A scenario list that quietly skips names it cannot resolve is a
+# gate that reports nothing while looking like it ran. `mixed-onroad-nonroad`
+# stayed in typical-scenarios.txt after 2122513e deleted its XML; this script
+# then printed `[SKIP] ...`, ran the eight surviving fixtures, assembled the
+# report, and only at the very END exited 1 on `[warn] 1 fixture(s) skipped or
+# failed`. In CI that killed the comparison STEP, so the next step — the one
+# that actually runs regression_gate.sh — never executed. The numeric gate the
+# audit-regression-gate job exists to enforce was dead, not merely red, and it
+# read to everyone who saw it as the PR's own numerical regression.
+#
+# The cut this restores: a name that does not resolve is a CONFIGURATION
+# error, not a comparison result.
+#   * It is fatal, never a skip.
+#   * It is reported for the WHOLE list at once, so one run names every dead
+#     entry instead of surfacing them one retirement at a time.
+#   * It fires here — before the cargo build and before any MOVES run — so it
+#     costs seconds, not the whole job.
+#   * It exits 2, keeping "the list is wrong" distinguishable from exit 1,
+#     "a fixture regressed". Those two demand completely different responses.
+MISSING_FIXTURES=()
+RESOLVED_COUNT=0
+for FIXTURE in "${FIXTURE_LIST[@]}"; do
+    FIXTURE="$(printf '%s' "${FIXTURE}" | tr -d '[:space:]')"
+    [ -z "${FIXTURE}" ] && continue
+    if find_fixture_xml "${FIXTURE}" >/dev/null 2>&1; then
+        RESOLVED_COUNT=$((RESOLVED_COUNT + 1))
+    else
+        MISSING_FIXTURES+=("${FIXTURE}")
+    fi
+done
+
+if [ "${#MISSING_FIXTURES[@]}" -gt 0 ]; then
+    {
+        printf '\n'
+        printf '############################################################\n'
+        printf '[run-comparison] SCENARIO LIST IS STALE — NOTHING WAS RUN\n'
+        printf '[run-comparison]   list        : %s\n' "${FIXTURE_SOURCE}"
+        printf '[run-comparison]   fixtures dir: %s\n' "${FIXTURES_DIR}"
+        printf '[run-comparison]   %d name(s) do not resolve to a fixture XML:\n' \
+            "${#MISSING_FIXTURES[@]}"
+        for FIXTURE in "${MISSING_FIXTURES[@]}"; do
+            printf '[run-comparison]     - %s\n' "${FIXTURE}"
+        done
+        printf '[run-comparison]\n'
+        printf '[run-comparison] Fix the list, or restore the fixture. Do NOT\n'
+        printf '[run-comparison] let it skip: a skipped scenario is a gate that\n'
+        printf '[run-comparison] silently stops checking what it was named for.\n'
+        printf '############################################################\n'
+    } >&2
+    exit 2
+fi
+
+if [ "${RESOLVED_COUNT}" -eq 0 ]; then
+    printf 'FATAL: fixture list %s resolved to zero scenarios — nothing to compare.\n' \
+        "${FIXTURE_SOURCE}" >&2
+    exit 2
+fi
+
+printf '[preflight] %d/%d scenario(s) from %s resolve to a fixture XML\n' \
+    "${RESOLVED_COUNT}" "${RESOLVED_COUNT}" "${FIXTURE_SOURCE}" >&2
+
+if [ "${CHECK_ONLY}" -eq 1 ]; then
+    exit 0
+fi
+
+mkdir -p "${OUTPUT_DIR}"
+
+# Build both binaries once up front.
+printf '[build] cargo build --release -p moves-cli -p moves-snapshot\n' >&2
+cargo build --release --manifest-path "${ROOT}/Cargo.toml" \
+    -p moves-cli -p moves-snapshot 2>&1 | grep -E '^(error|warning\[|Compiling|Finished)' >&2 || true
+MOVES_BIN="${ROOT}/target/release/moves"
+COMPARE_BIN="${ROOT}/target/release/compare-canonical"
 
 # Per-fixture JSON paths, collected for summary assembly later.
 declare -a JSON_FILES=()
@@ -119,10 +204,12 @@ for FIXTURE in "${FIXTURE_LIST[@]}"; do
     FIXTURE="$(printf '%s' "${FIXTURE}" | tr -d '[:space:]')"
     [ -z "${FIXTURE}" ] && continue
 
+    # Unreachable via the pre-flight above; kept as a belt in case a fixture
+    # XML is removed mid-run. Never a skip — see the pre-flight rationale.
     if ! FIXTURE_XML=$(find_fixture_xml "${FIXTURE}" 2>/dev/null); then
-        printf '[SKIP] fixture %s: no matching .xml in %s\n' "${FIXTURE}" "${FIXTURES_DIR}" >&2
-        FAILURES=$((FAILURES + 1))
-        continue
+        printf '[FATAL] fixture %s: no matching .xml in %s (it resolved at pre-flight — removed mid-run?)\n' \
+            "${FIXTURE}" "${FIXTURES_DIR}" >&2
+        exit 2
     fi
 
     FIXTURE_STEM="${FIXTURE_XML##*/}"

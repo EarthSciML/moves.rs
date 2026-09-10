@@ -288,13 +288,44 @@ jobs:
   # `apptainer` and the capture binary stubbed — no SIF, no Apptainer, no
   # cargo build, a couple of seconds.
   wrapper-guards:
-    name: run-fixture.sh capture guards
+    name: capture-wrapper guards
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - name: run-fixture.sh guard regression
         run: characterization/apptainer/tests/run-fixture-guards.sh
+
+      # Issue #60: the same defect one level up. generate-corpus.sh called
+      # run-moves.sh bare, had no log scan at all, and never removed the
+      # previous run's TSV — so a failed MOVES run could copy STALE bytes
+      # into baselines/ as a fresh gfortran reference, where they pass the
+      # corpus' own SHA check because the hash matches the bytes.
+      - name: generate-corpus.sh guard regression
+        run: characterization/nonroad-fidelity/tests/generate-corpus-guards.sh
+
+  # ── Audit scenario-list guards (issue #63) ────────────────────────────────
+  #
+  # characterization/audit/typical-scenarios.txt named a fixture that
+  # 2122513e had deleted. run-comparison.sh treated the dangling name as a
+  # [SKIP] and only exited 1 at the very end, which killed the comparison STEP
+  # of audit-regression-gate.yml before the step that runs regression_gate.sh
+  # — so the numeric gate never ran on any PR while looking like it had.
+  #
+  # This job runs the pre-flight guards via --check-scenarios: no cargo build,
+  # no Apptainer, no SIF, ~2 s. It is the tripwire that goes red the next time
+  # a fixture is retired without updating the scenario list. Deliberately here
+  # in ci.yml, which runs on every push, rather than in audit-regression-gate
+  # .yml, which is paths-filtered to PRs touching two crates and so never runs
+  # on main — that filter is why the dead gate stayed invisible.
+  audit-scenario-guards:
+    name: audit scenario-list guards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: run-comparison.sh scenario pre-flight guards
+        run: characterization/audit/tests/scenario-list-guards.sh
 
   deny:
     name: cargo deny
