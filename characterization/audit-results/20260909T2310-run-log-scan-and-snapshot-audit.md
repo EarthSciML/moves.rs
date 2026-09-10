@@ -108,6 +108,13 @@ Corpus: the retained MOVES run log of every one of the 42 published snapshots
 | logs matched by the old rule | 0 |
 | logs containing the substring `ERROR` anywhere | 6 |
 
+These are the counts **after** the one ambiguity is resolved (see §"Bounds",
+point 2). `snapshot-integrity-audit.py` scans every candidate file it finds and
+so prints the unresolved figures — **43 logs, 1 rule match, 7 substring logs** —
+because `process-apu-single` has two logs on scratch and the extra one is the
+02:36 run that failed. The tool is not disagreeing with this table; it is
+reporting one line per file where this table reports one line per snapshot.
+
 All six near-misses are the same shape:
 
 ```
