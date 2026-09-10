@@ -40,17 +40,27 @@
 -- these as frozen inputs to already-captured snapshots: changing any of them
 -- forces a recapture.
 --
--- KNOWN DATA DEFECT (documented, deliberately NOT fixed here)
+-- FIXED 2026-09-10: zoneRoadType(261610, roadTypeID 5) — EarthSciML/moves.rs#66
 --
--- zoneRoadType(261610, roadTypeID 5) is 0.002012975189 in this file. The
--- default DB value is 0.0010453931260005, which is what the sibling
--- setup-hotelling.sql uses for the same zone and road type. 0.002012975189
--- appears nowhere in movesdb20241112.zoneRoadType. It is a transcription
--- error, and it is already baked into the captured
--- process-crankcase-start-single snapshot (execution zoneRoadType reads
--- 2.012975189e-03 there, vs 1.045393126e-03 in process-extended-idle-single).
--- Fixing it requires a recapture. Tracked as EarthSciML/moves.rs#66;
--- see also #65 (startAllocFactor normalization).
+-- This row read 0.002012975189 from 30a3a528 (2026-06-03) until 2026-09-10.
+-- That value is 1.93x the default DB value 0.0010453931260005 and appears
+-- NOWHERE in movesdb20241112.zoneRoadType (an ABS(...) < 1e-12 scan over the
+-- whole table returns no rows), so it was not a mis-copy from another zone.
+-- The sibling setup-hotelling.sql carried the correct default for the same
+-- key, road types 2/3/4 agreed in both files, and 30a3a528's own message
+-- records that the work was "Salvaged from polecat furiosa (LLM context-gated
+-- at 1M before final verification)". A transcription error, now corrected to
+-- 0.001045393126 — the default TRUNCATED TO 12 DECIMAL PLACES, matching every
+-- other literal in this file and setup-hotelling.sql byte for byte.
+--
+-- The fix invalidated the process-crankcase-start-single snapshot (the only
+-- snapshot in the corpus that carried the wrong value; the other 30 zone-261610
+-- zoneRoadType parquets all read the default). It was recaptured in the same
+-- commit as this change.
+--
+-- Still open on this file: #65 (startAllocFactor normalization), and
+-- setup-hotelling.sql's hotellingActivityDistribution "= national defaults"
+-- claim is false for 2 of 3 model-year bins — deliberately not touched here.
 
 -- ---- Geography tables (required by MOVES SINGLE-scale validation) ----
 
@@ -100,7 +110,7 @@ TRUNCATE TABLE zoneRoadType;
 INSERT INTO zoneRoadType VALUES (261610, 2, 0.001310336774);
 INSERT INTO zoneRoadType VALUES (261610, 3, 0.000644397243);
 INSERT INTO zoneRoadType VALUES (261610, 4, 0.001645627794);
-INSERT INTO zoneRoadType VALUES (261610, 5, 0.002012975189);
+INSERT INTO zoneRoadType VALUES (261610, 5, 0.001045393126);
 
 CREATE TABLE IF NOT EXISTS roadTypeDistribution (
     sourceTypeID         SMALLINT NOT NULL,
