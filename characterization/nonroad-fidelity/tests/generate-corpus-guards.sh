@@ -124,6 +124,26 @@ case "${STUB_MODE}" in
 esac
 STUB
 
+# ----- Stub cp, to simulate an interrupted copy -----------------------------
+# The only way to exercise stage-then-swap is to break the copy partway. With
+# STUB_CP_TRUNCATE=1 a copy whose destination is a .tsv (or a .tsv staging
+# path) writes three lines and fails, exactly as a copy killed mid-write
+# would. Every other copy — notably the runspec .xml generate-corpus.sh
+# stages before the run — is passed straight through.
+cat > "${TMP}/bin/cp" <<'STUB'
+#!/bin/bash
+if [ "${STUB_CP_TRUNCATE:-0}" = "1" ]; then
+    dst="${!#}"
+    case "${dst}" in
+        *.tsv|*.tsv.staging.*)
+            head -n 3 "$1" > "${dst}" 2>/dev/null
+            echo "cp: interrupted" >&2
+            exit 1 ;;
+    esac
+fi
+exec /bin/cp "$@"
+STUB
+
 # ----- Stubs that must never run for real ----------------------------------
 # generate-corpus.sh clears orphaned MOVES/MariaDB processes off port 3306.
 # On a shared machine that would kill someone else's run; in CI there is
@@ -368,6 +388,27 @@ elif [ "$(sha256sum "${BASELINE}" | awk '{print $1}')" != "${GOOD_SHA}" ]; then
     bad "failure-after-good-baseline: the existing baseline was overwritten"
 else
     pass "failure-after-good-baseline: existing good baseline untouched"
+fi
+
+# ---------------------------------------------------------------------------
+# 13. Stage-then-swap, the only case that discriminates it. A copy killed
+#     partway through writes a short file and exits non-zero. Copying
+#     straight into baselines/<fixture>.tsv leaves those three lines sitting
+#     where a finished baseline goes — a truncated artifact whose SHA matches
+#     its bytes, which is this issue's whole failure mode. Copying into a
+#     staging path and mv-ing means the abort leaves baselines/ untouched.
+#
+#     Verified to discriminate: replacing the staged copy with a plain
+#     `cp "${nrdbg_host}" "${baseline}"` takes this case red and no other.
+# ---------------------------------------------------------------------------
+reset_state
+STUB_MODE=ok STUB_ROWS=500 STUB_CP_TRUNCATE=1     run_corpus interrupted-copy nonzero ""
+if [ -e "${BASELINE}" ]; then
+    bad "interrupted-copy: a partial baseline ($(wc -l < "${BASELINE}") rows) was left in baselines/"
+elif [ -e "${CORPUS_SHA}" ]; then
+    bad "interrupted-copy: corpus.sha recorded a copy that never completed"
+else
+    pass "interrupted-copy: baselines/ untouched, no corpus.sha entry"
 fi
 
 echo
