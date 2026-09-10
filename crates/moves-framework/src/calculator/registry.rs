@@ -537,6 +537,55 @@ impl CalculatorRegistry {
             .collect()
     }
 
+    /// The total-activity generators that must **not** run for the given
+    /// domain, mirroring the `MOVESInstantiator.instantiate` `M1` swap.
+    ///
+    /// Canonical MOVES instantiates exactly **one** total-activity basis
+    /// producer. In the PROJECT domain it *replaces*
+    /// `TotalActivityGenerator` (and `MesoscaleLookupTotalActivityGenerator`)
+    /// with `ProjectTAG`:
+    ///
+    /// ```text
+    /// if(isProjectDomain) {
+    ///     if(neededClassNames.contains("...TotalActivityGenerator")) {
+    ///         neededClassNames.remove("...TotalActivityGenerator");
+    ///         neededClassNames.add("...ProjectTAG");
+    ///     }
+    ///     if(neededClassNames.contains("...MesoscaleLookupTotalActivityGenerator")) {
+    ///         neededClassNames.remove("...MesoscaleLookupTotalActivityGenerator");
+    ///         neededClassNames.add("...ProjectTAG");
+    ///     }
+    ///     ...
+    /// ```
+    ///
+    /// (`MOVESInstantiator.java`, the `case M1:` / `if(isProjectDomain)`
+    /// block.) Outside the PROJECT domain `ProjectTAG` is never added.
+    ///
+    /// The port's `(pollutant, process)` module filter cannot make this
+    /// choice — every total-activity producer subscribes to the same
+    /// processes — so it over-selects. They then collide on the single `SHO`
+    /// scratch table: `TotalActivityGenerator` writes the HPMS/VMT-derived,
+    /// `TravelFraction`-weighted county SHO with a plain
+    /// `store.insert("SHO", …)`, clobbering the link-volume SHO `ProjectTAG`
+    /// appended. Because `TravelFraction ∝ ageFraction × relativeMAR` while
+    /// the PROJECT `SHO ∝ ageFraction` alone, the surviving activity carries
+    /// a spurious `relativeMAR` factor *and* the wrong absolute magnitude —
+    /// the `scale-project` fixture over-emitted by
+    /// `relativeMAR × 77.17` per row (docs/known-divergences.md §6.1).
+    ///
+    /// Returns the module names to drop.
+    #[must_use]
+    pub fn domain_excluded_total_activity_modules(&self, is_project: bool) -> BTreeSet<String> {
+        const TAG: &str = "TotalActivityGenerator";
+        const MESOSCALE_TAG: &str = "MesoscaleLookupTotalActivityGenerator";
+        const PROJECT_TAG: &str = "ProjectTAG";
+        if is_project {
+            [TAG, MESOSCALE_TAG].into_iter().map(String::from).collect()
+        } else {
+            [PROJECT_TAG].into_iter().map(String::from).collect()
+        }
+    }
+
     /// The selected modules to drop under canonical `MOVESInstantiator`
     /// `DO_RATES_FIRST` (the released-MOVES default, `CompilationFlags
     /// .DO_RATES_FIRST = true`): every selected **emission calculator** that is
@@ -951,6 +1000,37 @@ mod tests {
         let both = reg.domain_scale_excluded_omd_modules(true, true);
         assert!(!both.contains(LINK), "Project wins over Mesoscale");
         assert!(both.contains(STANDARD) && both.contains(MESOSCALE));
+    }
+
+    #[test]
+    fn domain_excluded_total_activity_modules_keeps_exactly_one_producer() {
+        // Regression guard for the `scale-project` 50.69x over-emit: the
+        // PROJECT domain planned BOTH `ProjectTAG` and `TotalActivityGenerator`,
+        // and the latter's `store.insert("SHO", ...)` overwrote the former's
+        // link-volume activity with the county HPMS/VMT allocation.
+        let reg = CalculatorRegistry::new(single_calc_dag());
+        const TAG: &str = "TotalActivityGenerator";
+        const MESOSCALE_TAG: &str = "MesoscaleLookupTotalActivityGenerator";
+        const PROJECT_TAG: &str = "ProjectTAG";
+
+        // PROJECT: keep ProjectTAG, drop both county/mesoscale producers.
+        let proj = reg.domain_excluded_total_activity_modules(true);
+        assert!(
+            proj.contains(TAG) && proj.contains(MESOSCALE_TAG),
+            "PROJECT must drop TotalActivityGenerator and its mesoscale variant, got {proj:?}"
+        );
+        assert!(!proj.contains(PROJECT_TAG), "PROJECT keeps ProjectTAG");
+
+        // Non-PROJECT: canonical never adds ProjectTAG.
+        let other = reg.domain_excluded_total_activity_modules(false);
+        assert!(
+            other.contains(PROJECT_TAG),
+            "only PROJECT instantiates ProjectTAG"
+        );
+        assert!(
+            !other.contains(TAG) && !other.contains(MESOSCALE_TAG),
+            "non-PROJECT keeps the county producer, got {other:?}"
+        );
     }
 
     #[test]

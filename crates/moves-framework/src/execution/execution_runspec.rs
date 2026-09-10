@@ -275,6 +275,16 @@ impl ExecutionRunSpec {
     /// empty for / 23 / 24 to fill in.
     #[must_use]
     pub fn new(run_spec: RunSpec) -> Self {
+        // Canonical `RunSpecXML.enforceConsistency()` — the load-time output
+        // breakdown invariants the GUI would have enforced. Notably, an onroad
+        // run that selects `onRoadSCC` has fuelType/sourceUseType/roadType/
+        // emissionProcess promoted to selected, because the SCC is built from
+        // those four columns.
+        let run_spec = {
+            let mut rs = run_spec;
+            rs.enforce_consistency();
+            rs
+        };
         let mut spec = Self {
             run_spec,
             will_run_calculators: true,
@@ -1125,6 +1135,30 @@ mod tests {
         };
         populate(&mut spec);
         spec
+    }
+
+    #[test]
+    fn new_applies_the_runspec_consistency_rules() {
+        // `ExecutionRunSpec::new` stands in for canonical MOVES' load-time
+        // `RunSpecXML.enforceConsistency()`: an onroad run that asks for the
+        // onroad SCC gets fuelType/sourceUseType/roadType/emissionProcess
+        // promoted, because the SCC is concatenated from those four columns.
+        // Every onroad fixture in the corpus ships `onroadscc=true` with
+        // `sourceusetype=false`, so without this the port emitted
+        // `sourceTypeID = NULL` on all of them where canonical emits the
+        // real source type.
+        let spec = build_run_spec(|s| {
+            s.output_breakdown.onroad_scc = true;
+            s.output_breakdown.source_use_type = false;
+            s.output_breakdown.road_type = false;
+            s.output_breakdown.emission_process = false;
+            s.output_breakdown.fuel_type = false;
+        });
+        let er = ExecutionRunSpec::new(spec);
+        assert!(er.run_spec.output_breakdown.source_use_type);
+        assert!(er.run_spec.output_breakdown.road_type);
+        assert!(er.run_spec.output_breakdown.emission_process);
+        assert!(er.run_spec.output_breakdown.fuel_type);
     }
 
     #[test]

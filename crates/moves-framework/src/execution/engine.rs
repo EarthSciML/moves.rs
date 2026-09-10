@@ -624,6 +624,19 @@ impl MOVESEngine {
             .domain_scale_excluded_omd_modules(is_project, is_mesoscale);
         names.retain(|n| !drop.contains(n));
 
+        // Domain total-activity swap (canonical `MOVESInstantiator` M1): the
+        // PROJECT domain replaces `TotalActivityGenerator` /
+        // `MesoscaleLookupTotalActivityGenerator` with `ProjectTAG`; every other
+        // domain never instantiates `ProjectTAG`. All of them write the same
+        // `SHO` scratch table, and `TotalActivityGenerator`'s insert clobbers
+        // `ProjectTAG`'s append, so running both silently substitutes the
+        // county HPMS/VMT activity (weighted by `TravelFraction`, which folds
+        // in `relativeMAR`) for the project link-volume activity.
+        let drop = self
+            .registry
+            .domain_excluded_total_activity_modules(is_project);
+        names.retain(|n| !drop.contains(n));
+
         // Canonical `MOVESInstantiator` DO_RATES_FIRST (released-MOVES default):
         // clear the legacy inventory emission calculators so only the
         // `BaseRateCalculator` + chained whitelist produce emissions. Without
@@ -1748,6 +1761,70 @@ mod tests {
         assert_eq!(
             engine.planned_modules().unwrap(),
             vec!["BaseRateCalculator".to_string()]
+        );
+    }
+
+    /// Registry whose CO/Running-Exhaust chain drags in both total-activity
+    /// producers plus `ProjectTAG` — the shape the real DAG has, where all
+    /// three subscribe to the same processes and the `(pollutant, process)`
+    /// filter cannot tell them apart.
+    fn total_activity_registry() -> CalculatorRegistry {
+        let info = parse_calculator_info_str(
+            "Registration\tCO\t2\tRunning Exhaust\t1\tBaseRateCalculator\n\
+             Subscribe\tBaseRateCalculator\tRunning Exhaust\t1\tPROCESS\tEMISSION_CALCULATOR\n\
+             Subscribe\tTotalActivityGenerator\tRunning Exhaust\t1\tPROCESS\tGENERATOR\n\
+             Subscribe\tMesoscaleLookupTotalActivityGenerator\tRunning Exhaust\t1\tPROCESS\tGENERATOR\n\
+             Subscribe\tProjectTAG\tRunning Exhaust\t1\tPROCESS\tGENERATOR\n\
+             Chain\tBaseRateCalculator\tTotalActivityGenerator\n\
+             Chain\tBaseRateCalculator\tMesoscaleLookupTotalActivityGenerator\n\
+             Chain\tBaseRateCalculator\tProjectTAG\n",
+            Path::new("test"),
+        )
+        .unwrap();
+        CalculatorRegistry::new(build_dag(&info, &[]).unwrap())
+    }
+
+    /// Canonical `MOVESInstantiator` M1 swaps `TotalActivityGenerator` out for
+    /// `ProjectTAG` in the PROJECT domain and never instantiates `ProjectTAG`
+    /// anywhere else. Planning both is what made `scale-project` over-emit
+    /// 50.69x: they share the `SHO` scratch table and the county generator's
+    /// insert overwrote the project generator's append.
+    #[test]
+    fn planned_modules_swaps_total_activity_generator_by_domain() {
+        let mut spec = sample_runspec();
+        spec.domain = Some(ModelDomain::Project);
+        let engine = MOVESEngine::new(
+            spec,
+            total_activity_registry(),
+            config(Path::new("/tmp/unused")),
+        );
+        let planned = engine.planned_modules().unwrap();
+        assert!(
+            planned.contains(&"ProjectTAG".to_string()),
+            "PROJECT must plan ProjectTAG, got {planned:?}"
+        );
+        assert!(
+            !planned.contains(&"TotalActivityGenerator".to_string())
+                && !planned.contains(&"MesoscaleLookupTotalActivityGenerator".to_string()),
+            "PROJECT must not also plan a county/mesoscale total-activity generator \
+             (they clobber ProjectTAG's SHO), got {planned:?}"
+        );
+
+        let mut spec = sample_runspec();
+        spec.domain = Some(ModelDomain::Single);
+        let engine = MOVESEngine::new(
+            spec,
+            total_activity_registry(),
+            config(Path::new("/tmp/unused")),
+        );
+        let planned = engine.planned_modules().unwrap();
+        assert!(
+            planned.contains(&"TotalActivityGenerator".to_string()),
+            "County must plan TotalActivityGenerator, got {planned:?}"
+        );
+        assert!(
+            !planned.contains(&"ProjectTAG".to_string()),
+            "only PROJECT instantiates ProjectTAG, got {planned:?}"
         );
     }
 

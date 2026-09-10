@@ -50,6 +50,53 @@ pub struct RunSpec {
     pub output_factors: OutputFactors,
 }
 
+impl RunSpec {
+    /// Apply canonical MOVES' load-time consistency rules to the output
+    /// breakdown — the port of `RunSpecXML.enforceConsistency()`.
+    ///
+    /// The GUI enforces these invariants interactively; a RunSpec loaded
+    /// straight from XML has not been through the GUI, so MOVES re-applies
+    /// them on load. The one that changes emitted output:
+    ///
+    /// ```text
+    /// } else {   // !runSpec.models.contains(Model.NONROAD)
+    ///     // Enforce onroad SCC detail requirements. To create onroad SCC
+    ///     // output, MOVES requires several details to be enabled.
+    ///     if(runSpec.outputEmissionsBreakdownSelection.onRoadSCC) {
+    ///         runSpec.outputEmissionsBreakdownSelection.fuelType = true;
+    ///         runSpec.outputEmissionsBreakdownSelection.sourceUseType = true;
+    ///         runSpec.outputEmissionsBreakdownSelection.roadType = true;
+    ///         runSpec.outputEmissionsBreakdownSelection.emissionProcess = true;
+    ///     }
+    /// ```
+    ///
+    /// An onroad SCC is `concat('22', fuelTypeID, sourceTypeID, roadTypeID,
+    /// processID)` (`AggregationSQLGenerator.java`), so a run that asks for
+    /// SCC and *not* for those four dimensions would emit an SCC whose
+    /// subfields contradict the `NULL` columns beside it. Canonical resolves
+    /// that by promoting the four dimensions; without this the port emits
+    /// `sourceTypeID = NULL` where canonical emits the real source type
+    /// (measured on `scale-project`: canonical 21, port NULL, which made a
+    /// full-key join of the two `MOVESOutput` tables match 0 of 125 rows).
+    ///
+    /// Applied by `ExecutionRunSpec::new`, not by the XML/TOML parsers, so
+    /// the surface formats stay byte-round-trippable.
+    pub fn enforce_consistency(&mut self) {
+        if self.models.contains(&Model::Nonroad) {
+            // NONROAD runs take the `useNonroadRules` branch, whose only
+            // live statements concern `fuelSubType` (not modelled by
+            // `OutputBreakdown`) and `timeSpan.aggregateBy`.
+            return;
+        }
+        if self.output_breakdown.onroad_scc {
+            self.output_breakdown.fuel_type = true;
+            self.output_breakdown.source_use_type = true;
+            self.output_breakdown.road_type = true;
+            self.output_breakdown.emission_process = true;
+        }
+    }
+}
+
 /// `models > model[value]` — which engine the run drives.
 ///
 /// MOVES supports independent ONROAD (light/heavy on-highway vehicles) and
@@ -586,5 +633,73 @@ mod energy_unit_tests {
         let f = EnergyUnit::MillionBtu.factor_from_kilojoules();
         assert!((f - 1000.0 / (1055.0559 * 1_000_000.0)).abs() < 1e-18);
         assert!((1.0 / f - 1_055_055.9).abs() < 1.0);
+    }
+}
+
+#[cfg(test)]
+mod enforce_consistency_tests {
+    use super::{Model, OutputBreakdown, RunSpec};
+
+    fn onroad_with_scc() -> RunSpec {
+        RunSpec {
+            models: vec![Model::Onroad],
+            output_breakdown: OutputBreakdown {
+                onroad_scc: true,
+                // The whole 51-fixture corpus ships exactly this combination:
+                // `<onroadscc selected="true"/>` with
+                // `<sourceusetype selected="false"/>`.
+                source_use_type: false,
+                road_type: false,
+                emission_process: false,
+                fuel_type: false,
+                ..OutputBreakdown::default()
+            },
+            ..RunSpec::default()
+        }
+    }
+
+    #[test]
+    fn onroad_scc_promotes_its_four_subfields() {
+        // Canonical `RunSpecXML.enforceConsistency()`. Without it the port
+        // emitted `sourceTypeID = NULL` where canonical emits the real source
+        // type, and a full-key join of the two MOVESOutput tables matched
+        // 0 of 125 rows on `scale-project`.
+        let mut spec = onroad_with_scc();
+        spec.enforce_consistency();
+        assert!(spec.output_breakdown.source_use_type, "sourceTypeID");
+        assert!(spec.output_breakdown.road_type, "roadTypeID");
+        assert!(spec.output_breakdown.emission_process, "processID");
+        assert!(spec.output_breakdown.fuel_type, "fuelTypeID");
+    }
+
+    #[test]
+    fn no_scc_leaves_the_breakdown_alone() {
+        let mut spec = onroad_with_scc();
+        spec.output_breakdown.onroad_scc = false;
+        spec.enforce_consistency();
+        assert!(!spec.output_breakdown.source_use_type);
+        assert!(!spec.output_breakdown.road_type);
+        assert!(!spec.output_breakdown.emission_process);
+        assert!(!spec.output_breakdown.fuel_type);
+    }
+
+    #[test]
+    fn nonroad_runs_take_the_other_branch() {
+        // `useNonroadRules` is true whenever NONROAD is among the models; the
+        // onroad-SCC promotion is in the `else` arm and must not fire.
+        let mut spec = onroad_with_scc();
+        spec.models = vec![Model::Onroad, Model::Nonroad];
+        spec.enforce_consistency();
+        assert!(!spec.output_breakdown.source_use_type);
+        assert!(!spec.output_breakdown.road_type);
+    }
+
+    #[test]
+    fn it_is_idempotent() {
+        let mut a = onroad_with_scc();
+        a.enforce_consistency();
+        let mut b = a.clone();
+        b.enforce_consistency();
+        assert_eq!(a.output_breakdown, b.output_breakdown);
     }
 }
