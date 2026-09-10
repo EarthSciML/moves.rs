@@ -27,3 +27,24 @@ moves-output/
 # Execution-DB Arrow-IPC bundle (derived from committed Parquet files).
 # Generate with: moves-snapshot bundle-update <snapshot-dir...>
 execution-db.bundle
+
+# ---------------------------------------------------------------------------
+# KEEP THIS BLOCK LAST. Git applies the LAST matching pattern, so a negation
+# only survives if nothing below re-excludes the path.
+# ---------------------------------------------------------------------------
+
+# Published snapshot run logs are evidence, not scratch.
+# characterization/apptainer/run-fixture.sh copies the MOVES run log into
+# every snapshot it publishes, as characterization/snapshots/<fixture>/
+# moves-run.log. It is the only durable record that ant's exit 0 actually
+# corresponded to a MOVES that succeeded — ant's <java> task for MOVES has no
+# failonerror="true", so the log is the sole witness — and it is what lets the
+# run-log failure scan be re-measured against the whole published corpus
+# without re-running MOVES.
+#
+# A blanket `*.log` rule anywhere above would silently drop all 42 of them and
+# quietly undo that, with no error and no diff to notice. Hence the explicit
+# negation. characterization/apptainer/tests/run-fixture-guards.sh asserts via
+# `git check-ignore` that this path is still trackable; if you add a `*.log`
+# rule above, that test is what will tell you.
+!characterization/snapshots/*/moves-run.log
