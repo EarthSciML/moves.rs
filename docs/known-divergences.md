@@ -110,6 +110,15 @@ asserted fixtures (with each one's per-pollutant residual) lives in
 that file's per-fixture comments are the canonical, kept-current record of how
 each one was graduated.
 
+A handful of the start/idle/hotelling fixtures (`process-apu`,
+`process-crankcase-extidle`/`-start`, `process-extended-idle`, and their
+`-single` variants) are asserted **vacuous**: canonical's captured execution DB
+holds the base rate but its activity and output tables are empty, so canonical's
+authoritative output for the process is zero rows, and the port — gated by the
+same activity weighting — reproduces that (canon 0 == port 0). The `vacuous`
+flag makes the gate fail loudly if a recapture ever gives either side a nonzero
+row.
+
 ### Triage of 2026-09-08/09-10 snapshot additions
 
 Three snapshots were captured after the 2026-06-15 state above and were never
@@ -129,15 +138,6 @@ SO2 (31) -3.8e-7, Atmospheric CO2 (90) +1.5e-7, CO2 Equivalent (98) +1.2e-7.
 The whole of the reported -3.408e-4 is Total Energy Consumption (91), the same
 energy summation-drift class already carried by `expand-day` (-3.5e-4),
 `expand-month` (-3.8e-4) and `process-tirewear` (-3.4e-4).
-
-A handful of the start/idle/hotelling fixtures (`process-apu`,
-`process-crankcase-extidle`/`-start`, `process-extended-idle`, and their
-`-single` variants) are asserted **vacuous**: canonical's captured execution DB
-holds the base rate but its activity and output tables are empty, so canonical's
-authoritative output for the process is zero rows, and the port — gated by the
-same activity weighting — reproduces that (canon 0 == port 0). The `vacuous`
-flag makes the gate fail loudly if a recapture ever gives either side a nonzero
-row.
 
 ### 1b.1 `process-crankcase-start-single` recaptured 2026-09-10 (input-data fix)
 
