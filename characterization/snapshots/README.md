@@ -253,6 +253,43 @@ problem: retracting a stated guarantee and loosening the regression gate
 are decisions for a reviewer, and folding them into a 42-fixture recapture
 would make the diff impossible to reason about.
 
+## The corpus runs August, and that is a decision, not an oversight
+
+Every fixture writes `<month key="7"/>`. MOVES reads `key` as a **0-based
+index** into `TimeSpan.allMonths`, so that selects **monthID 8, August** —
+`_generate.py`'s entry said `# July` for most of this project's life. The same
+trap as `<day key=>`, found the same way.
+
+Confirmed from the corpus rather than the source: every published
+`RunSpecMonth` is `key + 1`. 41 fixtures at `key=7` -> 8, `sample-runspec`
+(byte-identical to EPA's own `SampleRunSpec.xml`) at `key=6` -> 7, and
+`expand-month` at `key=1` -> its four-month set.
+
+**Nothing here is wrong, and nothing needs recapturing.** Unlike `<day key=>`
+— where canonical ran two days while the port ran one, and 28 snapshots had to
+be retaken — the port resolves months exactly as canonical does:
+`XmlIndexedId::to_id` returns `key + 1`
+(`crates/moves-runspec/src/xml_format.rs:667-676`), and `:137` writes
+`key = m - 1` back out. Both sides see August. Every snapshot is internally
+consistent and correct.
+
+Three edits were considered on 2026-09-10 and the **first was chosen**:
+
+| | effect | cost |
+|---|---|---|
+| **leave `key=`, document it** | none | none |
+| `<month id="8"/>` | none — same month, both sides | 43 `provenance.json` records whose `runspec_sha256` no longer matches their XML |
+| `<month id="7"/>` | the corpus finally means the July it claimed | full recapture, ~2-3 h, every document quoting a snapshot number needs rechecking |
+
+The second was rejected because `runspec_sha256` is written by
+`moves-fixture-capture` and **verified by nothing**, so a relabel would leave
+43 provenance records quietly false in a repo whose recent history is largely
+about not doing that. The third buys a nicer label for the cost of a corpus.
+
+So: **read `months=(N,)` as monthID N+1**, and write any month-keyed input-DB
+filter against N+1. `characterization/fixtures/_generate.py` carries the same
+note at the point of use.
+
 ## Float encoding, and the v1 → v2 format change
 
 **The v1 → v2 recapture sweep ran on 2026-09-08/09: all 42 snapshots here
