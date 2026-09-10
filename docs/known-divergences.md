@@ -359,6 +359,54 @@ error in the PROJECT-domain activity or rate path, not a shape or coverage
 error — the shape agreeing on all six dimensions is what makes it worth
 chasing.
 
+#### The divergence factors into exactly two errors
+
+"~50x" is the wrong way to hold this. The factor is **not** uniform: joined
+per row, the 125 ratios are all distinct and run from **7.095x to 73.594x**,
+monotonically increasing with model year. A single scalar — a unit slip, a
+double-count — is ruled out by that alone.
+
+Two facts locate it.
+
+**(a) Canonical's emission tracks SHO; the port's does not.** Per unit of
+`SHO`, canonical is flat at 1.07-1.10 across ages 9-40, which is what energy
+consumption should look like (Sigma emissionQuant ~ source-hours x a rate that
+barely moves with age). The port's falls monotonically from 1.11 at age 0 to
+0.20 at age 40 — it carries an extra factor that decays with vehicle age.
+
+**(b) That factor is `relativeMAR`.** Dividing the port's output by
+`SourceTypeAge.relativeMAR` and re-comparing per age gives
+
+```
+ages 9-34:  mean 77.1669   stdev 0.0016   min 77.1611   max 77.1682
+            spread 0.01% of the mean
+```
+
+So the divergence is exactly:
+
+  1. **one spurious `relativeMAR` multiplication** — `SHO` already carries the
+     age weighting, and the port applies `relativeMAR` a second time on top of
+     it; and
+  2. **one constant factor of 77.167**, clean to 0.01% over 26 consecutive
+     ages.
+
+The observed 50.687 is those two composed: 77.167 x the SHO-weighted mean of
+`relativeMAR` (~0.657). The drift outside ages 9-34 (1.17-1.50 at the young
+end, 1.83-2.17 at ages 35-40) is the 40+ lump bin and the young-age tail of
+the age distribution, not a third error.
+
+A constant that stable is a single scalar in a single expression, so this
+should be findable by reading the PROJECT activity path rather than by
+bisecting. Both errors are in the port; neither is a canonical quirk.
+
+**A third, separate defect, found the same way:** the port emits
+`sourceTypeID = NULL` where canonical emits 21. It is not a magnitude
+problem, but it means a naive full-key join of the two `MOVESOutput` tables
+matches **zero of 125 rows**, which is why the comparison above keys on
+`(SCC, fuelTypeID, modelYearID, pollutantID, processID, linkID, hourID,
+dayID)` instead. `iterationID` (port NULL vs canonical 1) is the already-known
+metadata divergence from Section 1 and is not the same thing.
+
 This fixture is **not** wired into `canonical_snapshot_diff`. Doing so means
 editing `all_fixtures()`, which also feeds `all_fixtures_run_without_error`
 and the "exactly 48 non-scale non-error fixtures" catalogue assertion, so it
