@@ -85,6 +85,35 @@ From: ubuntu:24.04
     update-alternatives --install /usr/bin/java java "${TEMURIN_JAVA}" 1099 || true
     update-alternatives --set java "${TEMURIN_JAVA}" || true
 
+    # libharfbuzz0b — NOT used by any MOVES code path; installed so the image
+    # stops carrying a broken shared-library edge.
+    #
+    # `ant` pulls in default-jre-headless -> openjdk-21-jre-headless, and
+    # run-moves.sh deliberately runs MOVES on THAT JVM (the SIF's classes are
+    # javac-21 output, class file version 65), not on the Temurin 17 pinned
+    # above. openjdk-21-jre-headless *Recommends* libharfbuzz0b, libfontconfig1
+    # and libfreetype6; --no-install-recommends drops all three, so its
+    # lib/libfontmanager.so has an unsatisfiable NEEDED libharfbuzz.so.0:
+    #
+    #   UnsatisfiedLinkError: .../libfontmanager.so: libharfbuzz.so.0:
+    #   cannot open shared object file
+    #
+    # Measured, not assumed: Temurin 17's own libfontmanager.so has no
+    # libharfbuzz NEEDED entry and renders text fine, and libfontmanager is
+    # the Java2D font engine, which a headless MOVES run never initializes. A
+    # full instrumented process-crankcase-start capture under OpenJDK 21
+    # (JAVA_TOOL_OPTIONS=-verbose:class) loaded 4311 classes, 28 of them
+    # java.awt.* (Toolkit/Component/Window), and ZERO sun.font.* — and
+    # reproduced the reference snapshot exactly (286 execution tables,
+    # driveschedulesecond=63602, nrbaseyearequippopulation=62699,
+    # sourcetypeagedistribution=33579). All 44 existing snapshots were
+    # captured without this package.
+    #
+    # So this is latent, not active. It is installed here to be picked up at
+    # the NEXT deliberate rebuild — it is not a reason to rebuild, because a
+    # rebuild changes the SIF hash and invalidates every snapshot.
+    apt-get install -y --no-install-recommends libharfbuzz0b
+
     # ----- Go (version from versions.env: $GO_VERSION) -----
     cd /tmp
     wget -q "${GO_DOWNLOAD_URL}"

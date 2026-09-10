@@ -27,3 +27,29 @@ go_version         = "1.21.13"
 built_at_utc       = "2026-05-31T00:05:47Z"
 built_on_host      = "ccc0232.campuscluster.illinois.edu"
 apptainer_version  = "1.4.5-3.el9"
+
+# ---------------------------------------------------------------------------
+# PENDING (no rebuild performed)
+#
+# canonical-moves.def now installs libharfbuzz0b. This lock still describes
+# the PRE-change image, deliberately: the package fixes a latent, unreachable
+# UnsatisfiedLinkError in openjdk-21-jre-headless's libfontmanager.so, which
+# no MOVES code path loads, and rebuilding would change sif_sha256 and
+# invalidate every downstream snapshot. Both fields below change at the next
+# deliberate rebuild.
+#
+# ALSO OBSERVED, UNEXPLAINED: the canonical-moves.sif on disk does not match
+# this lock.
+#
+#   on disk (mtime 2026-06-14)  sha256 e5bde6a91b3f90df669102882b7a90d1cc6cb3af50320974dc980155fda8a45b
+#                               bytes  1120333824
+#   this lock  (built 05-31)    sha256 859521ac232460abfaac7d2af77ae8b7e92ca6ed7d4b565ce5d1f143817d1966
+#                               bytes  1120337920
+#
+# So canonical-moves.sif was rebuilt on 2026-06-14 without this lock being
+# regenerated. moves-fixture.sif is NOT affected — it still matches
+# fixture-image.lock byte for byte (4f92c593…), and every snapshot in
+# characterization/snapshots/ was captured with it. Tracked separately;
+# not repaired here, because writing the new hash in would assert a
+# provenance chain nobody has verified.
+# ---------------------------------------------------------------------------

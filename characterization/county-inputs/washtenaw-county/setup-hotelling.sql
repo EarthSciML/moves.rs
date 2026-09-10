@@ -5,6 +5,53 @@
 -- 1. Required geography tables (State, County, Zone, ZoneRoadType, RoadTypeDistribution)
 -- 2. County-specific hotelling data (hotellingHoursPerDay, hotellingActivityDistribution)
 --    Values equal national defaults so SINGLE output ≈ DEFAULT at hour 7.
+--
+-- WHY LITERAL INSERTs, AND NOT `CREATE TABLE ... LIKE` + `INSERT ... SELECT`
+--
+-- The obvious cleanup for this file is to stop hand-transcribing constants and
+-- copy them out of the default database instead. That was tried and measured;
+-- it does not reproduce this database, so it would invalidate every snapshot
+-- captured against it. Recorded here so the experiment is not repeated:
+--
+--   * Column types diverge in 15 places across 5 tables. The default DB stores
+--     roadTypeDistribution.roadTypeVMTFraction, county.GPAFract,
+--     county.barometricPressure(CV) and hotellingActivityDistribution.
+--     opModeFraction as `float`; these files declare them `double`. `... LIKE`
+--     inherits `float` and every value shifts by ~3e-8 relative
+--     (e.g. 0.338174 -> 0.33817398548126221). Also char/varchar, smallint/int
+--     and NOT NULL/NULL differences, and utf8mb4_uca1400_ai_ci vs
+--     utf8mb4_unicode_ci collations.
+--   * `... LIKE` also inherits the default DB's secondary indexes: +3 on
+--     zone, +3 on roadTypeDistribution, +3 on sourceTypeYear, +1 on
+--     zoneRoadType, +1 on year.
+--   * The literals here are the default values TRUNCATED TO 12 DECIMAL PLACES
+--     (0.001122533244 vs the default 0.00112253324381788, 1.6e-10 relative).
+--     The truncation is not cosmetic: it reaches the captured snapshots. The
+--     execution-database `zone` table in process-*-single reads
+--     1.122533244e-03 where every DEFAULT-scale fixture reads
+--     1.12253324381788e-03.
+--   * hotellingHoursPerDay, hotellingHours and startsPerDay are all EMPTY in
+--     movesdb20241112. There is nothing to SELECT from; those values are
+--     derived, not copied.
+--   * hotellingActivityDistribution in the default DB exists only for the
+--     national placeholder zone 990000, with different model-year bins
+--     (2021-2023 / 2024-2026 / 2027-2060 vs the single 2021-9999 bin here).
+--
+-- So the value here is not "a constant that could have been looked up". Treat
+-- these as frozen inputs to already-captured snapshots: changing any of them
+-- forces a recapture.
+--
+-- KNOWN DATA DEFECTS (documented, deliberately NOT fixed here)
+--
+-- The claim above that hotelling values "equal national defaults" is false for
+-- two of the three model-year bins. movesdb20241112 zone 990000 fuelTypeID 2:
+--   1950-2009: 200=0.8  201=0     203=0  204=0.2   <- matches
+--   2010-2020: 200=0.73 201=0.07  203=0  204=0.2   <- here: 203=0.03 204=0.17
+--   2021-2023: 200=0.48 201=0.24  203=0  204=0.28  <- here: 2021-9999 repeats
+--                                                     the 2010-2020 row
+-- SINGLE output therefore does NOT equal DEFAULT output for 2010+ model years.
+--
+-- See also EarthSciML/moves.rs#65 (startAllocFactor normalization).
 
 -- ---- Geography tables ----
 
