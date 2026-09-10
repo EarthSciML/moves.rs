@@ -11,7 +11,7 @@ Task 82 (the lazy-loading reader).
 |------|---------|
 | `audit-schema.py` | Parser/classifier. Reads the canonical MOVES `CreateDefault.sql` and `CreateNRDefault.sql` and emits `tables.json`. Byte-deterministic for a fixed input pair. |
 | `tables.json` | Machine-readable inventory. Schema tag `moves-default-db-schema/v1`. Consumed by Task 80 to drive per-table Parquet writes. |
-| `partitioning-plan.md` | Human-readable plan: which tables stay monolithic, which partition by year, by county, or by both, and why. |
+| `partitioning-plan.md` | Human-readable plan. Since Phase 7 the policy is one Parquet file per table; the document explains why partitioning was removed and what it had been costing. |
 | `README.md` | This file. |
 
 ## Regenerating
@@ -33,6 +33,14 @@ python3 characterization/default-db-schema/audit-schema.py \
     --moves-commit   "${PINNED}" \
     --output         characterization/default-db-schema/tables.json
 ```
+
+**Do not regenerate blindly.** The committed `tables.json` has been
+hand-reconciled against the actual `movesdb20241112` dump since it was
+first emitted — `Link` moved out of `schema_only` when Task 81 measured
+22,610 rows in it, and the table set differs from a fresh DDL parse by
+8 additions and 11 removals (243 parsed, 240 present). Re-running the
+script overwrites those corrections. Regenerate when the upstream DDL
+changes, then diff and re-apply the reconciliation.
 
 The parser captures every CREATE TABLE body plus the out-of-band
 `CREATE UNIQUE INDEX XPK<Table>` and `ALTER TABLE ... ADD KEY ...`

@@ -17,6 +17,14 @@ Drives off the partitioning plan from Task 79
 └── <Table>/modelYear=<y>/part.parquet              # model_year strategy
 ```
 
+**Since Phase 7 only the first two lines are actually produced**: the
+policy is one Parquet file per table (237 monolithic + 3 schema-only),
+because the EarthSciAST equi-join gate makes read cost track join
+matches rather than table size, and per-file Parquet footers made
+partitioning cost more than it saved. The other three strategies remain
+implemented and tested so a future table can be assigned one. See
+[`partitioning-plan.md`](../default-db-schema/partitioning-plan.md).
+
 The pipeline is re-runnable for future EPA default-DB releases: bump the
 SIF and `tables.json`, run `convert-default-db.sh`, get a fresh
 `<db-version>/` tree.
@@ -165,12 +173,13 @@ silently dropping data — the audit must be updated to reclassify it.
 ## Memory model
 
 The current implementation loads each table fully into memory before
-writing. The largest default-DB tables (≤50M rows per the audit caveats)
-fit comfortably on a workstation with 8 GiB RAM. Tables that grow past
-that threshold in future releases should be re-bucketed in `tables.json`
-(see `partitioning-plan.md`'s "large-monolithic re-review queue") so
-their partition layout drops the per-table memory footprint by
-construction.
+writing. Measured on `movesdb20241112`: 2.0 GB peak RSS for the whole
+240-table run, whose largest table is `IMCoverage` at 2,024,874 rows —
+two orders of magnitude below the 50M-row band the audit's estimator
+worried about. A future release that pushed a table past that would
+want streaming row groups, or a partition strategy assigned in
+`tables.json` for that table alone; the machinery for the latter is
+still here.
 
 ## Validation (Task 81)
 
@@ -249,13 +258,14 @@ Captured by Task 81, [bead `mo-eq5d`](#):
 
 These are deliberately out of scope and tracked elsewhere:
 
-1. **zone → county join.** Tables with `zoneID` PK are partitioned by
-   zone. The lazy-loading reader (Task 82) will join through the `Zone`
-   dimension when callers filter by county.
-2. **`large` monolithic re-review.** The partitioning plan flags tables
-   whose measured row count may exceed 50M. Task 80 records true row
-   counts in the manifest; if any future EPA release pushes a table
-   past that band, the audit needs to be reclassified.
+1. ~~**zone → county join.**~~ Moot: nothing is partitioned by zone any
+   more. A reader that filters by county joins the `Zone` dimension
+   against a whole-table read, which is what the equi-join gate makes
+   cheap.
+2. ~~**`large` monolithic re-review.**~~ Closed. The measured counts are
+   in the manifest and the largest table in `movesdb20241112` is
+   2,024,874 rows, 25× below the 50M band the queue was set up to
+   watch.
 3. **Row-group statistics.** Currently disabled for byte-stable hashes.
    Task 82 (the reader) may flip this once the determinism contract is
    relaxed to "content equivalence" rather than "byte equivalence".

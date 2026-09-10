@@ -1,208 +1,235 @@
 # Default-DB partitioning plan
 
-Phase 4 Task 79 deliverable. Per-table assignment of a Parquet partition
-strategy for converting `movesdb20241112` to the columnar layout the
-Phase 4 lazy-loading reader (Task 82) will consume. Drives Task 80 (the
-conversion pipeline) and Task 81 (the round-trip validation).
+Per-table Parquet layout for converting `movesdb20241112`. Drives the
+conversion pipeline (`crates/moves-default-db-convert`) and its
+round-trip validation. The machine-readable inventory is
+[`tables.json`](tables.json); companion: [`README.md`](README.md)
+(regeneration, estimator caveats).
 
-The full machine-readable inventory is in [`tables.json`](tables.json).
-This document explains the reasoning and lists the non-monolithic
-assignments. Companion: [`README.md`](README.md) (regeneration,
-estimator caveats).
+**The policy is: one Parquet file per table.** Nothing partitions.
 
-## Headline numbers
+## Why nothing partitions
 
-* **243 distinct tables** in `CreateDefault.sql` + `CreateNRDefault.sql`
-  at the pinned MOVES commit (after collapsing case-variant duplicates
-  per `lower_case_table_names=1`).
-* **221 monolithic** — single Parquet file per table.
-* **4 schema-only** — empty in default DB; populated per-run.
-* **11 partitioned by county/zone**, **2 by year × county**,
-  **5 by model year**.
-* No table is partitioned by year alone — every plausibly large
-  year-keyed table also carries a geographic axis (so it lands in
-  `year_x_county`) or carries a year *range* PK (`beginModelYearID`,
-  `endModelYearID`) rather than a single-year column.
+The original plan (Phase 4 Task 79) sharded the large tables by county,
+by year × county, or by model year, so that a run could read only the
+geography it named. That was the right answer to the question as it
+stood, and the question has since changed.
 
-## Partition strategies
+**The equi-join gate removed the premise.** The naive objection to a
+national table is that selecting one county out of 3,232 means paying
+for all of them. `join.on` in EarthSciAST `28bda86ac`
+(`CONFORMANCE_SPEC.md` §5.5.8) drives enumeration from the *match set*,
+so cost tracks matches rather than the product.
 
-| Strategy | Layout | When to use |
-|----------|--------|-------------|
-| `monolithic`     | `default-db/movesdb20241112/<table>.parquet` | < 1M rows, or no natural partition column |
-| `schema_only`    | `default-db/movesdb20241112/<table>.schema.json` (no Parquet) | ships empty; runtime materialises rows |
-| `county`         | `default-db/movesdb20241112/<table>/county=<id>/part.parquet` | county/zone-dominated activity table |
-| `year_x_county`  | `default-db/movesdb20241112/<table>/year=<y>/county=<id>/part.parquet` | both axes present and large |
-| `model_year`     | `default-db/movesdb20241112/<table>/modelYear=<y>/part.parquet` | model-year-dominated rate table |
+Measured on this database's own `IMCoverage`, national, 2,024,874 rows,
+joined on `countyID` against a county selection:
 
-`zoneID` and `countyID` collapse 1:1 at the default scale, so the
-`county` partition for a `zoneID`-keyed table uses the corresponding
-`countyID` as the partition value (the conversion script joins through
-the `Zone` table to map). `stateID`-only tables (NR allocation tables)
-partition by `stateID` directly — the file count is 51 rather than
-~3200, which is the right granularity for those allocation patterns.
+| selection | matches | cartesian pairs | wall | peak RSS |
+|---|---|---|---|---|
+| 1 county | 3,884 | 2.02 M | 0.17 s | 145 MB |
+| 10 counties | 79,424 | 20.2 M | 0.26 s | 145 MB |
+| 100 counties | 669,186 | 202.5 M | 0.72 s | 237 MB |
+| all 405 counties in the table | 2,024,874 | 820.1 M | 2.23 s | 508 MB |
 
-## Selection rules
+The cartesian product grows 40.5× from the 10-county arm to the
+405-county arm; wall clock grows 8.6×, tracking the match set (25.5×,
+sub-linear only because of a fixed ~0.15 s scan floor). Marginal cost
+is about 1 µs per match. Each arm asserts an exact match count computed
+independently, so none can pass on a partial read.
 
-The classifier applies these rules in order (see
-`audit-schema.py::_classify_partition`):
+**The join is cheaper than not joining.** For the single-county case
+the join arm runs in 0.17 s against 0.39 s for the same selection
+expressed as a filter over all 2 M rows: the gate skips rows the scan
+has to touch. Reading a national table and joining is not a cost
+tolerated for legibility, it is the faster spelling.
 
-1. **`empty` bucket** → `schema_only`. Activity/output tables that ship
-   empty in the default DB are not data-converted; the conversion
-   pipeline records the schema only and the runtime populates rows.
-2. **`tiny`/`small`/`medium` bucket** → `monolithic`. Below 1M rows a
-   single Parquet file with column statistics is the simplest read path
-   and predicate pushdown still prunes effectively.
-3. **`large`/`huge` with both `yearID` and `countyID`/`zoneID`** →
-   `year_x_county`. Both axes appear in MOVES filter clauses for these
-   tables (e.g. `IMCoverage` joins on `(countyID, yearID, polProcessID)`).
-4. **`large`/`huge` with `yearID` only** → `year`. Currently empty —
-   every year-keyed large table also has a county axis.
-5. **`large`/`huge` with `countyID`/`zoneID`/`stateID` only** →
-   `county`. Most NR allocation tables and `*ActivityFraction` /
-   `*Temperature` tables land here.
-6. **`large`/`huge` with `modelYearID` only** → `model_year`. NR rate
-   tables (`nrEmissionRate`, `nrCrankcaseEmissionRate`,
-   `nrEvapEmissionRate`) carry model-year-by-SCC-by-HP keys.
-7. **Otherwise** → `monolithic`, with a follow-up flag if the upper
-   bound is `large`/`huge` (see below).
+One caveat for later: peak RSS tracks the *match set*, which is
+materialised (145 MB at 79 K matches, 508 MB at 2.02 M). At county
+scale that is free. Joining two multi-million-row MOVES tables on a
+low-cardinality key would not be.
+
+**And partitioning was not free — it was the dominant cost.** Every
+Parquet file carries a footer: schema, row-group metadata, column
+chunk descriptors. Sharded to one file per (county, year), `IMCoverage`
+became 21,625 files averaging 17 KB, of which almost all is footer:
+
+| `IMCoverage` | files | on disk | Parquet bytes | rows |
+|---|---|---|---|---|
+| partitioned by year × county | 21,625 | 378 MB | 262,910,040 | 2,024,874 |
+| monolithic | 1 | 196 MB | 204,574,768 | 2,024,874 |
+
+and the same table written by pyarrow with Snappy plus dictionary
+encoding is 874,011 bytes. So the 378 MB that this document once cited
+as the reason to partition `IMCoverage` was, in order of magnitude:
+Parquet footers, then a writer configured for byte-determinism rather
+than size, and only then data. The data is under a megabyte.
+
+Across the whole database the layout change alone is:
+
+| | files | directories | on disk | Parquet bytes |
+|---|---|---|---|---|
+| partitioned (11 tables sharded) | 31,681 | 31,531 | 781 MB | 620,566,894 |
+| monolithic | 241 | 0 | 517 MB | 540,886,214 |
+
+The 264 MB saved on disk is footers, 4 KB block slack on 31,681 tiny
+files, and 4 KB per directory inode on 31,531 directories. The
+conversion takes 15.6 s wall for all 240 tables either way.
+
+## Strategies
+
+The converter still implements all five strategies and
+`partition.rs`'s unit tests still exercise them. What changed is the
+*policy*, not the capability: a future table that genuinely needs
+sharding can be assigned one in `tables.json`. Nothing in the shipped
+audit does.
+
+| Strategy | Layout | Currently used by |
+|----------|--------|-------------------|
+| `monolithic`     | `<table>.parquet` | **237 tables — everything with data** |
+| `schema_only`    | `<table>.schema.json` (no Parquet) | 3 tables that ship empty |
+| `county`         | `<table>/county=<id>/part.parquet` | none |
+| `year`           | `<table>/year=<y>/part.parquet` | none |
+| `year_x_county`  | `<table>/year=<y>/county=<id>/part.parquet` | none |
+| `model_year`     | `<table>/modelYear=<y>/part.parquet` | none |
+
+## Selection rule
+
+`audit-schema.py::_classify_partition` applies one rule:
+
+1. **`empty` bucket** → `schema_only`. The table ships empty in the
+   default DB and the runtime populates it; the pipeline records the
+   schema and writes no Parquet body.
+2. **everything else** → `monolithic`.
+
+`size_bucket` is still recorded per table. It no longer steers the
+layout.
+
+### `tables.json` is edited, not regenerated
+
+`audit-schema.py` parses the canonical MOVES DDL, and the shipped
+`tables.json` has been hand-reconciled against the actual
+`movesdb20241112` dump since it was first emitted: `Link` was
+reclassified out of `schema_only` when Task 81 found 22,610 rows in it,
+and the table set differs from a fresh DDL parse by 8 additions and 11
+removals (243 tables parsed from the DDL, 240 in the dump). Re-running
+the script would throw that reconciliation away. The classifier is kept
+in step with the policy so a *future* regeneration lands in the right
+place, but the current file was updated in place — only the 17
+`partition` blocks that were not already monolithic, a 34-line diff.
+
+`crates/moves-default-db-convert/tests/end_to_end.rs::shipped_audit_is_entirely_monolithic_or_schema_only`
+asserts the shipped composition (237 + 3), so a partition strategy
+cannot reappear in `tables.json` without a test change and a change to
+this document.
+
+## The 17 tables that were partitioned
+
+Six of them ship empty, and the old code wrote **no file at all** for
+them — a partitioned table with zero rows produces zero partitions.
+Monolithic writes an empty Parquet carrying the schema, so they are
+readable now.
+
+| table | old strategy | old files | old Parquet bytes | rows | new bytes |
+|---|---|---|---|---|---|
+| `IMCoverage` | year_x_county | 21,625 | 262,910,040 | 2,024,874 | 204,574,768 |
+| `fuelUsageFraction` | county | 3,230 | 73,094,900 | 1,424,430 | 68,393,510 |
+| `nrStateSurrogate` | county | 3,285 | 6,343,150 | 62,821 | 2,514,750 |
+| `regionCounty` | county | 3,233 | 16,128,634 | 407,233 | 13,035,902 |
+| `nrMonthAllocation` | county (by state) | 53 | 1,815,674 | 46,428 | 1,765,625 |
+| `nrEngtechFraction` | model_year | 26 | 632,522 | 9,554 | 593,957 |
+| `nrEmissionRate` | model_year | 1 | 4,424,850 | 55,471 | 4,424,850 |
+| `nrEvapEmissionRate` | model_year | 1 | 59,520 | 718 | 59,520 |
+| `nrCrankcaseEmissionRate` | model_year | 1 | 11,714 | 126 | 11,714 |
+| `nrUSMonthAllocation` | county (by state) | 1 | 32,890 | 840 | 32,890 |
+| `hotellingActivityDistribution` | county (by zone) | 1 | 3,096 | 36 | 3,096 |
+| `AverageTankGasoline` | county | 0 | 0 | 0 | 865 |
+| `AverageTankTemperature` | county | 0 | 0 | 0 | 1,050 |
+| `ColdSoakInitialHourFraction` | county | 0 | 0 | 0 | 935 |
+| `SoakActivityFraction` | county | 0 | 0 | 0 | 1,020 |
+| `hotellingHours` | year_x_county | 0 | 0 | 0 | 1,059 |
+| `GREETManfAndDisposal` | model_year | 0 | 0 | 0 | 744 |
+
+Note the tail: five of the eleven populated tables were "partitioned"
+into a single file, because the partition key had one distinct value in
+the default DB. The classifier had assigned them a strategy on an
+estimated upper-bound row count that the real data never approached.
 
 ## Schema-only — populated at runtime
 
-These tables exist in the default-DB DDL but ship empty. The conversion
-pipeline records the schema (column names + types + primary key) so
-downstream Rust code can validate inserts, but writes no Parquet data
-file.
+`SHO`, `SourceHours`, and `Starts`: the activity tables the migration
+plan singled out as needing partitioning, but only in the *execution*
+database. In the default DB they are empty shells. The pipeline records
+the schema (column names, types, primary key) as a `*.schema.json`
+sidecar so downstream Rust can validate inserts, but writes no Parquet.
 
-- `Link` — PK linkID
-- `SHO` — PK hourDayID × monthID × yearID × ageID × linkID × sourceTypeID
-- `SourceHours` — PK hourDayID × monthID × yearID × ageID × linkID × sourceTypeID
-- `Starts` — PK hourDayID × monthID × yearID × ageID × zoneID × sourceTypeID
+`Link` was on this list until Task 81 measured 22,610 rows in the
+shipped dump; it is monolithic.
 
-`SHO`, `SourceHours`, and `Starts` are the activity tables the
-migration plan singled out as needing partitioning, but only in the
-**execution** database — in the *default* database they are empty
-shells. Their analogues in the execution DB will be written by the
-runtime; Task 89 defines the output Parquet schema for those.
+## Row counts, measured
 
-## County / zone (11)
+The estimator in `audit-schema.py` multiplies primary-key cardinalities
+and attenuates by a sparsity prior. It is an upper bound and it is
+loose — that looseness is what put five single-file tables into a
+partitioned strategy. The conversion measures the truth: **8,436,056
+rows across 240 tables**, the largest being `IMCoverage` (2,024,874),
+`EmissionRateByAge` (1,590,830), and `fuelUsageFraction` (1,424,430).
+Nothing is within two orders of magnitude of the 50M-row threshold the
+old "large-monolithic re-review queue" set for revisiting a decision,
+so that queue is closed.
 
-- `AverageTankGasoline` — PK zoneID × fuelTypeID × fuelYearID × monthGroupID (`large`)
-- `AverageTankTemperature` — PK tankTemperatureGroupID × zoneID × monthID × hourDayID × opModeID (`huge`)
-- `ColdSoakInitialHourFraction` — PK sourceTypeID × zoneID × monthID × hourDayID × initialHourDayID (`huge`)
-- `fuelUsageFraction` — PK countyID × fuelYearID × modelYearGroupID × sourceBinFuelTypeID × fuelSupplyFuelTypeID (`large`)
-- `hotellingActivityDistribution` — PK zoneID × fuelTypeID × beginModelYearID × endModelYearID × opModeID (`large`)
-- `nrMonthAllocation` — PK SCC × stateID × monthID (`large`, partitioned by `stateID`)
-- `nrStateSurrogate` — PK surrogateID × stateID × countyID × surrogateYearID (`huge`)
-- `nrUSMonthAllocation` — PK SCC × stateID × monthID (`large`, partitioned by `stateID`)
-- `NRZoneAllocation` — PK surrogateID × stateID × zoneID (`large`)
-- `regionCounty` — PK regionID × countyID × regionCodeID × fuelYearID (`huge`)
-- `SoakActivityFraction` — PK sourceTypeID × zoneID × monthID × hourDayID × opModeID (`huge`)
+## `_tsv/` — the intermediate dump, and where it should live
 
-The county-only group is dominated by activity tables whose values vary
-geographically but not by year. Reading a per-run subset only needs
-the counties referenced by the runspec, so per-county Parquet files
-allow Polars to load the right slice via predicate pushdown.
+`convert-default-db.sh` stage 1 runs MariaDB inside the canonical SIF and
+writes `<Table>.tsv` + `<Table>.schema.tsv` for every table into
+`${OUTPUT_DIR}/_tsv` — *inside* the versioned tree. Stage 2 reads it.
+It is not part of the database; it is the conversion's input, and it is
+also the only thing that makes a shipped database re-validatable, since
+`moves-default-db-validate` cross-checks Parquet against the TSV rather
+than against MariaDB.
 
-## Year × county (2)
+It is inside the release asset. `default-db-movesdb20241112.tar.gz` is
+64.5 MB, and 38.3 MB of that — 59% — is `_tsv/` (337 MB raw, 481 files).
+Every consumer then excludes it on the way out: `ci.yml` and
+`package-default-db.yml` each carry their own `--exclude`/`--exclude`
+of `_tsv/`, and `default-db-gate.yml` a third.
 
-- `hotellingHours` — PK sourceTypeID × fuelTypeID × hourDayID × monthID × yearID × ageID × zoneID (`huge`)
-- `IMCoverage` — PK polProcessID × countyID × yearID × sourceTypeID × fuelTypeID × IMProgramID (`huge`)
+Recommendation, not yet done: keep shipping the TSVs — dropping them
+would make the released database unverifiable by its own validator —
+but stop nesting them inside the thing they are not part of. Write them
+to a sibling (`${OUTPUT_ROOT}/_tsv-${DB_VERSION}/`) and package them as
+a second asset. Then the database asset is just the database, three
+workflows stop re-implementing the same exclusion, and the asset drops
+to 14.6 MB gzipped (monolithic, measured).
 
-Both vary on the year and county axes simultaneously, and both have
-upper-bound row counts large enough that Task 80 should partition
-aggressively. `IMCoverage` is the MOVES I/M (Inspection / Maintenance)
-program lookup — the reader will always filter to a single county +
-year combination per chunk.
+The monolithic tree produced for Phase 7 has no `_tsv/` in it: the
+conversion was run with `--tsv-dir` pointing at the existing dump rather
+than re-dumping into the output. That is the layout this section
+recommends, arrived at by accident.
 
-## Model year (5)
+## Open question for the reader phase: writer settings, not layout
 
-- `GREETManfAndDisposal` — PK GREETVehicleType × modelYearID × pollutantID × EmissionStage (`large`)
-- `nrCrankcaseEmissionRate` — PK polProcessID × SCC × hpMin × hpMax × modelYearID × engTechID (`huge`)
-- `nrEmissionRate` — PK polProcessID × SCC × hpMin × hpMax × modelYearID × engTechID (`huge`)
-- `nrEngtechFraction` — PK SCC × hpMin × hpMax × modelYearID × processGroupID × engTechID (`huge`)
-- `nrEvapEmissionRate` — PK polProcessID × SCC × hpMin × hpMax × modelYearID × engTechID (`huge`)
+The Parquet writer is pinned uncompressed, no dictionary, no
+statistics, `PARQUET_1_0`, for a byte-determinism contract (see
+`parquet_writer.rs`) — two conversion runs produce byte-identical files
+and therefore identical manifest hashes, which is verified.
 
-Nonroad rate tables key on `modelYearID` and the SCC inventory. The
-default DB carries the full historical model-year window (1990 onward),
-but a single MOVES run typically activates a 30-year subset. Partition
-by `modelYearID` so the run loads only the relevant years.
+That pinning, not the layout, is now what the database's size is made
+of. Re-encoding the shipped output with Snappy plus dictionary
+encoding, content unchanged:
 
-## Large-monolithic re-review queue
+| | Parquet bytes | |
+|---|---|---|
+| as shipped | 540,886,214 | 515.8 MiB |
+| Snappy + dictionary | 16,597,230 | 15.8 MiB — 32.6× smaller |
+| Zstd + dictionary | 12,614,911 | 12.0 MiB — 42.9× smaller |
 
-These tables sort into the `large`/`huge` upper-bound bucket but have
-no natural year/county/model-year axis to partition on — usually
-because the PK is dominated by source-bin / process / pollutant
-combinations that already prune most rows when MOVES filters by
-`polProcessID`. The classifier leaves them monolithic.
+and reading is *faster* compressed, not slower: `IMCoverage` reads back
+in 0.058 s at 0.83 MiB versus 0.102 s at 195 MiB (pyarrow, best of 3,
+warm). The MOVES tables are overwhelmingly small repeated integers,
+which is the case dictionary encoding is for.
 
-Task 80 should **measure the actual row count** during conversion and
-revisit any whose true count exceeds 50M:
-
-- `ATRatio` — air-toxics fuel ratio
-- `EmissionRateByAge`, `EmissionRateByAgeLEV`, `EmissionRateByAgeNLEV` — running emission rates by age group
-- `evefficiency` — electric-vehicle efficiency by source / model-year range
-- `FuelSupply`, `nrFuelSupply` — fuel-formulation market share by fuel region / month / year
-- `fuelWizardFactors` — fuel parameter adjustment factors
-- `IMFactor` — I/M correction factors
-- `LinkHourVMTFraction` — VMT fraction by link / hour (link is empty in default DB; counts may collapse)
-- `nratratio`, `nrhcspeciation` — NR HC speciation
-- `nrRetrofitFactors` — NR retrofit programs
-- `NRTransientAdjustFactor` — NR transient adjustment
-- `onRoadRetrofit` — onroad retrofit programs
-- `OpModeDistribution` — empty in default DB; runtime-populated
-- `PMSpeciation` — PM speciation
-- `SizeWeightFraction` — vehicle size/weight distribution
-
-If the measured row count comes in below 1M for a table currently
-flagged here, leave it monolithic. For tables that genuinely exceed
-50M rows, the candidate alternatives are:
-
-1. Partition by `polProcessID` range — the most common MOVES filter axis
-   for rate tables. Use ~10 buckets so the file count stays bounded.
-2. Partition by `sourceTypeID` (13 buckets) or `fuelTypeID` (5 buckets).
-3. Use row-group statistics + sorted writes inside a single Parquet
-   file — preferred when the count is borderline.
-
-The conversion pipeline (Task 80) is the right place to make this
-final call because it has the true row counts. This document captures
-the schema-driven baseline; Task 80's actual measurements override.
-
-## Monolithic small/medium (221)
-
-The remaining 221 tables are dimension lookups (`SourceUseType`,
-`FuelType`, `County`, `Year`, `EmissionProcess`, `Pollutant`, …),
-small-cardinality cross-products (`SourceTypeAge`,
-`PollutantProcessAssoc`, …), and medium fact tables whose upper bound
-sits below the 1M-row partition threshold. All write as a single
-`<table>.parquet` file.
-
-The complete list is in `tables.json`; query examples:
-
-```bash
-# Tables in each strategy:
-jq '.tables | group_by(.partition.strategy) | map({strategy: .[0].partition.strategy, count: length, tables: map(.name)})' \
-    characterization/default-db-schema/tables.json
-
-# Monolithic tables in the medium bucket (1k–1M upper bound) sorted by size:
-jq '[.tables[] | select(.partition.strategy == "monolithic" and .size_bucket == "medium")]
-    | sort_by(.estimated_rows_upper_bound) | reverse | .[].name' \
-    characterization/default-db-schema/tables.json
-```
-
-## Open questions Task 80 should resolve
-
-1. **Empty-by-default tables.** Confirm `SHO`, `SourceHours`, `Starts`,
-   and `Link` ship with zero rows in `movesdb20241112` (the DDL implies
-   so, but the dump is authoritative). If any of them ship populated,
-   reclassify per measured size.
-2. **`evefficiency` and `onRoadRetrofit`** carry `beginModelYearID` /
-   `endModelYearID` range PKs. These encode piecewise-constant rules
-   per model-year *range*, not per model-year *value* — partitioning
-   by model year would replicate rows across buckets. Stay monolithic.
-3. **`FuelSupply` partitioning.** The PK is `(fuelRegionID, fuelYearID,
-   monthGroupID, fuelFormulationID)`. If real row count >10M, partition
-   by `fuelYearID` — MOVES runs typically filter to a single fuel year.
-4. **Run-populated tables outside `schema_only`.** Tables like
-   `OpModeDistribution` (`linkID`-keyed) appear to be populated by the
-   execution DB at runtime, not the default DB. Verify during Task 80
-   and reclassify to `schema_only` if confirmed.
+This is left as it is. Changing it trades away the byte-determinism
+contract for a compressor's version-stability, and it needs a check
+that the reader decompresses Snappy — neither is a layout question.
+Recorded here because it is the next 30× on the table and the layout
+work is what surfaced it.
