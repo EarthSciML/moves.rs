@@ -26,11 +26,31 @@
 //! 10^9, rounded, and accumulated as i128, so it deliberately collapses
 //! magnitudes below ~1e-9 to zero and does NOT detect sub-1e-9
 //! differences on its own. Do not rely on the float sum for fidelity
-//! of small-rate columns — the exact min/max/count checks carry that.
+//! of small-rate columns — the min/max/count checks carry the extremes
+//! and the per-column content digest (check 6) carries every value in
+//! between, exactly.
 //! 5. **First-row spot check** — read the first row from the source TSV
 //! and the first row from the first partition, compare field-by-field
 //! using the converter's TSV-decode rules. Catches obvious type/order
 //! regressions even if the aggregates accidentally collide.
+//! 6. **Per-column content digest** — an order-independent 64-bit digest
+//! (add + xor of a per-cell hash) over *every* column of *every* type,
+//! nulls included. This is the exact check the aggregates are not:
+//! floats hash their IEEE-754 bit pattern rather than a quantised sum,
+//! and `Utf8`/`Boolean` columns — which checks 1-4 only ever counted
+//! non-nulls on — are covered cell by cell. A planted 1e-12 change to
+//! a mid-range float, and a planted one-character change to a string,
+//! both passed every other check in this module and are caught here.
+//! 7. **Row-multiset digest** — the same construction folded row-wise
+//! first, so the table-level comparison establishes that the Parquet
+//! body is the same *multiset of rows* as the source TSV. Per-column
+//! digests cannot show this: swapping two cells within one column
+//! leaves every column's multiset intact while moving two rows.
+//!
+//! Checks 6 and 7 are order-independent by construction, which is what
+//! lets them work unchanged for a partitioned table (whose rows are
+//! regrouped on the way out). The cost is that a pure permutation of
+//! whole rows is not detected; check 5 is the only ordering signal.
 //!
 //! This module is deliberately self-contained: it does not depend on
 //! MariaDB or the SIF at validation time. Transitivity argument:
@@ -42,7 +62,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use arrow::array::{Array, Float64Array, Int64Array};
+use arrow::array::{Array, BooleanArray, Float64Array, Int64Array, StringArray};
 use arrow::datatypes::DataType;
 use bytes::Bytes;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
@@ -595,11 +615,126 @@ struct ColumnAggregate {
     /// cross-comparison anyway.
     float_sum_scaled: i128,
     float_seen: bool,
+    /// Order-independent exact content digest over every cell in the
+    /// column, nulls included. See [`hash_cell`] for the canonical
+    /// encoding. `add` and `xor` are kept separately because they fail
+    /// differently: xor catches any single changed cell outright, add
+    /// catches the paired changes that xor cancels.
+    digest_add: u64,
+    digest_xor: u64,
 }
 
 #[derive(Debug, Default)]
 struct ColumnAggregates {
     by_name: HashMap<String, ColumnAggregate>,
+    /// Order-independent digest over whole rows: each row's cells are
+    /// folded in column order into one row hash, and the row hashes are
+    /// then combined commutatively. Equal row digests mean the two sides
+    /// hold the same *multiset of rows*, which per-column digests alone
+    /// do not establish — swapping two values within one column leaves
+    /// every column digest untouched but moves two rows.
+    row_digest_add: u64,
+    row_digest_xor: u64,
+}
+
+/// Canonical per-cell hash. The tag byte keeps the type domains disjoint,
+/// so a string `"1"` can never collide with the integer `1`, and a null
+/// can never collide with a value. Floats hash their exact IEEE-754 bit
+/// pattern, which is what makes this check strictly sharper than the
+/// scaled float sum: the sum deliberately quantises at 1e-9, the digest
+/// does not quantise at all.
+fn hash_cell(arrow: &DataType, cell: Option<&str>) -> u64 {
+    const TAG_NULL: u8 = b'n';
+    const TAG_INT: u8 = b'i';
+    const TAG_FLOAT: u8 = b'f';
+    const TAG_BOOL: u8 = b'b';
+    const TAG_STR: u8 = b's';
+    // An unparseable numeric cell hashes under its own tag rather than
+    // being skipped, so "TSV says 'abc', Parquet says 0.0" cannot pass.
+    const TAG_UNPARSED: u8 = b'x';
+
+    let Some(text) = cell else {
+        return hash_bytes(&[TAG_NULL]);
+    };
+    match arrow {
+        DataType::Int64 => match text.parse::<i64>() {
+            Ok(v) => hash_tagged_word(TAG_INT, v as u64),
+            Err(_) => hash_tagged_str(TAG_UNPARSED, text),
+        },
+        DataType::Float64 => match text.parse::<f64>() {
+            Ok(v) => hash_tagged_word(TAG_FLOAT, v.to_bits()),
+            Err(_) => hash_tagged_str(TAG_UNPARSED, text),
+        },
+        DataType::Boolean => match normalize_bool(text) {
+            Some(v) => hash_bytes(&[TAG_BOOL, v as u8]),
+            None => hash_tagged_str(TAG_UNPARSED, text),
+        },
+        _ => hash_tagged_str(TAG_STR, text),
+    }
+}
+
+fn hash_int_cell(v: i64) -> u64 {
+    hash_tagged_word(b'i', v as u64)
+}
+
+fn hash_float_cell(v: f64) -> u64 {
+    hash_tagged_word(b'f', v.to_bits())
+}
+
+fn hash_bool_cell(v: bool) -> u64 {
+    hash_bytes(&[b'b', v as u8])
+}
+
+fn hash_str_cell(s: &str) -> u64 {
+    hash_tagged_str(b's', s)
+}
+
+fn hash_null_cell() -> u64 {
+    hash_bytes(b"n")
+}
+
+fn hash_tagged_word(tag: u8, word: u64) -> u64 {
+    let mut buf = [0u8; 9];
+    buf[0] = tag;
+    buf[1..].copy_from_slice(&word.to_le_bytes());
+    hash_bytes(&buf)
+}
+
+fn hash_tagged_str(tag: u8, s: &str) -> u64 {
+    let mut buf = Vec::with_capacity(s.len() + 1);
+    buf.push(tag);
+    buf.extend_from_slice(s.as_bytes());
+    hash_bytes(&buf)
+}
+
+/// FNV-1a, finished with the splitmix64 finaliser so a one-byte input
+/// difference spreads over the whole word (plain FNV-1a leaves low-order
+/// structure that a commutative accumulator can cancel).
+fn hash_bytes(bytes: &[u8]) -> u64 {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for b in bytes {
+        h ^= *b as u64;
+        h = h.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    let mut z = h.wrapping_add(0x9e37_79b9_7f4a_7c15);
+    z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+    z ^ (z >> 31)
+}
+
+/// Fold one cell hash into a row hash. Order-*dependent* on purpose:
+/// within a row, column position matters.
+fn fold_row(acc: u64, cell: u64) -> u64 {
+    (acc ^ cell)
+        .wrapping_mul(0x0000_0100_0000_01b3)
+        .rotate_left(17)
+}
+
+impl ColumnAggregate {
+    fn absorb_digest(&mut self, h: u64) {
+        self.digest_add = self.digest_add.wrapping_add(h);
+        self.digest_xor ^= h;
+    }
 }
 
 impl ColumnAggregates {
@@ -626,70 +761,148 @@ impl ColumnAggregates {
                     float_max_bits: (-f64::INFINITY).to_bits(),
                     float_sum_scaled: 0,
                     float_seen: false,
+                    digest_add: 0,
+                    digest_xor: 0,
                 },
             );
         }
-        Self { by_name }
+        Self {
+            by_name,
+            row_digest_add: 0,
+            row_digest_xor: 0,
+        }
+    }
+
+    fn absorb_row_digest(&mut self, row_hash: u64) {
+        self.row_digest_add = self.row_digest_add.wrapping_add(row_hash);
+        self.row_digest_xor ^= row_hash;
     }
 
     fn absorb_batch(&mut self, batch: &arrow::record_batch::RecordBatch) {
+        let n_rows = batch.num_rows();
+        // Per-cell hashes, column-major (cache-friendly), then folded
+        // row-wise below. Column order is the batch's own, which the
+        // schema cross-check has already tied to the manifest order — the
+        // same order the TSV side folds in.
+        let mut cell_hashes: Vec<Vec<u64>> = Vec::with_capacity(batch.num_columns());
+
         for col_idx in 0..batch.num_columns() {
             let field = batch.schema().field(col_idx).clone();
             let name = field.name().to_string();
-            let Some(agg) = self.by_name.get_mut(&name) else {
-                continue;
-            };
             let array = batch.column(col_idx);
+            let mut hashes = Vec::with_capacity(n_rows);
+
             match field.data_type() {
                 DataType::Int64 => {
                     let a = array.as_any().downcast_ref::<Int64Array>().unwrap();
                     for i in 0..a.len() {
                         if a.is_null(i) {
-                            continue;
+                            hashes.push(hash_null_cell());
+                        } else {
+                            hashes.push(hash_int_cell(a.value(i)));
                         }
-                        let v = a.value(i);
-                        agg.count_non_null += 1;
-                        agg.int_seen = true;
-                        if v < agg.int_min {
-                            agg.int_min = v;
-                        }
-                        if v > agg.int_max {
-                            agg.int_max = v;
-                        }
-                        agg.int_sum = agg.int_sum.wrapping_add(v as i128);
                     }
                 }
                 DataType::Float64 => {
                     let a = array.as_any().downcast_ref::<Float64Array>().unwrap();
                     for i in 0..a.len() {
                         if a.is_null(i) {
-                            continue;
+                            hashes.push(hash_null_cell());
+                        } else {
+                            hashes.push(hash_float_cell(a.value(i)));
                         }
-                        let v = a.value(i);
-                        agg.count_non_null += 1;
-                        agg.float_seen = true;
-                        update_float_min_max(agg, v);
-                        agg.float_sum_scaled =
-                            agg.float_sum_scaled.wrapping_add(scale_f64_to_i128(v));
+                    }
+                }
+                DataType::Boolean => {
+                    let a = array.as_any().downcast_ref::<BooleanArray>().unwrap();
+                    for i in 0..a.len() {
+                        if a.is_null(i) {
+                            hashes.push(hash_null_cell());
+                        } else {
+                            hashes.push(hash_bool_cell(a.value(i)));
+                        }
                     }
                 }
                 _ => {
-                    for i in 0..array.len() {
-                        if !array.is_null(i) {
-                            agg.count_non_null += 1;
+                    let a = array.as_any().downcast_ref::<StringArray>().unwrap();
+                    for i in 0..a.len() {
+                        if a.is_null(i) {
+                            hashes.push(hash_null_cell());
+                        } else {
+                            hashes.push(hash_str_cell(a.value(i)));
                         }
                     }
                 }
             }
+
+            if let Some(agg) = self.by_name.get_mut(&name) {
+                for h in &hashes {
+                    agg.absorb_digest(*h);
+                }
+                match field.data_type() {
+                    DataType::Int64 => {
+                        let a = array.as_any().downcast_ref::<Int64Array>().unwrap();
+                        for i in 0..a.len() {
+                            if a.is_null(i) {
+                                continue;
+                            }
+                            let v = a.value(i);
+                            agg.count_non_null += 1;
+                            agg.int_seen = true;
+                            if v < agg.int_min {
+                                agg.int_min = v;
+                            }
+                            if v > agg.int_max {
+                                agg.int_max = v;
+                            }
+                            agg.int_sum = agg.int_sum.wrapping_add(v as i128);
+                        }
+                    }
+                    DataType::Float64 => {
+                        let a = array.as_any().downcast_ref::<Float64Array>().unwrap();
+                        for i in 0..a.len() {
+                            if a.is_null(i) {
+                                continue;
+                            }
+                            let v = a.value(i);
+                            agg.count_non_null += 1;
+                            agg.float_seen = true;
+                            update_float_min_max(agg, v);
+                            agg.float_sum_scaled =
+                                agg.float_sum_scaled.wrapping_add(scale_f64_to_i128(v));
+                        }
+                    }
+                    _ => {
+                        for i in 0..array.len() {
+                            if !array.is_null(i) {
+                                agg.count_non_null += 1;
+                            }
+                        }
+                    }
+                }
+            }
+            cell_hashes.push(hashes);
+        }
+
+        for row in 0..n_rows {
+            let mut acc: u64 = 0;
+            for col in &cell_hashes {
+                acc = fold_row(acc, col[row]);
+            }
+            self.absorb_row_digest(acc);
         }
     }
 
     fn absorb_tsv_row(&mut self, columns: &[SchemaColumn], row: &[Option<String>]) {
+        let mut row_acc: u64 = 0;
         for (i, col) in columns.iter().enumerate() {
+            let cell = row.get(i).and_then(|c| c.as_deref());
+            row_acc = fold_row(row_acc, hash_cell(&col.arrow_type, cell));
+
             let Some(agg) = self.by_name.get_mut(&col.name) else {
                 continue;
             };
-            let cell = row.get(i).and_then(|c| c.as_ref());
+            agg.absorb_digest(hash_cell(&col.arrow_type, cell));
             let Some(value) = cell else { continue };
             agg.count_non_null += 1;
             match &col.arrow_type {
@@ -716,6 +929,7 @@ impl ColumnAggregates {
                 _ => {}
             }
         }
+        self.absorb_row_digest(row_acc);
     }
 }
 
@@ -749,6 +963,23 @@ fn compare_aggregates(
     table: &str,
     report: &mut ValidationReport,
 ) {
+    if (tsv.row_digest_add, tsv.row_digest_xor) != (parquet.row_digest_add, parquet.row_digest_xor)
+    {
+        push(
+            report,
+            table,
+            FindingKind::RowContentError,
+            format!(
+                "row-multiset digest tsv=({:#018x},{:#018x}) parquet=({:#018x},{:#018x}) — \
+                 the Parquet body is not the same multiset of rows as the source TSV",
+                tsv.row_digest_add,
+                tsv.row_digest_xor,
+                parquet.row_digest_add,
+                parquet.row_digest_xor
+            ),
+        );
+    }
+
     for (name, t) in &tsv.by_name {
         let Some(p) = parquet.by_name.get(name) else {
             push(
@@ -759,6 +990,19 @@ fn compare_aggregates(
             );
             continue;
         };
+        if (t.digest_add, t.digest_xor) != (p.digest_add, p.digest_xor) {
+            push(
+                report,
+                table,
+                FindingKind::AggregateError,
+                format!(
+                    "column '{name}': content digest tsv=({:#018x},{:#018x}) \
+                     parquet=({:#018x},{:#018x}) — the two sides hold different \
+                     cell values (exact, all types, nulls included)",
+                    t.digest_add, t.digest_xor, p.digest_add, p.digest_xor
+                ),
+            );
+        }
         if t.count_non_null != p.count_non_null {
             push(
                 report,
@@ -941,6 +1185,173 @@ mod tests {
         .unwrap();
         assert!(report.has_errors());
         assert!(report.summary.manifest_drift > 0);
+    }
+
+    /// Build a converted tree from a caller-supplied TSV body, then hand
+    /// back the pieces so a test can corrupt the TSV and re-validate.
+    fn setup_with_rows(rows: &[u8]) -> (PathBuf, PathBuf, tempfile::TempDir) {
+        let dir = tempdir().unwrap();
+        let tsv_dir = dir.path().join("tsv");
+        let out_dir = dir.path().join("out");
+        let plan = dir.path().join("plan.json");
+        write_file(&plan, &tiny_plan());
+        write_file(
+            &tsv_dir.join("Sample.schema.tsv"),
+            b"id\tint\tPRI\nv\tdouble\t\ntag\tvarchar\t\n",
+        );
+        write_file(&tsv_dir.join("Sample.tsv"), rows);
+        let opts = crate::convert::ConvertOptions {
+            tsv_dir: tsv_dir.clone(),
+            plan_path: plan,
+            output_root: out_dir.clone(),
+            moves_db_version: "movesdb20241112".into(),
+            generated_at_utc: Some("1970-01-01T00:00:00Z".into()),
+            require_every_table: true,
+        };
+        crate::convert::convert(&opts).unwrap();
+        (tsv_dir, out_dir, dir)
+    }
+
+    fn revalidate(tsv_dir: PathBuf, out_dir: PathBuf) -> ValidationReport {
+        validate(&ValidateOptions {
+            output_root: out_dir,
+            tsv_dir,
+            aggregate_row_cap: None,
+        })
+        .unwrap()
+    }
+
+    /// A changed string cell moves no numeric aggregate at all — before
+    /// the content digest, the validator passed this clean. Utf8 columns
+    /// were only ever checked for non-null count.
+    #[test]
+    fn validate_catches_a_changed_string_cell() {
+        let (tsv_dir, out_dir, _guard) =
+            setup_with_rows(b"1\t1.5\talpha\n2\tNULL\tbeta\n3\t-2.25\tgamma\n");
+        write_file(
+            &tsv_dir.join("Sample.tsv"),
+            b"1\t1.5\talphb\n2\tNULL\tbeta\n3\t-2.25\tgamma\n",
+        );
+        let report = revalidate(tsv_dir, out_dir);
+        assert!(report.has_errors(), "string change went undetected");
+        assert!(report.summary.aggregate_errors > 0);
+        assert!(report
+            .findings
+            .iter()
+            .any(|f| f.message.contains("content digest") && f.message.contains("tag")));
+    }
+
+    /// A float change of 1e-12 on a value that is neither the column min
+    /// nor its max shifts nothing the scaled sum can see: 3.000000000001
+    /// × 10^9 rounds to the same integer as 3.0 × 10^9. The exact bit
+    /// digest sees it.
+    #[test]
+    fn validate_catches_a_sub_nanosecond_float_change() {
+        let (tsv_dir, out_dir, _guard) =
+            setup_with_rows(b"1\t1\talpha\n2\t5\tbeta\n3\t3\tgamma\n4\t9\tdelta\n");
+        write_file(
+            &tsv_dir.join("Sample.tsv"),
+            b"1\t1\talpha\n2\t5\tbeta\n3\t3.000000000001\tgamma\n4\t9\tdelta\n",
+        );
+        let report = revalidate(tsv_dir, out_dir);
+        assert!(report.has_errors(), "sub-1e-9 float change went undetected");
+        let digest_findings: Vec<&Finding> = report
+            .findings
+            .iter()
+            .filter(|f| f.message.contains("content digest"))
+            .collect();
+        assert!(
+            !digest_findings.is_empty(),
+            "expected a content-digest finding, got {:?}",
+            report.findings
+        );
+        // And prove the coarse signal really is blind to it, so this test
+        // is not silently riding on the scaled sum.
+        assert!(
+            !report
+                .findings
+                .iter()
+                .any(|f| f.message.contains("scaled-float sum")),
+            "scaled-float sum was expected to miss this: {:?}",
+            report.findings
+        );
+    }
+
+    /// Swapping two values within one column leaves every per-column
+    /// aggregate — digest included — untouched, because the column's
+    /// multiset of cells has not changed. Only the row-multiset digest
+    /// notices that two rows moved.
+    #[test]
+    fn validate_catches_a_within_column_swap_via_the_row_digest() {
+        let (tsv_dir, out_dir, _guard) =
+            setup_with_rows(b"1\t1.5\talpha\n2\t2.5\tbeta\n3\t-2.25\tgamma\n");
+        write_file(
+            &tsv_dir.join("Sample.tsv"),
+            b"1\t1.5\tbeta\n2\t2.5\talpha\n3\t-2.25\tgamma\n",
+        );
+        let report = revalidate(tsv_dir, out_dir);
+        assert!(report.has_errors(), "within-column swap went undetected");
+        assert_eq!(
+            report.summary.aggregate_errors, 0,
+            "per-column aggregates should be blind to a swap: {:?}",
+            report.findings
+        );
+        assert!(report.summary.row_content_errors > 0);
+        assert!(report
+            .findings
+            .iter()
+            .any(|f| f.message.contains("row-multiset digest")));
+    }
+
+    /// Nulls take part in the digest, so replacing a value with NULL is
+    /// caught even where the non-null count is compared per column (it
+    /// is) — this pins the null encoding itself.
+    #[test]
+    fn digest_distinguishes_null_from_value() {
+        assert_ne!(
+            hash_cell(&DataType::Utf8, None),
+            hash_cell(&DataType::Utf8, Some("")),
+        );
+        assert_ne!(
+            hash_cell(&DataType::Int64, Some("1")),
+            hash_cell(&DataType::Utf8, Some("1")),
+        );
+        assert_eq!(
+            hash_cell(&DataType::Float64, Some("1.5")),
+            hash_cell(&DataType::Float64, Some("1.50")),
+        );
+        assert_ne!(
+            hash_cell(&DataType::Float64, Some("1.5")),
+            hash_cell(&DataType::Float64, Some("1.5000000000001")),
+        );
+        // An unparseable numeric cell must not collapse onto a real value.
+        assert_ne!(
+            hash_cell(&DataType::Int64, Some("abc")),
+            hash_cell(&DataType::Int64, Some("0")),
+        );
+    }
+
+    /// The TSV side goes through `hash_cell`, the Parquet side through the
+    /// typed `hash_*_cell` helpers. If those two encodings ever drift, the
+    /// digest compares apples to oranges and every table goes red (or,
+    /// worse, a real difference cancels). Pin them together.
+    #[test]
+    fn tsv_and_parquet_cell_encodings_agree() {
+        assert_eq!(hash_null_cell(), hash_cell(&DataType::Int64, None));
+        assert_eq!(hash_null_cell(), hash_cell(&DataType::Utf8, None));
+        assert_eq!(hash_int_cell(-7), hash_cell(&DataType::Int64, Some("-7")));
+        assert_eq!(
+            hash_float_cell(1.5),
+            hash_cell(&DataType::Float64, Some("1.5"))
+        );
+        assert_eq!(
+            hash_bool_cell(true),
+            hash_cell(&DataType::Boolean, Some("1"))
+        );
+        assert_eq!(
+            hash_str_cell("alpha"),
+            hash_cell(&DataType::Utf8, Some("alpha"))
+        );
     }
 
     #[test]
