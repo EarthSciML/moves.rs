@@ -296,6 +296,29 @@ jobs:
       - name: run-fixture.sh guard regression
         run: characterization/apptainer/tests/run-fixture-guards.sh
 
+  # ── Audit scenario-list guards (issue #63) ────────────────────────────────
+  #
+  # characterization/audit/typical-scenarios.txt named a fixture that
+  # 2122513e had deleted. run-comparison.sh treated the dangling name as a
+  # [SKIP] and only exited 1 at the very end, which killed the comparison STEP
+  # of audit-regression-gate.yml before the step that runs regression_gate.sh
+  # — so the numeric gate never ran on any PR while looking like it had.
+  #
+  # This job runs the pre-flight guards via --check-scenarios: no cargo build,
+  # no Apptainer, no SIF, ~2 s. It is the tripwire that goes red the next time
+  # a fixture is retired without updating the scenario list. Deliberately here
+  # in ci.yml, which runs on every push, rather than in audit-regression-gate
+  # .yml, which is paths-filtered to PRs touching two crates and so never runs
+  # on main — that filter is why the dead gate stayed invisible.
+  audit-scenario-guards:
+    name: audit scenario-list guards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: run-comparison.sh scenario pre-flight guards
+        run: characterization/audit/tests/scenario-list-guards.sh
+
   deny:
     name: cargo deny
     runs-on: ubuntu-latest

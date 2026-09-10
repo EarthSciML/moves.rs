@@ -1,9 +1,32 @@
+# Scenario list for characterization/audit/run-comparison.sh (and the
+# audit-regression-gate CI job). One fixture name per line; blank lines and
+# `#` comments are ignored.
+#
+# Every name here MUST resolve to a characterization/fixtures/<name>.xml
+# (matched case-insensitively with non-alphanumerics stripped). A name that
+# does not resolve is a hard configuration error — run-comparison.sh refuses
+# to start rather than skipping it. See issue #63: `mixed-onroad-nonroad`
+# outlived the fixture 2122513e deleted, and the gate reported nothing for
+# months while looking like it ran.
+#
+# Check this list without running anything:
+#   ./characterization/audit/run-comparison.sh --check-scenarios
+
 process-evap-permeation
 process-evap-leaks
 process-evap-fvv
 SampleRunSpec
 expand-counties
 expand-day
-mixed-onroad-nonroad
+
+# The two halves 2122513e split the retired `mixed-onroad-nonroad` fixture
+# into. Canonical MOVES 5.0.1 cannot run ONROAD+NONROAD in one RunSpec
+# (ExecutionRunSpec.buildVehicleSelections leaves the M12 case a stub), so the
+# retired fixture emitted an all-zero MOVESOutput and could never validate the
+# port. Both halves have committed snapshots, so replacing one dead name with
+# two live ones widens the gate's coverage rather than shrinking it.
+mixed-onroad
+nr-mixed-nonroad
+
 nr-agriculture-state
 nr-commercial-nation
