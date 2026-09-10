@@ -1,0 +1,55 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__physicsoperatingmode",
+  "schema": [
+    {
+      "name": "opModeID",
+      "kind": "int64"
+    },
+    {
+      "name": "opModeName",
+      "kind": "utf8"
+    },
+    {
+      "name": "VSPLower",
+      "kind": "float64"
+    },
+    {
+      "name": "VSPUpper",
+      "kind": "float64"
+    },
+    {
+      "name": "speedLower",
+      "kind": "float64"
+    },
+    {
+      "name": "speedUpper",
+      "kind": "float64"
+    },
+    {
+      "name": "brakeRate1Sec",
+      "kind": "float64"
+    },
+    {
+      "name": "brakeRate3Sec",
+      "kind": "float64"
+    },
+    {
+      "name": "minSoakTime",
+      "kind": "int64"
+    },
+    {
+      "name": "maxSoakTime",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "opModeID"
+  ],
+  "row_count": 85,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "8c5dd2ccfac9616f986e2e31fc9f6adf654b1144a3df7168be4377a08f0f8245"
+}

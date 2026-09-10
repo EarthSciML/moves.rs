@@ -1,0 +1,51 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__tempopmodedistribution",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "hourDayID",
+      "kind": "int64"
+    },
+    {
+      "name": "linkID",
+      "kind": "int64"
+    },
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "opModeID",
+      "kind": "int64"
+    },
+    {
+      "name": "opModeFraction",
+      "kind": "float64"
+    },
+    {
+      "name": "opModeFractionCV",
+      "kind": "float64"
+    },
+    {
+      "name": "isUserInput",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "sourceTypeID",
+    "hourDayID",
+    "linkID",
+    "polProcessID",
+    "opModeID"
+  ],
+  "row_count": 42,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "7092bce5bf2dcea441509ec9704b49f04a79eb9235fa5f6f2d1769a24d10c35a"
+}

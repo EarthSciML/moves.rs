@@ -1,0 +1,35 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__avgspeedbin",
+  "schema": [
+    {
+      "name": "avgSpeedBinID",
+      "kind": "int64"
+    },
+    {
+      "name": "avgBinSpeed",
+      "kind": "float64"
+    },
+    {
+      "name": "avgSpeedBinDesc",
+      "kind": "utf8"
+    },
+    {
+      "name": "opModeIDTirewear",
+      "kind": "int64"
+    },
+    {
+      "name": "opModeIDRunning",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "avgSpeedBinID"
+  ],
+  "row_count": 16,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "3a090a1716962b08002b4ea3be9ef2b961d16b21b094fba36abc77c17f6b312c"
+}
