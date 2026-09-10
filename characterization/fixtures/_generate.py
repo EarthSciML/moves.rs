@@ -748,6 +748,20 @@ FIXTURES: list[FixtureSpec] = [
         timespan=TimeSpan(year=2020, months=(7,), days=(5,),
                           begin_hour=8, end_hour=8),
         geographic_output_detail="LINK",
+        # PROJECT-domain input databases are checked by MOVES's domain
+        # database validator (MOVESAPI.java:858, gated on
+        # RunSpec.skipDomainDatabaseValidation) before the run starts. The
+        # validator compares the supplied database against an expected
+        # checklist and aborts on any mismatch; the minimal project DB in
+        # county-inputs/washtenaw-project/setup-project.sql trips it on
+        # fuel-formulation and unused-fuel-type warnings that have no
+        # bearing on what this fixture measures. Without this element the
+        # run dies before MOVESInstantiator runs and no execution database
+        # is created at all (measured: the capture dumps 46 tables instead
+        # of 360). The flag skips an input QA gate only — it changes no
+        # calculation, and it is the same switch MOVES's own GUI exposes as
+        # "Do Not Perform Domain Database Validation" (Alt+8).
+        extra_root_elements='\t<skipdomaindatabasevalidation selected="true"/>',
     ),
     FixtureSpec(
         name="scale-rates",
