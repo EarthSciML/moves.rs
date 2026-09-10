@@ -129,9 +129,15 @@ fn attr(e: &BytesStart, name: &str) -> Result<Option<String>> {
             // 0.41's replacement for the deprecated `unescape_value`: it
             // unescapes entities *and* applies the XML attribute-value
             // normalization the spec requires (tab/newline -> space).
-            // MOVES RunSpecs declare `<?xml version="1.0"?>`.
+            // `Implicit1_0` is what the deprecated call assumed, and it is
+            // right here: MOVES RunSpecs carry no `<?xml ... ?>` declaration
+            // (they open straight on `<runspec version="MOVES5.0.1">`), and
+            // the spec says an entity with no declaration is XML 1.0. So this
+            // is behaviour-identical to the old `unescape_value()`, which
+            // delegated to `normalized_value_with(Implicit1_0, 1,
+            // resolve_predefined_entity)`.
             let value = attr
-                .normalized_value(quick_xml::XmlVersion::Explicit1_0)
+                .normalized_value(quick_xml::XmlVersion::Implicit1_0)
                 .map_err(|source| Error::Xml {
                     path: PathBuf::from("<runspec>"),
                     source,
