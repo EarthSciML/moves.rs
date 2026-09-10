@@ -1138,6 +1138,30 @@ mod tests {
     }
 
     #[test]
+    fn new_applies_the_runspec_consistency_rules() {
+        // `ExecutionRunSpec::new` stands in for canonical MOVES' load-time
+        // `RunSpecXML.enforceConsistency()`: an onroad run that asks for the
+        // onroad SCC gets fuelType/sourceUseType/roadType/emissionProcess
+        // promoted, because the SCC is concatenated from those four columns.
+        // Every onroad fixture in the corpus ships `onroadscc=true` with
+        // `sourceusetype=false`, so without this the port emitted
+        // `sourceTypeID = NULL` on all of them where canonical emits the
+        // real source type.
+        let spec = build_run_spec(|s| {
+            s.output_breakdown.onroad_scc = true;
+            s.output_breakdown.source_use_type = false;
+            s.output_breakdown.road_type = false;
+            s.output_breakdown.emission_process = false;
+            s.output_breakdown.fuel_type = false;
+        });
+        let er = ExecutionRunSpec::new(spec);
+        assert!(er.run_spec.output_breakdown.source_use_type);
+        assert!(er.run_spec.output_breakdown.road_type);
+        assert!(er.run_spec.output_breakdown.emission_process);
+        assert!(er.run_spec.output_breakdown.fuel_type);
+    }
+
+    #[test]
     fn new_starts_with_will_run_calculators_true() {
         let er = ExecutionRunSpec::new(RunSpec::default());
         assert!(er.will_run_calculators);

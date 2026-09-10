@@ -635,3 +635,71 @@ mod energy_unit_tests {
         assert!((1.0 / f - 1_055_055.9).abs() < 1.0);
     }
 }
+
+#[cfg(test)]
+mod enforce_consistency_tests {
+    use super::{Model, OutputBreakdown, RunSpec};
+
+    fn onroad_with_scc() -> RunSpec {
+        RunSpec {
+            models: vec![Model::Onroad],
+            output_breakdown: OutputBreakdown {
+                onroad_scc: true,
+                // The whole 51-fixture corpus ships exactly this combination:
+                // `<onroadscc selected="true"/>` with
+                // `<sourceusetype selected="false"/>`.
+                source_use_type: false,
+                road_type: false,
+                emission_process: false,
+                fuel_type: false,
+                ..OutputBreakdown::default()
+            },
+            ..RunSpec::default()
+        }
+    }
+
+    #[test]
+    fn onroad_scc_promotes_its_four_subfields() {
+        // Canonical `RunSpecXML.enforceConsistency()`. Without it the port
+        // emitted `sourceTypeID = NULL` where canonical emits the real source
+        // type, and a full-key join of the two MOVESOutput tables matched
+        // 0 of 125 rows on `scale-project`.
+        let mut spec = onroad_with_scc();
+        spec.enforce_consistency();
+        assert!(spec.output_breakdown.source_use_type, "sourceTypeID");
+        assert!(spec.output_breakdown.road_type, "roadTypeID");
+        assert!(spec.output_breakdown.emission_process, "processID");
+        assert!(spec.output_breakdown.fuel_type, "fuelTypeID");
+    }
+
+    #[test]
+    fn no_scc_leaves_the_breakdown_alone() {
+        let mut spec = onroad_with_scc();
+        spec.output_breakdown.onroad_scc = false;
+        spec.enforce_consistency();
+        assert!(!spec.output_breakdown.source_use_type);
+        assert!(!spec.output_breakdown.road_type);
+        assert!(!spec.output_breakdown.emission_process);
+        assert!(!spec.output_breakdown.fuel_type);
+    }
+
+    #[test]
+    fn nonroad_runs_take_the_other_branch() {
+        // `useNonroadRules` is true whenever NONROAD is among the models; the
+        // onroad-SCC promotion is in the `else` arm and must not fire.
+        let mut spec = onroad_with_scc();
+        spec.models = vec![Model::Onroad, Model::Nonroad];
+        spec.enforce_consistency();
+        assert!(!spec.output_breakdown.source_use_type);
+        assert!(!spec.output_breakdown.road_type);
+    }
+
+    #[test]
+    fn it_is_idempotent() {
+        let mut a = onroad_with_scc();
+        a.enforce_consistency();
+        let mut b = a.clone();
+        b.enforce_consistency();
+        assert_eq!(a.output_breakdown, b.output_breakdown);
+    }
+}

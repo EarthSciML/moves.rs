@@ -373,7 +373,7 @@ CDB/PDB Parquet inputs:
 | Fixture | Canonical snapshot | Requires for the port |
 |---------|--------------------|-----------------------|
 | `scale-county` | not captured | County Database (CDB) Parquet inputs |
-| `scale-project` | **captured 2026-09-10** | Project Database (PDB) Parquet inputs, or `--snapshot` |
+| `scale-project` | **captured 2026-09-10** | Project Database (PDB) Parquet inputs, or `--snapshot`. Matches canonical since 2026-09-10 (§6.1) |
 | `scale-rates` | not captured | Rates-mode setup database |
 
 `run-all-fixtures.sh` keeps `scale-county` and `scale-rates` in
@@ -382,12 +382,10 @@ for the cost of the extra MariaDB seed pass: `--include scale-project` now
 captures it, routed through `apptainer/capture-county-snapshot.sh` with
 `characterization/county-inputs/washtenaw-project/setup-project.sql`.
 
-### 6.1 `scale-project`: the port over-emits by ~50× (unfiled, measured 2026-09-10)
+### 6.1 `scale-project`: was ~50x high, now matches (measured and fixed 2026-09-10)
 
 The snapshot carries the execution database, so the port does not need a PDB
-importer to be measured against it — `--snapshot` supplies the slow tier.
-Measured by temporarily lifting the `scale-` exclusion in `all_fixtures()`
-and running `canonical_snapshot_diff`, and independently by running the CLI:
+importer to be measured against it — `--snapshot` supplies the slow tier:
 
 ```sh
 moves run --runspec characterization/fixtures/scale-project.xml \
@@ -395,73 +393,126 @@ moves run --runspec characterization/fixtures/scale-project.xml \
           --output /tmp/portout
 ```
 
-| | canonical | port |
-|---|---|---|
-| `MOVESOutput` rows | 125 | 125 |
-| pollutants emitted | 91 only | 91 only |
-| process / roadType / link / day / hour / month | 1 / 4 / 1 / 5 / 9 / 8 | identical |
-| Σ `emissionQuant` (Million BTU) | 4.227043523010997 | 214.257191021672 |
+| Sigma `emissionQuant` (Million BTU) | value |
+|---|---|
+| canonical | 4.227043523011 |
+| port, before | 214.257191021672 — **50.687x** canonical |
+| port, after | 4.2270374987767 — ratio **0.9999986** |
 
-`max_rel_diff = +4.969e1`; the port's total is **50.69×** canonical's. Every
-key column agrees and the row count agrees exactly, so this is a magnitude
-error in the PROJECT-domain activity or rate path, not a shape or coverage
-error — the shape agreeing on all six dimensions is what makes it worth
-chasing.
+Row count agreed exactly (125/125) before and after, and so did every key
+column: pollutant 91 only, process 1, one link, one hour, one day.
 
-#### The divergence factors into exactly two errors
+Three defects, all in the port, none a canonical quirk.
 
-"~50x" is the wrong way to hold this. The factor is **not** uniform: joined
-per row, the 125 ratios are all distinct and run from **7.095x to 73.594x**,
-monotonically increasing with model year. A single scalar — a unit slip, a
-double-count — is ruled out by that alone.
+#### 1. The PROJECT domain ran two total-activity generators
 
-Two facts locate it.
+The "~50x" was never a scalar. Joined per row the 125 ratios ran from
+**7.095x to 73.594x**, monotonically increasing with model year; dividing by
+`SourceTypeAge.relativeMAR` flattened them to **77.1678 +/- 0.0016** over ages
+9-40 (0.002% spread; ages 0-8 drift down to 77.093, about 0.1%). That reads
+like two independent errors — "one spurious `relativeMAR`" plus "one constant
+of 77.167". It is one.
 
-**(a) Canonical's emission tracks SHO; the port's does not.** Per unit of
-`SHO`, canonical is flat at 1.07-1.10 across ages 9-40, which is what energy
-consumption should look like (Sigma emissionQuant ~ source-hours x a rate that
-barely moves with age). The port's falls monotonically from 1.11 at age 0 to
-0.20 at age 40 — it carries an extra factor that decays with vehicle age.
+`MOVESInstantiator.instantiate`'s `M1` block *replaces* `TotalActivityGenerator`
+(and `MesoscaleLookupTotalActivityGenerator`) with `ProjectTAG` when
+`isProjectDomain`. The port had ported the sibling swap for the three
+`OpModeDistribution` generators
+(`CalculatorRegistry::domain_scale_excluded_omd_modules`) but not this one, so
+the `(pollutant, process)` module filter selected both — every total-activity
+producer subscribes to the same processes. They collide on the single `SHO`
+scratch table: `ProjectTAG` *appends* its link-volume rows, then
+`TotalActivityGenerator` *overwrites* the whole table with
+`store.insert("SHO", ...)`.
 
-**(b) That factor is `relativeMAR`.** Dividing the port's output by
-`SourceTypeAge.relativeMAR` and re-comparing per age gives
+The surviving activity is therefore the county HPMS/VMT allocation weighted by
+`TravelFraction`, which is `ageFraction x relativeMAR / sum(ageFraction x
+relativeMAR)`, where the PROJECT `SHO` is `linkVolume x sourceTypeHourFraction
+x noOfRealDays x ageFraction x min(length/speed, 1)` — `ageFraction` alone.
+Their ratio is exactly `relativeMAR x (a constant activity ratio)`. Both
+halves of the divergence fall out of the one missing swap; there was no stray
+scalar in an expression to find, and 77.1678 is not a quantity that appears
+anywhere in the code — it is the ratio of Washtenaw's county activity to the
+fixture link's.
 
+Fixed by `CalculatorRegistry::domain_excluded_total_activity_modules`, applied
+in `MOVESEngine::planned_modules` next to the OMD swap. The fixture's planned
+module count drops 32 -> 30.
+
+#### 2. `sourceTypeID` was NULL where canonical emits 21
+
+Not a magnitude error, but it meant a full-key join of the two `MOVESOutput`
+tables matched **0 of 125 rows** (distinct from the `iterationID` NULL in
+Section 1, which is expected and unchanged).
+
+Root cause: `RunSpecXML.enforceConsistency()`, which canonical runs at RunSpec
+load, promotes `fuelType`, `sourceUseType`, `roadType` and `emissionProcess`
+to selected whenever a non-NONROAD run selects `onRoadSCC` — the SCC is
+`concat('22', fuelTypeID, sourceTypeID, roadTypeID, processID)`
+(`AggregationSQLGenerator.java`), so those four columns have to survive
+aggregation. The port never ported that rule, and
+`AggregationSQLGenerator`'s `null as sourceTypeID` branch therefore fired.
+
+Fixed as `RunSpec::enforce_consistency`, applied in `ExecutionRunSpec::new` —
+deliberately *not* in the XML/TOML parsers, so surface-format round-trips stay
+byte-stable.
+
+This is corpus-wide, not `scale-project`-specific: every onroad fixture ships
+`<onroadscc selected="true"/>` with `<sourceusetype selected="false"/>`, and
+every canonical snapshot has `sourceTypeID` populated. Row counts are
+unaffected — the SCC key already encodes all four subfields, so the group-by
+is unchanged and only the emitted column values move from NULL to the real
+value. Measured: `canonical_snapshot_diff` row counts are identical
+fixture-for-fixture before and after.
+
+#### 3. The `evefficiency` section was never enabled
+
+With defects 1 and 2 fixed, 104 of the 125 rows (fuel types 1/2/5) agreed with
+canonical to a worst relative error of 9.3e-06, but the 21 electricity rows
+(`fuelTypeID` 9) were **10.7% to 22.1% low**, monotone in model year. That is
+`BaseRateCalculator.sql`'s `evefficiency` section:
+
+```sql
+-- @algorithm emissionRate=emissionRate/(batteryEfficiency*chargingEfficiency),
+--            meanbaserate=meanbaserate/(batteryEfficiency*chargingEfficiency)
 ```
-ages 9-34:  mean 77.1669   stdev 0.0016   min 77.1611   max 77.1682
-            spread 0.01% of the mean
-```
 
-So the divergence is exactly:
+`BaseRateCalculator.java` enables it unconditionally (`// always run
+evefficiency section`). The port implements the arithmetic
+(`baseratecalculator::adjust::apply_ev_efficiency`) and loads the table, but
+built its `ModuleFlags` with `..Default::default()`, leaving `ev_efficiency`
+**false**. The snapshot's `evefficiency` carries `polProcessID` 9101 only,
+with `batteryEfficiency x chargingEfficiency` running from `0.95 x 0.94 =
+0.8930` for the newest age group down to `0.828273 x 0.94 = 0.7786` for the
+oldest — exactly the observed 10.7%-22.1% deficit.
 
-  1. **one spurious `relativeMAR` multiplication** — `SHO` already carries the
-     age weighting, and the port applies `relativeMAR` a second time on top of
-     it; and
-  2. **one constant factor of 77.167**, clean to 0.01% over 26 consecutive
-     ages.
+Fixed by `BaseRateCalculator::module_flags`. This is shared onroad code:
+`fuelTypeID` 9 is about 0.25%-0.3% of pollutant 91 in the default-scale
+fixtures, so the defect showed up there as a ~-3.4e-04 per-pollutant residual.
+Enabling the section moved `chain-so2-co2e-mechanism`,
+`chain-so2-co2e-mechanism-control` from **-3.408e-04 to +5.366e-07** and
+`process-tirewear` from **-3.403e-04 to +2.514e-07** — see §6.1.1.
 
-The observed 50.687 is those two composed: 77.167 x the SHO-weighted mean of
-`relativeMAR` (~0.657). The drift outside ages 9-34 (1.17-1.50 at the young
-end, 1.83-2.17 at ages 35-40) is the 40+ lump bin and the young-age tail of
-the age distribution, not a third error.
+#### Residual
 
-A constant that stable is a single scalar in a single expression, so this
-should be findable by reading the PROJECT activity path rather than by
-bisecting. Both errors are in the port; neither is a canonical quirk.
+**None beyond output precision.** All 125 rows join on the full key, and the
+worst relative error over them is **9.32e-06** (median 2.21e-06), with no
+structure by fuel type (fuel 1: 7.7e-06, fuel 2: 9.3e-06, fuel 5: 7.2e-06,
+fuel 9: 4.8e-06) or by age. That is the `real*4` intermediate-table class: the
+captured `SHO` carries six significant digits (`5.47084`, `6.76147`, ...),
+about 2e-06 of relative granularity per value, and the emission is a product
+of several such tables. It is the same class as, and no worse than, the
+asserted default-scale fixtures (6e-08 to 8e-05).
 
-**A third, separate defect, found the same way:** the port emits
-`sourceTypeID = NULL` where canonical emits 21. It is not a magnitude
-problem, but it means a naive full-key join of the two `MOVESOutput` tables
-matches **zero of 125 rows**, which is why the comparison above keys on
-`(SCC, fuelTypeID, modelYearID, pollutantID, processID, linkID, hourID,
-dayID)` instead. `iterationID` (port NULL vs canonical 1) is the already-known
-metadata divergence from Section 1 and is not the same thing.
+#### Wiring it into the gate
 
-This fixture is **not** wired into `canonical_snapshot_diff`. Doing so means
-editing `all_fixtures()`, which also feeds `all_fixtures_run_without_error`
-and the "exactly 48 non-scale non-error fixtures" catalogue assertion, so it
-is a deliberate three-test change and an operator call. The numbers above are
-recorded here so that call can be made on evidence. Once made, `scale-project`
-belongs in `QUARANTINED_FIXTURES` until the magnitude error is fixed.
+This fixture is still **not** wired into `canonical_snapshot_diff`. Doing so
+means editing `all_fixtures()`, which also feeds
+`all_fixtures_run_without_error` and the "exactly 48 non-scale non-error
+fixtures" catalogue assertion, so it is a deliberate three-test change and an
+operator call. On the evidence above it now belongs in `asserted_fixtures`
+(`ONROAD_REL_TOL`, non-vacuous), not in `QUARANTINED_FIXTURES`.
+
+#### Capture determinism
 
 Note also that across two independent captures of this fixture on 2026-09-10
 (same SIF, input DB differing only in its month filter) all 360 table Parquets
@@ -471,3 +522,29 @@ were byte-identical except `db__out_scale_project__movestablesused`;
 result than the corpus generally holds — see
 `characterization/snapshots/README.md` §"Measured limits of the determinism
 contract" for the two known sources of run-to-run drift.
+
+### 6.1.1 Regression evidence for the §6.1 fixes
+
+`cargo test --release -p moves-cli --test full_suite_regression`, same machine,
+same snapshot tree, before (`2eb13772`) and after:
+
+| | before | after |
+|---|---|---|
+| test result | 8 passed, 1 failed | 8 passed, 1 failed |
+| `canonical_snapshot_diff` | 39 asserted-pass, 3 UNCLASSIFIED | 39 asserted-pass, 3 UNCLASSIFIED |
+| row counts | — | identical, fixture for fixture |
+
+No fixture changed verdict and no tolerance was touched. Three fixtures'
+residuals improved by roughly 635x:
+
+| fixture | before | after |
+|---|---|---|
+| `chain-so2-co2e-mechanism` | -3.408e-04 (UNCLASS) | +5.366e-07 (UNCLASS) |
+| `chain-so2-co2e-mechanism-control` | -3.408e-04 (UNCLASS) | +5.366e-07 (UNCLASS) |
+| `process-tirewear` | -3.403e-04 (PASS) | +2.514e-07 (PASS) |
+
+The two `chain-so2-co2e-mechanism*` fixtures stay UNCLASSIFIED only because
+they are absent from `asserted_fixtures()` — a catalogue entry, not a
+numerical problem; they are now well inside `ONROAD_REL_TOL`.
+`nr-airtoxics-lawn-garden-county` is unchanged (`-1.000e0`, 968 port rows
+against 14036 canonical) — a NONROAD air-toxics coverage gap, untouched here.

@@ -789,18 +789,7 @@ impl Calculator for BaseRateCalculator {
                 p
             }
         };
-        // Inventory (MACROSCALE / Inv) runs convert rates to an inventory by
-        // multiplying `meanBaseRate * universalActivity` — the Java
-        // `BaseRateCalculator.doExecute` enables the `ApplyActivity` section for
-        // every process when `getModelScale() == MACROSCALE`. Rates
-        // (MESOSCALE_LOOKUP) output leaves the rate unscaled. SMFR aggregation
-        // (`aggregate_smfr`) is a rates-mode concern and stays off here.
-        let flags = ModuleFlags {
-            apply_activity: ctx
-                .model_scale()
-                .is_some_and(|s| s != moves_framework::ModelScale::Rates),
-            ..ModuleFlags::default()
-        };
+        let flags = Self::module_flags(ctx.model_scale());
         let output = Self::run_with_prepared(
             smfr_sbd_summary,
             base_rate_by_age,
@@ -811,6 +800,42 @@ impl Calculator for BaseRateCalculator {
         )?;
         let rows = output.rows();
         crate::wiring::emit_rows(rows)
+    }
+}
+
+impl BaseRateCalculator {
+    /// The `BRC_*` section flags canonical `BaseRateCalculator.doExecute`
+    /// derives from the run, for the sections whose *computation* the port
+    /// models.
+    ///
+    /// * `apply_activity` — the Java enables `ApplyActivity` for every process
+    ///   when `getModelScale() == MACROSCALE`, turning the rate into an
+    ///   inventory via `meanBaseRate * universalActivity`. Rates
+    ///   (`MESOSCALE_LOOKUP`) output leaves the rate unscaled.
+    /// * `ev_efficiency` — unconditional. The Java is explicit:
+    ///
+    ///   ```text
+    ///   // always run evefficiency section
+    ///   enabledSectionNames.add("evefficiency");
+    ///   ```
+    ///
+    ///   (`BaseRateCalculator.java`.) The section divides both `meanBaseRate`
+    ///   and `emissionRate` by `batteryEfficiency * chargingEfficiency` for
+    ///   electricity (`fuelTypeID` 9). Leaving it off under-emits every EV row
+    ///   by the efficiency product — measured on `scale-project`, 10.7% to
+    ///   22.1% low across model years, matching `evefficiency`'s
+    ///   `0.95 * 0.94 = 0.893` down to `0.8283 * 0.94 = 0.7786`.
+    ///
+    /// SMFR aggregation (`aggregate_smfr`) is a rates-mode concern and stays
+    /// off. The remaining flags gate SQL-section selection rather than
+    /// computation and are left at their defaults.
+    #[must_use]
+    pub fn module_flags(scale: Option<moves_framework::ModelScale>) -> ModuleFlags {
+        ModuleFlags {
+            apply_activity: scale.is_some_and(|s| s != moves_framework::ModelScale::Rates),
+            ev_efficiency: true,
+            ..ModuleFlags::default()
+        }
     }
 }
 
@@ -1635,6 +1660,39 @@ fn build_universal_activity(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn module_flags_always_enable_evefficiency() {
+        // `BaseRateCalculator.java`: "always run evefficiency section".
+        // The section divides meanBaseRate and emissionRate by
+        // batteryEfficiency*chargingEfficiency for fuelTypeID 9. With the flag
+        // off the port under-emitted every electricity row by that product
+        // (measured on scale-project: 10.7%-22.1% low, exactly
+        // 0.95*0.94 .. 0.8283*0.94).
+        for scale in [
+            None,
+            Some(moves_framework::ModelScale::Inventory),
+            Some(moves_framework::ModelScale::Macro),
+            Some(moves_framework::ModelScale::Rates),
+        ] {
+            assert!(
+                BaseRateCalculator::module_flags(scale).ev_efficiency,
+                "evefficiency is unconditional in canonical MOVES (scale {scale:?})"
+            );
+        }
+    }
+
+    #[test]
+    fn module_flags_apply_activity_only_outside_rates() {
+        assert!(
+            BaseRateCalculator::module_flags(Some(moves_framework::ModelScale::Inventory))
+                .apply_activity
+        );
+        assert!(
+            !BaseRateCalculator::module_flags(Some(moves_framework::ModelScale::Rates))
+                .apply_activity
+        );
+    }
 
     #[test]
     fn calculator_metadata_matches_calculator_info() {

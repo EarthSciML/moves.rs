@@ -1003,6 +1003,37 @@ mod tests {
     }
 
     #[test]
+    fn domain_excluded_total_activity_modules_keeps_exactly_one_producer() {
+        // Regression guard for the `scale-project` 50.69x over-emit: the
+        // PROJECT domain planned BOTH `ProjectTAG` and `TotalActivityGenerator`,
+        // and the latter's `store.insert("SHO", ...)` overwrote the former's
+        // link-volume activity with the county HPMS/VMT allocation.
+        let reg = CalculatorRegistry::new(single_calc_dag());
+        const TAG: &str = "TotalActivityGenerator";
+        const MESOSCALE_TAG: &str = "MesoscaleLookupTotalActivityGenerator";
+        const PROJECT_TAG: &str = "ProjectTAG";
+
+        // PROJECT: keep ProjectTAG, drop both county/mesoscale producers.
+        let proj = reg.domain_excluded_total_activity_modules(true);
+        assert!(
+            proj.contains(TAG) && proj.contains(MESOSCALE_TAG),
+            "PROJECT must drop TotalActivityGenerator and its mesoscale variant, got {proj:?}"
+        );
+        assert!(!proj.contains(PROJECT_TAG), "PROJECT keeps ProjectTAG");
+
+        // Non-PROJECT: canonical never adds ProjectTAG.
+        let other = reg.domain_excluded_total_activity_modules(false);
+        assert!(
+            other.contains(PROJECT_TAG),
+            "only PROJECT instantiates ProjectTAG"
+        );
+        assert!(
+            !other.contains(TAG) && !other.contains(MESOSCALE_TAG),
+            "non-PROJECT keeps the county producer, got {other:?}"
+        );
+    }
+
+    #[test]
     fn modules_for_runspec_includes_chain_template_steps() {
         let reg = CalculatorRegistry::new(chained_calc_dag());
         let selections = vec![(PollutantId(2), ProcessId(1))];
