@@ -24,3 +24,14 @@ patch_sha256       = "a13858dacb3c890f18c4979a9fa58697cb86092afc354c299697f75513
 built_at_utc       = "2026-05-31T00:08:57Z"
 built_on_host      = "ccc0232.campuscluster.illinois.edu"
 apptainer_version  = "1.4.5-3.el9"
+
+# ---------------------------------------------------------------------------
+# VERIFIED 2026-09-09: moves-fixture.sif on disk matches this lock exactly
+# (sha256 4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f,
+# 1120321536 bytes). This is the SIF all 44 snapshots were captured with.
+#
+# NOTE: parent_sif_sha256 below (859521ac…) no longer matches the
+# canonical-moves.sif currently on disk (e5bde6a9…, rebuilt 2026-06-14
+# without its lock being regenerated). Rebuilding this SIF today from the
+# on-disk parent would therefore NOT reproduce it. See canonical-image.lock.
+# ---------------------------------------------------------------------------
