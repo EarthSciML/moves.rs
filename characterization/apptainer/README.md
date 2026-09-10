@@ -341,7 +341,11 @@ excluded by the word boundary and not by an allowlist — MOVES's
 for the duration of a simulation, and `RUN_ERROR: WARNING: Using default
 formulation ...` occurs benignly in 6 of the 42 published snapshots' run
 logs. The reasoning, the measurement and its bound are in the comment
-above `MOVES_FAILURE_PATTERNS` in `run-fixture.sh`.
+above `MOVES_FAILURE_PATTERNS` in `lib/moves-log-scan.sh`, which
+`run-fixture.sh` sources. `../nonroad-fidelity/generate-corpus.sh`
+sources the same file (issue #60) so the two capture wrappers cannot
+drift; that script's header records what the rule cannot see on the
+NONROAD path, where NONROAD.exe's own output never reaches this log.
 
 Every published snapshot now carries the MOVES run log as
 `characterization/snapshots/<fixture-name>/moves-run.log`, written by the

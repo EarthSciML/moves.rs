@@ -262,10 +262,7 @@ run_one() {
     # file is there", not "this run produced it", and a MOVES failure over a
     # populated workdir hands the previous run's bytes to baselines/.
     rm -f "${nrdbg_host}" "${run_log}"
-    local stale_nrerrors
-    while IFS= read -r stale_nrerrors; do
-        [ -n "${stale_nrerrors}" ] && rm -f "${stale_nrerrors}"
-    done < <(find "${moves_temp}" -type f -name 'nrerrors.txt' 2>/dev/null)
+    find "${moves_temp}" -type f -name 'nrerrors.txt' -delete 2>/dev/null || true
     if [ -e "${nrdbg_host}" ]; then
         fail "could not remove the previous run's TSV at ${nrdbg_host}"
     fi
