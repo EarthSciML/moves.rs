@@ -685,7 +685,10 @@ const QUARANTINED_FIXTURES: &[&str] = &[
     // Layer 2: adding both names to `KEEP` puts them in the plan and they
     // execute, but output is still 968 rows — they emit nothing, and
     // NonroadEmissionCalculator still withholds 99/110. That is a data-plane
-    // bug in the NONROAD chain, not a gate or tolerance question.
+    // bug in the NONROAD chain, not a gate or tolerance question. Its sibling
+    // nr-lawn-garden-county (identical vehicle/geography/time selections,
+    // different pollutant set) passes at -1.2e-6, so the NONROAD population /
+    // activity / allocation front half is not implicated.
     //
     // Per §1 this fixture stays in the gate and CI stays red until the data
     // plane is fixed. Do NOT widen a tolerance or scope-except pollutants to

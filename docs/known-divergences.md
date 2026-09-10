@@ -419,13 +419,21 @@ that list rather than a modelled exclusion.
 **Layer 2 — the calculators emit nothing anyway (data plane).** Adding both
 names to `KEEP` is *not* sufficient: with both planned and executed, output is
 still 968 rows and the same 2 pollutants. So there is a second, independent
-defect in the NONROAD chain — `NonroadEmissionCalculator` withholds pollutants
-99 and 110 for this RunSpec (it produces them for no fixture in the suite), and
-with no VOC (87) / PM2.5 (110) / fuel (99) inputs the two downstream NR
-calculators have nothing to scale. This is the fixture's whole purpose: it is
-the only fixture in the corpus that reaches `NRHCSpeciationCalculator` and
-`NRAirToxicsCalculator` at all (see `characterization/fixtures/coverage-matrix.md`),
-so nothing else in the suite guards them.
+defect in the NONROAD chain. The port's `NonroadEmissionCalculator` does not
+produce total fuel consumption (99) or PM2.5 (110) for this RunSpec even though
+canonical does, and `NRAirToxicsCalculator` scales precisely those two plus VOC
+(87) — see the calculator's own module docs — so it has no inputs to work from
+and `NRHCSpeciationCalculator` likewise contributes nothing.
+
+Nothing else in the corpus guards this: `nr-airtoxics-lawn-garden-county` is
+the only fixture that selects pollutants 99 or 110 (the other eleven `nr-*`
+snapshots carry only subsets of {1, 2, 3, 31, 100}), and per
+`characterization/fixtures/coverage-matrix.md` it is the only fixture that
+reaches `NRHCSpeciationCalculator` or `NRAirToxicsCalculator` at all. Its
+sibling `nr-lawn-garden-county` — identical vehicle/geography/time selections,
+different pollutant set — passes at -1.2e-6, which is what isolates the defect
+to the air-toxics/speciation pollutants rather than to the NONROAD population,
+activity or allocation front half.
 
 **Explicitly not a tolerance question.** The port is not computing 27 of the 29
 pollutants, so no tolerance, `excluded_pollutants` scope exception, or storage
