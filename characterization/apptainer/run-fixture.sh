@@ -320,11 +320,13 @@ trap cleanup_incomplete EXIT
 #
 # Reproduced on three FRESH captures taken for this change on 2026-09-09
 # with the same SIF (see characterization/audit-results/
-# 20260909-run-log-scan-and-snapshot-audit.md for the commands):
+# 20260909T2310-run-log-scan-and-snapshot-audit.md for the commands and for
+# the bound on what any of this establishes):
 # nr-logging-county, process-crankcase-start and chain-tog-speciation —
 # 0 matches each, all three published a snapshot and exited 0.
 #
-# TRUE-POSITIVE RATE. The four project-scale trials of 2026-09-10
+# TRUE-POSITIVE RATE. The four project-scale trials of 2026-09-09 (their
+# in-log timestamps read 9/10/26 because MOVES logs UTC)
 # (/scratch/$USER/scalescope-trial/trial{1,2,3,4}.log), every one of which
 # the previous four-literal marker set passed as "MOVES run OK" and only
 # the zero-table belt stopped: 8, 3, 2 and 4 matching lines respectively.

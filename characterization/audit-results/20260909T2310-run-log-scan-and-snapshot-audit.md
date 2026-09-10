@@ -232,7 +232,48 @@ using the wrapper as changed:
     --output-dir /scratch/$USER/agent-markers/out/<fixture>
 ```
 
-<!-- FRESH-CAPTURE-RESULTS -->
+| fixture | rc | tables | published `moves-run.log` | `ERROR:` matches | `ERROR` substring lines |
+|---|---|---|---|---|---|
+| `nr-logging-county` | 0 | 324 | 10,905 B | 0 | 0 |
+| `process-crankcase-start` | 0 | 316 | 9,545 B | 0 | 0 |
+| `chain-tog-speciation` | 0 | 373 | 24,739 B | 0 | 0 |
+
+All three exited 0, published a snapshot, and carry the run log inside it —
+which is the point: this is the first time a snapshot in this project has
+shipped with the evidence for its own success.
+
+They also reproduce the committed snapshots. Comparing content hashes table by
+table against `characterization/snapshots/<fixture>/`:
+
+* `process-crankcase-start` — 316/316 tables shared, **0** content
+  differences. Byte-identical.
+* `nr-logging-county` — 321 shared tables, **0** content differences. The 3
+  unshared ones are the same three `MOVESTemporary` worker tables under a
+  different worker-directory index (`workertemp` vs `workertemp3`), which is
+  a run-local name, not data.
+* `chain-tog-speciation` — 367 shared tables, **1** content difference, and 6
+  unshared worker-temp tables. The unshared ones are an artifact of this
+  audit: the first attempt at this fixture aborted mid-script, and
+  `run-fixture.sh` wipes the MariaDB datadir between runs but not
+  `MOVESTemporary/`, so the re-run's snapshot carries both that attempt's
+  `workertemp3` set and its own `workertemp` set.
+
+The one real content difference is worth recording even though it is outside
+this audit's subject:
+
+```
+db__movesexecution..._drivingidlefraction, 1 row both sides
+  committed  drivingIdleFraction = 3.0299686857752525e-02
+  fresh      drivingIdleFraction = 3.029968685775254e-02
+```
+
+A last-bit double-precision difference (~5e-16 relative) in canonical MOVES's
+own output, i.e. canonical is not bit-deterministic for this value across
+runs of the same SIF on the same host. That is the class
+`docs/known-divergences.md` §4.2 and
+`characterization/audit-results/20260908T0948-float-precision-blast-radius.md`
+already cover; it is noted here because a table-hash comparison of snapshots
+will see it, and not chased further.
 
 ## Bound
 
