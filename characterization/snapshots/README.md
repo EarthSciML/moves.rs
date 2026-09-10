@@ -197,6 +197,8 @@ that's the regression-detection signal Phase 0 is designed to provide.
 The recapture sweep (2026-09-08/09) captured two fixtures twice, from the
 same SIF (`4f92c593`), the same RunSpec bytes and the same host
 (`ccc0232`). Neither pair was byte-identical, for two independent reasons.
+Two further sources (3 and 4 below) were identified on 2026-09-10 from the
+`scale-project` and `process-crankcase-start-single` captures.
 
 **1. Worker-temp table names are assigned per run.** MOVES's master hands
 work to `MOVESTemporary/manyworkers/workerfolder/workertempN/`, and both
@@ -234,6 +236,30 @@ differing in content, so value-level nondeterminism is not universal — one
 cell in one table is all that has been observed. A wider estimate needs
 repeat captures across the suite, which this sweep did not perform.
 
+**3. `MOVESTablesUsed.dataFileModificationDate` records wall-clock.**
+For the five fixtures with a `<scaleinputdatabase>`, the `washtenaw_cdb`
+rows of `db__out_<fixture>__movestablesused` carry the mtime of the county
+input database as `capture-county-snapshot.sh` seeded it, so they change on
+every capture regardless of content. Measured on the 2026-09-10
+`process-crankcase-start-single` recapture: 8 rows, `2026-09-09 02:44:09`
+-> `2026-09-10 15:39:36`, with all 314 other common tables byte-identical.
+This is the mechanism behind the one table that differed between the two
+`scale-project` captures the same day (`docs/known-divergences.md` §6.1) —
+that pair also differed only in `movestablesused`.
+
+**4. Class loading is not fully reproducible either.** Three captures of
+`process-crankcase-start-single` on 2026-09-09/10 recorded 136, 136 and 137
+entries in `execution-trace.json`'s `java_classes`; the odd one out is
+`HeartbeatDetectionThread$ObservedFileStamp`, a lazily-loaded inner class
+whose load depends on whether the heartbeat path ran before shutdown. The
+trace's `sources.class_load_log_files` is also a count of
+`MOVESTemporary/instrumentation/class-load-<pid>.log` files present, and
+the JVM names them by PID — so **a workdir reused across runs accumulates
+them and inflates the count** (4 instead of 2 in one intermediate capture).
+`capture-county-snapshot.sh` clears only `mariadb-data`, not the whole
+workdir. Delete `/scratch/$USER/moves-county-fixture/<fixture>` before a
+recapture.
+
 ### What this affects
 
 * `.github/workflows/fixture-suite-weekly.yml` runs `moves-snapshot diff`
@@ -241,6 +267,10 @@ repeat captures across the suite, which this sweep did not perform.
   gate will now report drift on any fixture whose re-capture lands a
   different worker partition, and on `drivingidlefraction` whenever the
   aggregation order differs — neither being a real regression.
+* The same gate will report drift on `movestablesused` for any of the
+  five `<scaleinputdatabase>` fixtures on every recapture, because
+  `dataFileModificationDate` is a wall-clock stamp (source 3 above).
+  Excluding that column, or the table, is the fix.
 * `characterization/tolerance.toml` sets `default_float_tolerance = 0.0`,
   which cannot absorb a 6.9e-16 relative difference. A per-column
   tolerance on `drivingidlefraction.drivingIdleFraction` (or a small

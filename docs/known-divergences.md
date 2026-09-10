@@ -99,6 +99,55 @@ same activity weighting — reproduces that (canon 0 == port 0). The `vacuous`
 flag makes the gate fail loudly if a recapture ever gives either side a nonzero
 row.
 
+### 1b.1 `process-crankcase-start-single` recaptured 2026-09-10 (input-data fix)
+
+`characterization/county-inputs/washtenaw-county/setup-starts.sql` carried
+`zoneRoadType(261610, roadTypeID 5).SHOAllocFactor = 0.002012975189` from
+30a3a528 (2026-06-03) until 2026-09-10. The `movesdb20241112` default is
+`0.0010453931260005`; the committed value was **1.93x** that and occurs
+nowhere in the default table (`ABS(SHOAllocFactor - 0.002012975189) < 1e-12`
+returns no rows), so it was not a mis-copy from another zone. The sibling
+`setup-hotelling.sql` had the correct default for the same key and road
+types 2/3/4 agreed in both files. 30a3a528's message records that the work
+was "Salvaged from polecat furiosa (LLM context-gated at 1M before final
+verification)". Filed as EarthSciML/moves.rs#66, fixed and recaptured.
+
+Corrected to **`0.001045393126`** — the default truncated to 12 decimal
+places, which is the convention every other literal in that file follows
+(see the file's own header on why the literals are not `SELECT`ed from the
+default DB). Writing the full 17-digit default would have introduced a new
+divergence rather than removed one: the truncation reaches the execution
+database, where SINGLE fixtures read `1.122533244e-03` for
+`zone.startAllocFactor` against `1.12253324381788e-03` in DEFAULT-scale
+fixtures.
+
+**Blast radius: exactly one snapshot.** All 43 `…__zoneroadtype.parquet`
+files in `characterization/snapshots/` were scanned; 31 contain zone
+261610, and `process-crankcase-start-single` was the only one reading
+`2.012975189e-03`. The other 30 (including `mixed-onroad`,
+`process-extended-idle-single` and the three other `-single` fixtures) read
+the default.
+
+**Nothing propagated downstream, and that is the finding.** The recapture
+(same SIF `4f92c593`, same RunSpec bytes) changed **2 of 316** tables:
+
+| table | change |
+|---|---|
+| `db__movesexecution…__zoneroadtype` | the corrected input itself, 1 cell |
+| `db__out_…__movestablesused` | `dataFileModificationDate` on the 8 `washtenaw_cdb` rows — wall-clock metadata |
+
+The other 314 are byte-identical, including every output table.
+`SHOAllocFactor` is consumed by `TotalActivityGenerator`'s SHO allocation,
+and this fixture generates **0 bundles** with `sho`, `sourcehours`,
+`starts`, `startspervehicle`, `movesworkeractivityoutput`,
+`baserateoutput`, `movesactivityoutput` and `movesoutput` all at 0 rows —
+so the value is copied into the execution database and read by nothing.
+A 1.93x error on it was invisible to every output-side gate, which is how
+it survived three months. The fixture remains asserted-**vacuous**; no
+test changed.
+
+Snapshot aggregate `a3af712b` -> `dc60a36e`.
+
 ### Resolved (historical)
 
 Earlier revisions of this document (state dated 2026-05-31) catalogued **8
