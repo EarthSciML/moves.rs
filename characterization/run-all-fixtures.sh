@@ -68,6 +68,10 @@ declare -a EXCLUDES=()
 # Pass `--include PATTERN` to opt them back in.
 declare -a SKIP_BY_DEFAULT=(
     "scale-county"
+    # scale-project is now capturable: `--include scale-project` routes it
+    # through capture-county-snapshot.sh with the input DB named in
+    # COUNTY_SQL_FOR below. It stays skipped by default because that path
+    # costs an extra MariaDB seed pass, not because it cannot run.
     "scale-project"
     "scale-rates"
     # rates-minimal: rates-mode (MESOSCALE_LOOKUP) requires county-scale CDB
@@ -198,6 +202,28 @@ if [ "${LIST_ONLY}" = "1" ]; then
     exit 0
 fi
 
+# ----- Fixtures that need a scale-input database ---------------------------
+# A fixture whose RunSpec has a <scaleinputdatabase> cannot be captured by
+# run-fixture.sh alone: MOVES needs the database to exist before the run.
+# capture-county-snapshot.sh seeds it from the SQL file named here and then
+# delegates to run-fixture.sh. Each SQL file's header names the fixtures it
+# serves. Without this routing the four SINGLE-domain fixtures failed with
+# "The database does not have the required county" and scale-project failed
+# domain validation, in both cases only after a full MOVES startup.
+county_sql_for() {
+    case "$1" in
+        process-apu-single|process-crankcase-extidle-single|process-extended-idle-single)
+            echo "${HERE}/county-inputs/washtenaw-county/setup-hotelling.sql" ;;
+        process-crankcase-start-single)
+            echo "${HERE}/county-inputs/washtenaw-county/setup-starts.sql" ;;
+        scale-project)
+            echo "${HERE}/county-inputs/washtenaw-project/setup-project.sql" ;;
+        *)
+            echo "" ;;
+    esac
+}
+CAPTURE_COUNTY="${HERE}/apptainer/capture-county-snapshot.sh"
+
 # ----- Driver loop ---------------------------------------------------------
 TOTAL="${#FIXTURES[@]}"
 FAILED=()
@@ -212,18 +238,30 @@ for xml in "${FIXTURES[@]}"; do
     echo "[run-all] fixture ${INDEX}/${TOTAL}: ${name}"
     echo "[run-all] ============================================================"
 
-    declare -a ARGS=( --runspec "${xml}" --sif "${SIF}" )
-    [ "${USE_FAKEROOT}" = "1" ] && ARGS=( -f "${ARGS[@]}" )
-    [ -n "${WORKDIR_ROOT}" ] && ARGS+=( --workdir "${WORKDIR_ROOT}/${name}" )
-    [ -n "${OUTPUT_ROOT}" ] && ARGS+=( --output-dir "${OUTPUT_ROOT}/${name}" )
+    county_sql="$(county_sql_for "${name}")"
+    if [ -n "${county_sql}" ]; then
+        # capture-county-snapshot.sh takes --fixture, not --runspec, and owns
+        # its own workdir (it must survive between the seeding pass and the
+        # MOVES pass), so --workdir-root does not apply to these.
+        RUNNER="${CAPTURE_COUNTY}"
+        declare -a ARGS=( --fixture "${name}" --county-sql "${county_sql}" --sif "${SIF}" )
+        [ "${USE_FAKEROOT}" = "1" ] && ARGS=( -f "${ARGS[@]}" )
+        [ -n "${OUTPUT_ROOT}" ] && ARGS+=( --output-dir "${OUTPUT_ROOT}/${name}" )
+    else
+        RUNNER="${RUN_FIXTURE}"
+        declare -a ARGS=( --runspec "${xml}" --sif "${SIF}" )
+        [ "${USE_FAKEROOT}" = "1" ] && ARGS=( -f "${ARGS[@]}" )
+        [ -n "${WORKDIR_ROOT}" ] && ARGS+=( --workdir "${WORKDIR_ROOT}/${name}" )
+        [ -n "${OUTPUT_ROOT}" ] && ARGS+=( --output-dir "${OUTPUT_ROOT}/${name}" )
+    fi
 
-    if "${RUN_FIXTURE}" "${ARGS[@]}"; then
+    if "${RUNNER}" "${ARGS[@]}"; then
         SUCCEEDED=$((SUCCEEDED + 1))
         echo "[run-all] ${name}: OK"
     else
         rc=$?
         FAILED+=("${name}")
-        echo "[run-all] ${name}: FAILED (run-fixture.sh exit ${rc})"
+        echo "[run-all] ${name}: FAILED ($(basename "${RUNNER}") exit ${rc})"
         if [ "${KEEP_GOING}" != "1" ]; then
             echo "[run-all] aborting; pass --keep-going to continue after failures." >&2
             break

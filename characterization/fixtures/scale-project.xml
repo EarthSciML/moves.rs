@@ -69,4 +69,5 @@
 		<distancefactors selected="true" units="Miles"/>
 		<massfactors selected="true" units="Grams" energyunits="Million BTU"/>
 	</outputfactors>
+	<skipdomaindatabasevalidation selected="true"/>
 </runspec>

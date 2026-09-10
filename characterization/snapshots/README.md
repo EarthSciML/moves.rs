@@ -7,31 +7,41 @@ phase verifies against.
 
 ## Acceptance status
 
-As of 2026-09-09 `characterization/fixtures/` holds **54** RunSpec XML
-fixtures, and **42** of them have a populated snapshot directory here (one
-sub-directory per fixture carrying a `manifest.json`). All 42 are
-`moves-snapshot/v2` — see "Float encoding" below. The three `scale-*`
-fixtures are skipped (require an additional input DB; see
+As of 2026-09-10 `characterization/fixtures/` holds **54** RunSpec XML
+fixtures, and **43** of them have a populated snapshot directory here (one
+sub-directory per fixture carrying a `manifest.json`). All 43 are
+`moves-snapshot/v2` — see "Float encoding" below. Two of the three
+`scale-*` fixtures are still skipped (require an additional input DB; see
 `characterization/fixtures/README.md`). The canonical-diff regression gate
 asserts them against canonical MOVES (see
 `docs/known-divergences.md` §1b).
 
-Four of the 42 are `<modeldomain value="SINGLE"/>` county-domain runs
-(`process-apu-single`, `process-crankcase-extidle-single`,
-`process-crankcase-start-single`, `process-extended-idle-single`) and
-**cannot** be captured with `run-fixture.sh` alone — MOVES fails with
-"The database does not have the required county." They go through
-`apptainer/capture-county-snapshot.sh`, which seeds `washtenaw_cdb` from
-`../county-inputs/washtenaw-county/setup-{starts,hotelling}.sql` first;
-each SQL file's header names the fixtures it serves. `scale-county.xml` is
-a fifth SINGLE-domain fixture but has never been captured and is out of
-scope here.
+Five of the 43 carry a `<scaleinputdatabase>` and **cannot** be captured
+with `run-fixture.sh` alone — MOVES needs the database to exist before the
+run and fails with "The database does not have the required county" (the
+SINGLE-domain four) or aborts in domain-database validation (the PROJECT
+one). They go through `apptainer/capture-county-snapshot.sh`, which seeds
+`washtenaw_cdb` from a SQL file first; each SQL file's header names the
+fixtures it serves. `run-all-fixtures.sh`'s `county_sql_for` holds the
+fixture → SQL mapping and dispatches to the right runner.
+
+| Fixture | Domain | Input DB |
+|---------|--------|----------|
+| `process-apu-single` | SINGLE | `../county-inputs/washtenaw-county/setup-hotelling.sql` |
+| `process-crankcase-extidle-single` | SINGLE | `../county-inputs/washtenaw-county/setup-hotelling.sql` |
+| `process-extended-idle-single` | SINGLE | `../county-inputs/washtenaw-county/setup-hotelling.sql` |
+| `process-crankcase-start-single` | SINGLE | `../county-inputs/washtenaw-county/setup-starts.sql` |
+| `scale-project` | PROJECT | `../county-inputs/washtenaw-project/setup-project.sql` |
+
+`scale-county.xml` is a sixth SINGLE-domain fixture but has never been
+captured and is out of scope here.
 
 Counts measured with `ls characterization/fixtures/*.xml | wc -l` (54),
-`ls -d characterization/snapshots/*/ | wc -l` (42) and
-`ls characterization/snapshots/*/manifest.json | wc -l` (42). The two
+`ls -d characterization/snapshots/*/ | wc -l` (43) and
+`ls characterization/snapshots/*/manifest.json | wc -l` (43). The two
 2026-09-08 additions are `chain-so2-co2e-mechanism` and
-`chain-so2-co2e-mechanism-control`.
+`chain-so2-co2e-mechanism-control`; the 2026-09-10 addition is
+`scale-project`.
 
 The original acceptance pass was T7 (`mo-o785i`) on 2026-05-26 — at that
 time the suite was 34 non-scale fixtures, **34/34 succeeded, 0 failed**, and
@@ -41,9 +51,22 @@ since grown to the counts above.
 | Fixture | Status | Notes |
 |---------|--------|-------|
 | 42 non-scale fixtures | OK | Populated; see sub-directories |
+| scale-project | OK | Populated 2026-09-10; PROJECT domain, input DB above |
 | scale-county | skipped | Requires additional input DB |
-| scale-project | skipped | Requires additional input DB |
 | scale-rates | skipped | Requires additional input DB |
+
+### Why `scale-project` was worth a capture
+
+`opModeDistribution` is present in all 42 earlier snapshots and **empty in
+all 42**. `LinkOperatingModeDistributionGenerator` is the only writer of a
+non-empty one (with `isUserInput='N'`), and it runs only in PROJECT domain
+— it is on the `DO_RATES_FIRST` whitelist at
+`MOVESInstantiator.java:1454-1476` but has no other reachable trigger. So
+until this capture nothing in the corpus constrained that generator at
+all. `scale-project` records **122** rows, all `isUserInput='N'`, over
+sourceTypeID 21, hourDayID 95 and linkIDs {1, -153, -1021} — the project
+link plus the two negative pseudo-links the generator writes for the
+bracketing drive schedules.
 
 ## Layout
 

@@ -1,0 +1,29 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__usedmystrc",
+  "schema": [
+    {
+      "name": "modelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "regClassID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "modelYearID",
+    "sourceTypeID",
+    "regClassID"
+  ],
+  "row_count": 41,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "58a3da1ec3a689a3c2651e8b2eb58911b4975ccc0a50aebfb7660f1bf1bf4518"
+}

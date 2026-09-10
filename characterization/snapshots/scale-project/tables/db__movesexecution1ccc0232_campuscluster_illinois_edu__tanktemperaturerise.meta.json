@@ -1,0 +1,35 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__tanktemperaturerise",
+  "schema": [
+    {
+      "name": "tankTemperatureGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "tankTemperatureRiseTermA",
+      "kind": "float64"
+    },
+    {
+      "name": "tankTemperatureRiseTermACV",
+      "kind": "float64"
+    },
+    {
+      "name": "tankTemperatureRiseTermB",
+      "kind": "float64"
+    },
+    {
+      "name": "tankTemperatureRiseTermBCV",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "tankTemperatureGroupID"
+  ],
+  "row_count": 16,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "996c44c60072a939bc83903e419f2dac1154871a66b4e28b7be864044f66a570"
+}

@@ -197,7 +197,41 @@ class Geo:
 @dataclass
 class TimeSpan:
     year: int = 2020
-    months: tuple[int, ...] = (7,)         # July
+    # `<month key=>` is a 0-based INDEX into TimeSpan.allMonths, NOT a monthID
+    # (RunSpecXML.java:501-509 -> TimeSpan.getMonthByIndex, TimeSpan.java:156-161)
+    # — exactly the trap `day_attr` documents below. So `months=(7,)` renders
+    # `<month key="7"/>` and selects allMonths[7] = **August**, monthID 8, not
+    # July. Verified against canonical output: the scale-project snapshot's
+    # `db__out_scale_project__movesoutput` carries monthID = 8 for a fixture
+    # written as month 7.
+    #
+    # All 54 committed fixtures use the `key` form, so all of them run one
+    # month later than their spec entry reads.
+    #
+    # UNLIKE the `<day key=>` bug, this is NOT a port-vs-canonical divergence
+    # and NOTHING needs recapturing. The port resolves the same way canonical
+    # does — `XmlIndexedId::to_id` returns `key + 1`
+    # (moves-runspec/src/xml_format.rs:667-676) and writes `key = m - 1` back
+    # out at :137 — so both sides see monthID 8 and the snapshots are correct
+    # and self-consistent. What is wrong is only what the spec entry SAYS.
+    #
+    # Two different edits get confused here, so be explicit about which one
+    # you mean:
+    #
+    #   `<month id="8"/>`  — provably a NO-OP. It is the same month that
+    #                        `key="7"` already selects, in canonical
+    #                        (getMonthByID) and in the port alike. It changes
+    #                        no output, only `runspec_sha256` in provenance.
+    #                        This is the honest spelling and is cheap.
+    #   `<month id="7"/>`  — a real change. It would make the corpus mean
+    #                        the July it has always CLAIMED to mean, and
+    #                        invalidates all 43 published snapshots. That is
+    #                        a recapture decision, not an editing one.
+    #
+    # Until one of those is taken, read `months=(N,)` as "monthID N+1" and
+    # write any month-keyed input-DB filter against N+1 (see
+    # ../county-inputs/washtenaw-project/setup-project.sql).
+    months: tuple[int, ...] = (7,)         # index 7 -> August (monthID 8)
     days: tuple[int, ...] = (5,)           # Weekdays
     begin_hour: int = 6                    # hour-of-day index per hourofanyday
     end_hour: int = 6
@@ -748,6 +782,20 @@ FIXTURES: list[FixtureSpec] = [
         timespan=TimeSpan(year=2020, months=(7,), days=(5,),
                           begin_hour=8, end_hour=8),
         geographic_output_detail="LINK",
+        # PROJECT-domain input databases are checked by MOVES's domain
+        # database validator (MOVESAPI.java:858, gated on
+        # RunSpec.skipDomainDatabaseValidation) before the run starts. The
+        # validator compares the supplied database against an expected
+        # checklist and aborts on any mismatch; the minimal project DB in
+        # county-inputs/washtenaw-project/setup-project.sql trips it on
+        # fuel-formulation and unused-fuel-type warnings that have no
+        # bearing on what this fixture measures. Without this element the
+        # run dies before MOVESInstantiator runs and no execution database
+        # is created at all (measured: the capture dumps 46 tables instead
+        # of 360). The flag skips an input QA gate only — it changes no
+        # calculation, and it is the same switch MOVES's own GUI exposes as
+        # "Do Not Perform Domain Database Validation" (Alt+8).
+        extra_root_elements='\t<skipdomaindatabasevalidation selected="true"/>',
     ),
     FixtureSpec(
         name="scale-rates",

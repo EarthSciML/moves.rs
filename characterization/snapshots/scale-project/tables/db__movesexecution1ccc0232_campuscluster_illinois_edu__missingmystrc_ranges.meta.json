@@ -1,0 +1,42 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__missingmystrc_ranges",
+  "schema": [
+    {
+      "name": "modelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "regClassID",
+      "kind": "int64"
+    },
+    {
+      "name": "isUpperLimit",
+      "kind": "int64"
+    },
+    {
+      "name": "minModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "maxModelYearID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "modelYearID",
+    "sourceTypeID",
+    "regClassID",
+    "isUpperLimit"
+  ],
+  "row_count": 0,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "c141272b17e55c6dd0b3242bb10b1453d72e574f122e369c0af9e66335081206"
+}

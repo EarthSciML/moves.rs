@@ -22,7 +22,7 @@ input databases not present in the default test environment and are excluded.
 |-----|---------|
 | Onroad (default-scale) | `chain-*`, `expand-*`, `process-*`, `sample-runspec`, `mixed-onroad` |
 | NONROAD | `nr-*` (including `nr-mixed-nonroad`) |
-| Excluded (need extra input DB) | `scale-county`, `scale-project`, `scale-rates` |
+| Excluded from `all_fixtures()` (`scale-*`) | `scale-county`, `scale-project`, `scale-rates` — see §6 |
 
 ### The regression gate
 
@@ -312,17 +312,65 @@ REGRESSION_SNAPSHOTS_DIR=characterization/snapshots \
 
 ---
 
-## 6. Scale fixtures (deferred)
+## 6. Scale fixtures
 
-The three excluded `scale-*` fixtures require additional input databases:
+`all_fixtures()` in `crates/moves-cli/tests/full_suite_regression.rs`
+hard-excludes every `scale-*.xml` (the `!name.starts_with("scale-")` filter),
+so no `scale-*` fixture reaches `all_fixtures_run_without_error`,
+`canonical_snapshot_diff`, or the catalogue-count assertion. The purpose-built
+home for them is the dormant `SCALE_INPUTS_DIR_ENV` gate, which wants
+CDB/PDB Parquet inputs:
 
-| Fixture | Requires |
-|---------|----------|
-| `scale-county` | County Database (CDB) Parquet inputs |
-| `scale-project` | Project Database (PDB) Parquet inputs |
-| `scale-rates` | Rates-mode setup database |
+| Fixture | Canonical snapshot | Requires for the port |
+|---------|--------------------|-----------------------|
+| `scale-county` | not captured | County Database (CDB) Parquet inputs |
+| `scale-project` | **captured 2026-09-10** | Project Database (PDB) Parquet inputs, or `--snapshot` |
+| `scale-rates` | not captured | Rates-mode setup database |
 
-These fixtures will be added to the regression suite after the CDB/PDB
-importers and a matching test fixture set are in place.
-The `run-all-fixtures.sh` script has the same exclusion: pass
-`--include scale-county` to opt in once the inputs are available.
+`run-all-fixtures.sh` keeps `scale-county` and `scale-rates` in
+`SKIP_BY_DEFAULT` for want of an input DB. `scale-project` stays there only
+for the cost of the extra MariaDB seed pass: `--include scale-project` now
+captures it, routed through `apptainer/capture-county-snapshot.sh` with
+`characterization/county-inputs/washtenaw-project/setup-project.sql`.
+
+### 6.1 `scale-project`: the port over-emits by ~50× (unfiled, measured 2026-09-10)
+
+The snapshot carries the execution database, so the port does not need a PDB
+importer to be measured against it — `--snapshot` supplies the slow tier.
+Measured by temporarily lifting the `scale-` exclusion in `all_fixtures()`
+and running `canonical_snapshot_diff`, and independently by running the CLI:
+
+```sh
+moves run --runspec characterization/fixtures/scale-project.xml \
+          --snapshot characterization/snapshots/scale-project \
+          --output /tmp/portout
+```
+
+| | canonical | port |
+|---|---|---|
+| `MOVESOutput` rows | 125 | 125 |
+| pollutants emitted | 91 only | 91 only |
+| process / roadType / link / day / hour / month | 1 / 4 / 1 / 5 / 9 / 8 | identical |
+| Σ `emissionQuant` (Million BTU) | 4.227043523010997 | 214.257191021672 |
+
+`max_rel_diff = +4.969e1`; the port's total is **50.69×** canonical's. Every
+key column agrees and the row count agrees exactly, so this is a magnitude
+error in the PROJECT-domain activity or rate path, not a shape or coverage
+error — the shape agreeing on all six dimensions is what makes it worth
+chasing.
+
+This fixture is **not** wired into `canonical_snapshot_diff`. Doing so means
+editing `all_fixtures()`, which also feeds `all_fixtures_run_without_error`
+and the "exactly 48 non-scale non-error fixtures" catalogue assertion, so it
+is a deliberate three-test change and an operator call. The numbers above are
+recorded here so that call can be made on evidence. Once made, `scale-project`
+belongs in `QUARANTINED_FIXTURES` until the magnitude error is fixed.
+
+Note also that across two independent captures of this fixture on 2026-09-10
+(same SIF, input DB differing only in its month filter) all 360 table Parquets
+were byte-identical except `db__out_scale_project__movestablesused`;
+`db__out_scale_project__movesoutput` in particular did not change a byte. Only
+`manifest.json` and `provenance.json` otherwise differ. That is a stronger
+result than the corpus generally holds — see
+`characterization/snapshots/README.md` §"Measured limits of the determinism
+contract" for the two known sources of run-to-run drift.
