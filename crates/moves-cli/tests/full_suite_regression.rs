@@ -605,8 +605,8 @@ fn asserted_fixtures() -> &'static [(&'static str, f64, bool)] {
         ("chain-so2-co2e-mechanism-control", ONROAD_REL_TOL, false), // pol 91 -3.408e-4, rest <=5e-7
         ("process-nox-speciation", ONROAD_REL_TOL, false), // NO/NO2/HONO: 3/32/33/34 exact
         ("process-crankcase-running", ONROAD_REL_TOL, false), // crankcase THC: 1/2/3 exact
-        ("process-brakewear", ONROAD_REL_TOL, false),    // 91/106/116 exact
-        ("process-tirewear", ONROAD_REL_TOL, false),     // 91/107/117 exact
+        ("process-brakewear", ONROAD_REL_TOL, false),      // 91/106/116 exact
+        ("process-tirewear", ONROAD_REL_TOL, false),       // 91/107/117 exact
         // AirToxics: extracts synthesized from the raw ratio tables + per-row
         // formulation expansion (AT*FuelSupply). 1/20/24/25/79/87 exact.
         ("process-airtoxics", ONROAD_REL_TOL, false),
