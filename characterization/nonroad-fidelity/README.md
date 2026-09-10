@@ -131,6 +131,40 @@ SIF=/path/to/custom.sif ./generate-corpus.sh  # use a specific SIF
 The script writes each fixture's TSV to `baselines/<fixture>.tsv` and
 records SHA256, line count, and elapsed time in `baselines/corpus.sha`.
 
+### What the generator refuses (issue #60)
+
+A stale or truncated TSV recorded as a baseline passes the corpus'
+own integrity check — the SHA genuinely matches the bytes — so the
+generator has to refuse it at capture time or not at all. It removes
+every artifact it will judge the run by *before* the run, then
+refuses to record a baseline unless all of the following hold:
+
+| Check | Refusal |
+|---|---|
+| `run-moves.sh` exit status, via `PIPESTATUS[0]` | `run-moves.sh exited N` |
+| Run log, scanned by `../apptainer/lib/moves-log-scan.sh` | non-zero `Java Result`, `BUILD FAILED`, a word-boundary `ERROR:` token |
+| `nrerrors.txt` absent from the worker folder | `NONROAD reported an error` |
+| The TSV exists (it was deleted pre-run, so this means *this* run wrote it) | `NRDBG_FILE not produced` |
+| The TSV is non-empty and field 1 is a dbgemit phase | `does not look like a dbgemit capture` |
+| Row count ≥ `MIN_ROWS` (default 100) | `below the MIN_ROWS floor` |
+
+Publication is stage-then-swap, so an interrupted copy can never
+leave a half-written `baselines/<fixture>.tsv` that looks finished.
+
+**The log scan is weaker here than it is for `run-fixture.sh`.**
+NONROAD.exe's stdout never reaches the ant log (MOVES redirects it to
+`NonroadProcessOutput.txt`), its exit status is discarded, and the
+errors MOVES does re-log arrive as `RUN_ERROR:` because the worker
+runs inside the simulation window where `Logger` promotes both
+WARNING and ERROR to that category. So for NONROAD's *own* failures
+the artifact checks and `nrerrors.txt` are the primary detector, not
+a belt behind the log scan. See the header of `generate-corpus.sh`
+for the source citations.
+
+Guards: `tests/generate-corpus-guards.sh` drives the real script with
+`apptainer` stubbed — 20 cases in ~2 s, no SIF, no Apptainer, no
+cargo. It runs in CI on every push.
+
 ### MANIFEST.toml contract
 
 The fidelity harness reads `MANIFEST.toml` from the baseline directory —
