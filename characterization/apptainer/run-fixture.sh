@@ -8,12 +8,20 @@
 # `moves-fixture-capture` to produce a deterministic snapshot under
 # `characterization/snapshots/<fixture-name>/`.
 #
-# The on-disk snapshot is a function of:
+# The snapshot's DATA is a function of:
 #   * the SIF SHA256 (pinned in characterization/fixture-image.lock)
 #   * the RunSpec bytes
 # Two runs of this script against the same inputs produce byte-identical
-# snapshot files — that's the bead's "deterministic given the same inputs"
-# acceptance criterion.
+# tables/, manifest.json, provenance.json and execution-trace.json — that's
+# the bead's "deterministic given the same inputs" acceptance criterion,
+# and snapshot_aggregate_sha256 covers exactly that set.
+#
+# The one file in the snapshot that is NOT byte-reproducible is
+# moves-run.log: it carries wall-clock timestamps, PIDs and elapsed times.
+# It is deliberately outside manifest.json and outside the aggregate hash;
+# it is evidence about the run, not part of the captured state. Diff
+# snapshots with the aggregate hash or with tables/, never with a plain
+# recursive diff of the directory.
 #
 # Usage:
 #   ./run-fixture.sh [-f|--fakeroot] --runspec PATH [options]
@@ -40,6 +48,8 @@
 #                         floor only trips on a catastrophically empty run.
 #   --keep-captures       Don't delete the staged captures directory after
 #                         the snapshot is built. Useful for forensics.
+#                         (The MOVES run log is published into the snapshot
+#                         as moves-run.log regardless of this flag.)
 #   --skip-run            Skip the MOVES execution. Captures and snapshot
 #                         only — assumes a previous run's scratch is intact.
 #
@@ -256,31 +266,128 @@ trap cleanup_incomplete EXIT
 # than wrapped in helper functions because bash restores the ERR trap when a
 # function returns, which silently undoes a helper's `trap - ERR`.
 
-# ant's <java> task for MOVES has no failonerror="true", so these markers in
-# the run log are the only evidence that MOVES failed.
+# ----- MOVES failure detection in the run log -------------------------------
 #
-# `ERROR: Error:` is the general one and is deliberately first: MOVES's own
-# logger emits a fatal as `<timestamp> ERROR: Error: <message>`, so this catches
-# the whole class rather than one incident's spelling. It was added after
-# `process-apu-single` — a SINGLE-domain fixture run without its county input
-# database — logged
+# ant's <java> task for MOVES has no failonerror="true" (MOVES's own
+# build.xml, target main1worker), so a MOVES that dies still reaches this
+# script as exit 0. The run log is the only witness, which makes this scan
+# the primary detector and the table-count checks the belts behind it.
 #
-#     [java] ERROR: Error: The database does not have the required county.
+# THE RULE: a line carrying the bare token `ERROR:` is a MOVES failure.
+# The pattern is word-boundary anchored on the left, so `RUN_ERROR:` does
+# NOT match. Three non-Logger literals are matched as well, for the ant and
+# argument-handling paths that never reach MOVES's Logger at all.
 #
-# and then exited 0 through ant, so scan_moves_log printed "MOVES run OK" over a
-# run that produced no output databases at all. The zero-table belt below caught
-# it, but the log scan is supposed to be the *first* line of defence and named
-# only three literal strings.
+# Why word-boundary `ERROR:` is the right cut, from MOVES's own source
+# (paths are inside moves-fixture.sif under /opt/moves):
 #
-# False-positive risk was measured, not assumed: across 13 successful captures
-# of this suite (chain-*, expand-*, mixed-onroad, process-*), the string `ERROR`
-# does not appear in the run log at all. A legitimate fixture that trips this is
-# therefore itself a finding.
-MOVES_FAILURE_MARKERS=(
-    'ERROR: Error:'
+#   * common/Logger.java:83 renders every message as
+#         "<timestamp> <CATEGORY>: <message>"
+#     so a bare `ERROR:` token is exactly LogMessageCategory.ERROR, which
+#     common/LogMessageCategory.java:41-42 documents as "an error, the
+#     program cannot continue to run".
+#   * common/Logger.java:78-80 rewrites BOTH WARNING and ERROR to the
+#     RUN_ERROR category whenever `Logger.shouldPromoteErrorLevel` is set,
+#     and master/framework/MOVESEngine.java sets it at line 457 (simulation
+#     start) and clears it at line 1245 (simulation end). `ERROR:` is
+#     therefore emitted only OUTSIDE the simulation window — RunSpec
+#     parsing, domain-database validation, importer construction,
+#     output-database creation — where MOVES has not begun computing and an
+#     ERROR is always terminal. See RESIDUAL GAP below for what this costs.
+#
+# FALSE-POSITIVE RATE, MEASURED. Corpus: the MOVES run log of every one of
+# the 42 published snapshots in characterization/snapshots/, i.e. the
+# moves-snapshot/v2 recapture sweep of 2026-09-08/09, retained under
+# /scratch/$USER/moves-fixture/<fixture>/moves-run.log (38 fixtures) and
+# /scratch/$USER/moves-county-fixture/<fixture>/moves-run.log (4 SINGLE-
+# domain fixtures). One log per published snapshot; the 42 fixture names
+# were matched against `ls characterization/snapshots/` with no gaps.
+#
+#   run logs scanned ................................ 42
+#   logs matched by this rule ....................... 0
+#   logs containing the substring "ERROR" anywhere ... 6
+#
+# All six near-misses are the same shape —
+#     RUN_ERROR: WARNING: Using default formulation <N> for <fuel> in
+#     region <R>, year 2020, month 8. Check your input FuelSupply table
+#     for errors.
+# — an in-simulation FuelSupply/NRFuelSupply fallback, in
+# process-apu-single (2), process-crankcase-extidle-single (2),
+# process-crankcase-start-single (3), process-extended-idle-single (2),
+# nr-construction-state (1) and nr-pleasure-craft-state (1). It is the word
+# boundary, not an allowlist, that excludes them: `_` is a word
+# constituent, so `RUN_ERROR:` contains no `ERROR:` token.
+#
+# Reproduced on three FRESH captures taken for this change on 2026-09-09
+# with the same SIF (see characterization/audit-results/
+# 20260909T2310-run-log-scan-and-snapshot-audit.md for the commands and for
+# the bound on what any of this establishes):
+# nr-logging-county, process-crankcase-start and chain-tog-speciation —
+# 0 matches each, all three published a snapshot and exited 0.
+#
+# TRUE-POSITIVE RATE. The four project-scale trials of 2026-09-09 (their
+# in-log timestamps read 9/10/26 because MOVES logs UTC)
+# (/scratch/$USER/scalescope-trial/trial{1,2,3,4}.log), every one of which
+# the previous four-literal marker set passed as "MOVES run OK" and only
+# the zero-table belt stopped: 8, 3, 2 and 4 matching lines respectively.
+# trial5.log, the run that actually succeeded and published a 360-table
+# snapshot, has 0. The strings that walked past the old set and are caught
+# by this one:
+#     ERROR: Unable to validate input database Data Status
+#     ERROR: Unable to count offNetwork links
+#     ERROR: ImporterInstantiator is unable to instantiate ...GenericImporter
+#     ERROR: ERROR: AVFT table does not exist. ...
+#     ERROR: ERROR: AVFT table is not imported.
+#
+# THE ALLOWLIST IS EMPTY, deliberately. The one shape that argues for an
+# entry is trial4 lines 124-126:
+#     ERROR: Missing: Warning: Fuel formulation 2675 changed fuelSubtypeID
+#     ERROR: Missing: Warning: Fuel type 3 is imported but will not be used
+# which are warnings in substance. They are nonetheless a correct failure
+# signal, and the call site says why —
+# master/framework/MOVESAPI.java:870-876:
+#
+#     result = manager.performAllImporterChecks(runSpec,messages,db);
+#     if(result < 0) {
+#         // Log the error messages
+#         for(Iterator<String> i = messages.iterator(); i.hasNext(); ) {
+#             Logger.log(LogMessageCategory.ERROR, i.next());
+#         }
+#         return false;
+#     }
+#
+# The whole importer message list is re-logged at ERROR level ONLY on the
+# `result < 0` branch, which then refuses to launch. The "Missing: " prefix
+# is added by framework/importers/ImporterBase.java:409-411 to any quality
+# message that does not already start with "error". So a warning-shaped
+# `ERROR:` line means "MOVES dumped its importer message list on the way
+# out" — a failure by construction, not a warning that got misfiled. It
+# also never occurs in the 42-log success corpus above. Allowlisting it
+# would have blinded the guard to trial4 almost entirely: strip those three
+# lines and ImporterInstantiator is the only evidence left.
+#
+# A legitimate fixture that trips this rule is therefore itself a finding:
+# either MOVES really failed, or MOVES logs a terminal category for a
+# non-terminal condition and that belongs in known-divergences.md.
+#
+# RESIDUAL GAP (issue #64): an error raised *during* the simulation prints
+# as `RUN_ERROR:` and is textually indistinguishable from an in-simulation
+# warning (Logger.java:78-80 above). This scan cannot see that class at
+# all. Behind it stand the non-zero "Java Result" scan, the zero-dumped-
+# table refusal and the --min-tables floor — all of which only catch gross
+# failure. moves-run.log is now published into every snapshot precisely so
+# this class can be re-audited later without re-running MOVES.
+MOVES_FAILURE_PATTERNS=(
+    # LogMessageCategory.ERROR, word-boundary anchored so RUN_ERROR: is not
+    # matched. `[^A-Za-z0-9_]` is the boundary because MOVES's own category
+    # names use `_`.
+    '(^|[^A-Za-z0-9_])ERROR:'
+    # ant itself failed (compile error, missing target, ...).
     'BUILD FAILED'
+    # MOVESCommandLine argument handling, which prints straight to stdout
+    # without going through Logger. Both are the issue #56 repro shapes.
     'The specified runspec file does not exist'
-    'ERROR: A runspec was not provided'
+    'A runspec was not provided'
 )
 
 scan_moves_log() {
@@ -299,10 +406,16 @@ scan_moves_log() {
         fail "ant reported non-zero Java Result (${codes}) — MOVES failed while ant exited 0"
     fi
 
-    local marker
-    for marker in "${MOVES_FAILURE_MARKERS[@]}"; do
-        if grep -Fq -- "${marker}" "${log}"; then
-            fail "MOVES run log contains failure marker: ${marker}"
+    # Report the offending line, not just the pattern that matched it: the
+    # operator needs to know which failure happened, and a bare regex in the
+    # banner is not that. Truncated so one runaway line can't bury the banner.
+    local pattern hit
+    for pattern in "${MOVES_FAILURE_PATTERNS[@]}"; do
+        hit="$(grep -Em1 -- "${pattern}" "${log}" 2>/dev/null | tr -d '\r' \
+               | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' \
+               | cut -c1-200 || true)"
+        if [ -n "${hit}" ]; then
+            fail "MOVES run log contains a failure line: ${hit}"
         fi
     done
 }
@@ -564,6 +677,41 @@ if [ "${SNAPSHOT_TABLES}" -eq 0 ]; then
 fi
 if [ "${SNAPSHOT_TABLES}" -lt "${MIN_TABLES}" ]; then
     fail "built snapshot holds only ${SNAPSHOT_TABLES} table(s), below the --min-tables floor of ${MIN_TABLES}"
+fi
+
+# Publish the MOVES run log INTO the snapshot, before the swap, so it
+# travels by the same stage-then-swap path as manifest.json and friends: a
+# failed capture unwinds the whole staging tree and can never leave a log
+# behind pretending to be a snapshot.
+#
+# Why this exists: every previous investigation of "ant exited 0 but MOVES
+# failed" had to re-run MOVES, because the run log lived only in the
+# per-fixture scratch dir and was overwritten by the next run. With the log
+# in the snapshot, the log-scan rule above can be re-measured against the
+# whole published corpus at any time, for free:
+#     grep -lE '(^|[^A-Za-z0-9_])ERROR:' characterization/snapshots/*/moves-run.log
+#
+# Stored uncompressed, and that is a measured choice, not laziness. Across
+# the 42 v2 captures these logs run 2.7 KB (process-apu-single) to 59 KB
+# (expand-counties), median ~20 KB, 1.0 MB for the whole corpus — which git
+# zlib-compresses in the pack anyway, so gzipping here would buy a fraction
+# of a megabyte and cost the thing the file is for: plain `grep` over the
+# committed tree, and a readable diff when a fixture's behaviour changes.
+# A gzip member would also carry an mtime in its header unless written with
+# -n, i.e. it would be one more determinism trap. Revisit if a fixture ever
+# produces a log in the megabytes.
+#
+# NOTE: this file is named `moves-run.log`, so a blanket `*.log` line in
+# .gitignore would silently drop it from every snapshot and quietly undo
+# this whole change. .gitignore carries an explicit trailing negation for
+# this path, and tests/run-fixture-guards.sh asserts via `git check-ignore`
+# that the file is still trackable. Do not remove either.
+if [ -f "${MOVES_LOG}" ]; then
+    cp "${MOVES_LOG}" "${STAGING_DIR}/moves-run.log"
+elif [ "${SKIP_RUN}" = "1" ]; then
+    echo "[run-fixture] NOTE: --skip-run and no ${MOVES_LOG}; snapshot gets no run log." >&2
+else
+    fail "MOVES run log ${MOVES_LOG} vanished before it could be published"
 fi
 
 # Publish: move any existing snapshot aside, move the staging tree into

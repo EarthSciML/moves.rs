@@ -332,6 +332,40 @@ marker, checks the dump step's status, refuses an empty captures
 directory, and enforces the `--min-tables` floor on the built snapshot
 before publishing it.
 
+The log scan is the *primary* detector, and it is a general rule rather
+than a list of strings from past incidents: any line carrying a
+word-boundary-anchored `ERROR:` token fails the capture, plus
+`BUILD FAILED` and the two RunSpec-argument literals. `RUN_ERROR:` is
+excluded by the word boundary and not by an allowlist — MOVES's
+`Logger.java` rewrites both WARNING and ERROR to the `RUN_ERROR` category
+for the duration of a simulation, and `RUN_ERROR: WARNING: Using default
+formulation ...` occurs benignly in 6 of the 42 published snapshots' run
+logs. The reasoning, the measurement and its bound are in the comment
+above `MOVES_FAILURE_PATTERNS` in `run-fixture.sh`.
+
+Every published snapshot now carries the MOVES run log as
+`characterization/snapshots/<fixture-name>/moves-run.log`, written by the
+same stage-then-swap path as `manifest.json`, so a refused capture never
+leaves one behind. It is outside `manifest.json` and outside
+`snapshot_aggregate_sha256` — it carries timestamps and PIDs and is not
+byte-reproducible — so compare snapshots by aggregate hash or by
+`tables/`, never with a recursive directory diff. Its point is that the
+"ant exited 0 but MOVES failed" class can be re-audited over the whole
+corpus at any time without re-running MOVES:
+
+```sh
+grep -lE '(^|[^A-Za-z0-9_])ERROR:' characterization/snapshots/*/moves-run.log
+```
+
+`.gitignore` carries a trailing negation for that path; a blanket `*.log`
+rule would otherwise drop all of them silently. The guard suite asserts
+this with `git check-ignore`.
+
+What the scan still cannot see is filed as
+[#64](https://github.com/EarthSciML/moves.rs/issues/64): an error raised
+*during* the simulation prints as `RUN_ERROR:` and is textually
+indistinguishable from an in-simulation warning.
+
 `characterization/apptainer/tests/run-fixture-guards.sh` is the
 regression test for those guards. It stubs `apptainer` and the capture
 binary — no SIF, no Apptainer, no cargo build — and runs in seconds:
