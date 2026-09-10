@@ -433,4 +433,42 @@ if [ "${DRY_RUN}" = "0" ]; then
     } > "${MANIFEST}"
 
     echo "[corpus] MANIFEST.toml written (sif_sha256 ${SIF_SHA256:0:12}…)"
+
+    # ----- Cross-fixture duplicate check -----------------------------------
+    # Two different fixtures producing a byte-identical capture is a corpus
+    # that reports coverage it does not have: the fidelity gate diffs the
+    # port against the same reference twice and calls it two fixtures.
+    #
+    # This is NOT the issue #60 failure mode — the workdirs are per-fixture,
+    # so a stale TSV cannot cross between them — which is exactly why it
+    # needs its own check. It is live in the corpus as shipped:
+    # nr-airport-support-county and nr-industrial-county both record
+    # caa856d8…, 49300684 bytes, 312481 rows, though their RunSpecs select
+    # different sectors (AirportSupport 8 vs Industrial 3) and a different
+    # pollutant set.
+    #
+    # A warning, not a refusal: two fixtures differing only in, say, output
+    # database name would legitimately collide, and this script cannot tell
+    # the cases apart. It is printed last and loudly so it cannot be scrolled
+    # past, and it names both sides so the RunSpecs can be compared.
+    DUPES="$(awk 'BEGIN{FS="\t"} {if($2 in seen){print seen[$2]" == "$1"  ("substr($2,1,12)"…)"} else {seen[$2]=$1}}' \
+             "${CORPUS_SHA}")"
+    if [ -n "${DUPES}" ]; then
+        {
+            echo
+            echo "############################################################"
+            echo "[corpus] WARNING: fixtures with IDENTICAL captures"
+            while IFS= read -r dupe; do
+                [ -n "${dupe}" ] && echo "[corpus]   ${dupe}"
+            done <<< "${DUPES}"
+            echo "[corpus]"
+            echo "[corpus] Each pair above contributes ONE reference to the"
+            echo "[corpus] fidelity gate while counting as two fixtures. Diff"
+            echo "[corpus] their RunSpecs in ../fixtures/: if they select"
+            echo "[corpus] different sectors or pollutants, the capture is not"
+            echo "[corpus] reflecting the selection and the corpus overstates"
+            echo "[corpus] its coverage."
+            echo "############################################################"
+        } >&2
+    fi
 fi

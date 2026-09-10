@@ -47,25 +47,34 @@ cat > "${TMP}/bin/apptainer" <<'STUB'
 #!/bin/bash
 if [ "$1" = "--version" ]; then echo "apptainer version stub"; exit 0; fi
 STUB_MODE="${STUB_MODE:-ok}"
-NRDBG_NAME="${STUB_NRDBG_NAME:?stub needs STUB_NRDBG_NAME}"
 
+# Both the capture's destination and its name come out of the real argv the
+# script built, so the stub follows a multi-fixture run without being told.
 moves_temp=""
+NRDBG_NAME=""
 prev=""
 for a in "$@"; do
     if [ "${prev}" = "--bind" ]; then
         case "$a" in *:/opt/moves/MOVESTemporary) moves_temp="${a%:/opt/moves/MOVESTemporary}" ;; esac
     fi
+    case "$a" in NRDBG_FILE=*) NRDBG_NAME="${a##*/}" ;; esac
     prev="$a"
 done
+[ -n "${NRDBG_NAME}" ] || { echo "[stub] no NRDBG_FILE in argv" >&2; exit 91; }
 [ -n "${moves_temp}" ] || { echo "[stub] no MOVESTemporary bind in argv" >&2; exit 90; }
 tsv="${moves_temp}/${NRDBG_NAME}"
 
 # Write a dbgemit-shaped capture with $1 data rows.
+# Captures carry the fixture name so two fixtures differ, as real ones must.
+# STUB_IDENTICAL=1 drops it, making two fixtures collide byte for byte.
 write_tsv() {
     local n="$1" i=1
+    local tag="${NRDBG_NAME%.tsv}"
+    [ "${STUB_IDENTICAL:-0}" = "1" ] && tag="same"
     : > "${tsv}"
     while [ "${i}" -le "${n}" ]; do
-        printf 'GETPOP\tfips=26161,scc=2270002006,year=2020\tpopeqp\t1\t%d.0\n' "${i}" >> "${tsv}"
+        printf 'GETPOP\tfips=26161,scc=2270002006,year=2020,fixture=%s\tpopeqp\t1\t%d.0\n' \
+            "${tag}" "${i}" >> "${tsv}"
         i=$((i + 1))
     done
 }
@@ -155,8 +164,6 @@ done
 printf '#!/bin/bash\nexit 0\n' > "${TMP}/bin/ss"
 chmod +x "${TMP}/bin/"*
 export PATH="${TMP}/bin:${PATH}"
-
-export STUB_NRDBG_NAME="${FIXTURE}.tsv"
 
 FAILURES=0
 pass() { printf 'ok   — %s\n' "$1"; }
@@ -409,6 +416,51 @@ elif [ -e "${CORPUS_SHA}" ]; then
     bad "interrupted-copy: corpus.sha recorded a copy that never completed"
 else
     pass "interrupted-copy: baselines/ untouched, no corpus.sha entry"
+fi
+
+# ---------------------------------------------------------------------------
+# 14. Cross-fixture duplicate captures. Two different fixtures with a
+#     byte-identical capture means the corpus reports coverage it does not
+#     have: the fidelity gate diffs the port against the same reference
+#     twice. This is NOT the #60 failure mode — workdirs are per-fixture, so
+#     a stale TSV cannot cross between them — which is why it needs its own
+#     check. It is live in the shipped corpus: nr-airport-support-county and
+#     nr-industrial-county both record caa856d8…, 49300684 bytes, 312481
+#     rows, from RunSpecs selecting different sectors and pollutants.
+#
+#     A warning rather than a refusal, so the run must still exit 0.
+# ---------------------------------------------------------------------------
+SECOND_FIXTURE="nr-commercial-nation"
+if [ ! -f "${CHAR_DIR}/fixtures/${SECOND_FIXTURE}.xml" ]; then
+    bad "duplicate-captures: ${SECOND_FIXTURE}.xml not found — cannot run the two-fixture case"
+else
+    printf '%s\n%s\n' "${FIXTURE}" "${SECOND_FIXTURE}" > "${TMP}/FIXTURES"
+
+    reset_state
+    STUB_MODE=ok STUB_ROWS=500 STUB_IDENTICAL=1 \
+        run_corpus duplicate-captures zero ""
+    dlog="${TMP}/duplicate-captures.log"
+    if ! grep -q 'WARNING: fixtures with IDENTICAL captures' "${dlog}"; then
+        bad "duplicate-captures: two identical captures were recorded with no warning"
+    elif ! grep -q "${FIXTURE} == ${SECOND_FIXTURE}" "${dlog}"; then
+        bad "duplicate-captures: warning did not name both fixtures"
+    else
+        pass "duplicate-captures: identical captures across two fixtures are called out"
+    fi
+
+    # NEGATIVE: two fixtures that genuinely differ must produce no warning.
+    reset_state
+    STUB_MODE=ok STUB_ROWS=500 run_corpus distinct-captures zero ""
+    if grep -q 'WARNING: fixtures with IDENTICAL captures' "${TMP}/distinct-captures.log"; then
+        bad "distinct-captures: warned about fixtures whose captures differ"
+    elif [ "$(sha256sum "${TMP}/baselines/${FIXTURE}.tsv" | awk '{print $1}')" \
+         = "$(sha256sum "${TMP}/baselines/${SECOND_FIXTURE}.tsv" | awk '{print $1}')" ]; then
+        bad "distinct-captures: the two baselines are identical — the case tests nothing"
+    else
+        pass "distinct-captures: differing captures draw no warning"
+    fi
+
+    printf '%s\n' "${FIXTURE}" > "${TMP}/FIXTURES"
 fi
 
 echo
