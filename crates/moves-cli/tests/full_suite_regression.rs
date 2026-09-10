@@ -592,17 +592,23 @@ fn asserted_fixtures() -> &'static [(&'static str, f64, bool)] {
         // CO2AERunningStartExtendedIdleCalculator, TOGSpeciationCalculator).
         // Both snapshots landed 2026-09-08 and were never classified, so the
         // gate reported them UNCLASSIFIED until 2026-09-10 — a triage gap, not
-        // a divergence. Measured with the fixture run against its own snapshot:
-        // identical pollutant key sets AND identical per-pollutant row counts
-        // (2767/2767 and 2309/2309), every pollutant within ~5e-7 — including
-        // the three trigger pollutants the fixtures exist to prove:
-        // SO2 (31) -3.8e-7, Atmospheric CO2 (90) +1.5e-7, CO2 Equivalent (98)
-        // +1.2e-7. The reported max_rel_diff of -3.408e-4 is Total Energy
-        // Consumption (91) alone, the same energy float-summation drift class
-        // carried by every other energy fixture here (expand-day -3.5e-4,
-        // expand-month -3.8e-4, process-tirewear -3.4e-4); §4.2.
-        ("chain-so2-co2e-mechanism", ONROAD_REL_TOL, false), // pol 91 -3.408e-4, rest <=5e-7
-        ("chain-so2-co2e-mechanism-control", ONROAD_REL_TOL, false), // pol 91 -3.408e-4, rest <=5e-7
+        // a divergence. Measured with each fixture run against its own
+        // snapshot: identical pollutant key sets AND identical per-pollutant
+        // row counts (2767/2767 and 2309/2309), and EVERY pollutant within
+        // 5.4e-7 — including the three trigger pollutants the pair exists to
+        // prove reachable: SO2 (31) -3.8e-7, Atmospheric CO2 (90) +1.5e-7,
+        // CO2 Equivalent (98) +1.2e-7. Pure f64 summation drift, §4.2.
+        //
+        // Both sat at -3.408e-4 until the `ev_efficiency` fix (BaseRate-
+        // Calculator built ModuleFlags without it, against BaseRate-
+        // Calculator.java's "always run evefficiency section"). That residual
+        // was Total Energy Consumption (91) alone and it was a real bug, not a
+        // precision floor: pollutant 91 is now -2.6e-7. Recorded here because
+        // the near-miss matters — -3.4e-4 sits inside ONROAD_REL_TOL, so
+        // classifying these two a day earlier would have papered over a live
+        // defect with a tolerance that happened to be wide enough.
+        ("chain-so2-co2e-mechanism", ONROAD_REL_TOL, false), // max 5.366e-7 (pol 26)
+        ("chain-so2-co2e-mechanism-control", ONROAD_REL_TOL, false), // max 5.366e-7 (pol 26)
         ("process-nox-speciation", ONROAD_REL_TOL, false), // NO/NO2/HONO: 3/32/33/34 exact
         ("process-crankcase-running", ONROAD_REL_TOL, false), // crankcase THC: 1/2/3 exact
         ("process-brakewear", ONROAD_REL_TOL, false),      // 91/106/116 exact

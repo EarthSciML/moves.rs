@@ -127,17 +127,31 @@ measurement — see §1). All three were triaged on 2026-09-10:
 
 | fixture | canon/port rows | max_rel_diff | verdict |
 |---|---|---|---|
-| `chain-so2-co2e-mechanism` | 2767 / 2767 | -3.408e-4 | **asserted** — precision only |
-| `chain-so2-co2e-mechanism-control` | 2309 / 2309 | -3.408e-4 | **asserted** — precision only |
+| `chain-so2-co2e-mechanism` | 2767 / 2767 | +5.366e-7 | **asserted** — precision only |
+| `chain-so2-co2e-mechanism-control` | 2309 / 2309 | +5.366e-7 | **asserted** — precision only |
 | `nr-airtoxics-lawn-garden-county` | 14036 / 968 | -1.000e0 | **quarantined** — §4.4 |
 
 For the two `chain-so2-*` fixtures the pollutant key sets and the per-pollutant
-row counts are identical on both sides, and every pollutant agrees to ≤ 5e-7 —
-including the three trigger pollutants those fixtures exist to prove reachable:
-SO2 (31) -3.8e-7, Atmospheric CO2 (90) +1.5e-7, CO2 Equivalent (98) +1.2e-7.
-The whole of the reported -3.408e-4 is Total Energy Consumption (91), the same
-energy summation-drift class already carried by `expand-day` (-3.5e-4),
-`expand-month` (-3.8e-4) and `process-tirewear` (-3.4e-4).
+row counts are identical on both sides, and every pollutant agrees to ≤ 5.4e-7
+— including the three trigger pollutants those fixtures exist to prove
+reachable: SO2 (31) -3.8e-7, Atmospheric CO2 (90) +1.5e-7, CO2 Equivalent (98)
++1.2e-7. The worst residual is Acetaldehyde (26) at +5.366e-7; Total Energy
+Consumption (91) is -2.6e-7.
+
+**A near-miss worth recording.** Until the `ev_efficiency` fix landed (30dc3d28
+— `BaseRateCalculator` built `ModuleFlags` without `ev_efficiency`, against
+`BaseRateCalculator.java`'s explicit *"always run evefficiency section"*), both
+fixtures reported -3.408e-4, all of it Total Energy Consumption (91). That is
+comfortably *inside* `ONROAD_REL_TOL = 1e-3`, so classifying these two on
+2026-09-09 would have graduated them with a comment attributing a real,
+findable defect — EV energy, ~0.25–0.3% of pollutant 91 across the whole
+onroad set — to "f64 summation drift". The tolerance would not have been
+widened, and the gate would still have been green, and the bug would still
+have been there. The lesson is the one §1 already states in the other
+direction: a residual that fits the budget is not thereby explained. The
+existing `expand-*` and `process-*` energy fixtures carried the same -3.4e-4
+signature and are now in the same place; their per-fixture comments in
+`asserted_fixtures()` are the current record.
 
 ### 1b.1 `process-crankcase-start-single` recaptured 2026-09-10 (input-data fix)
 
