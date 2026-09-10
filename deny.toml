@@ -16,6 +16,24 @@ yanked = "warn"
 ignore = [
     { id = "RUSTSEC-2025-0141", reason = "bincode 2.0.1 unmaintained, no safe upgrade; transitive dep of polars-utils" },
     { id = "RUSTSEC-2024-0436", reason = "paste 1.0.15 unmaintained, no safe upgrade; transitive dep of parquet" },
+    # quick-xml < 0.41 XML-parser DoS pair. The workspace's own quick-xml
+    # dependency (moves-runspec, moves-fixture-capture) IS on 0.41, so no
+    # RunSpec we parse is exposed. The copy that remains is quick-xml 0.39.4,
+    # reached only as:
+    #     polars 0.53 -> polars-error -> object_store 0.13.2 -> quick-xml ^0.39
+    # object_store first requires quick-xml ^0.41 at 0.14.1, but every polars
+    # release through 0.55.2 still pins `object_store = "^0.13.1"`, so the fix
+    # is unreachable by any polars bump available today -- verified against the
+    # crates.io index, not assumed. Nothing in moves.rs feeds attacker-controlled
+    # XML to object_store either: it is pulled in transitively by the
+    # polars `ipc` feature (ipc -> new_streaming -> dtype-categorical ->
+    # polars-stream -> polars-io/file_cache -> cloud -> http -> object_store)
+    # and we never open a cloud object store -- all Parquet/IPC I/O is local.
+    # UNBLOCKED BY: a polars release that raises its object_store requirement
+    # to >= 0.14.1. Re-check with `cargo tree -i quick-xml@<ver>` and delete
+    # both entries when it lands.
+    { id = "RUSTSEC-2026-0194", reason = "quick-xml 0.39.4 quadratic duplicate-attribute check; only via polars-error -> object_store 0.13.2, which no available polars release lets us move off" },
+    { id = "RUSTSEC-2026-0195", reason = "quick-xml 0.39.4 unbounded NsReader namespace allocation; only via polars-error -> object_store 0.13.2, which no available polars release lets us move off" },
 ]
 
 [licenses]
@@ -61,7 +79,7 @@ skip = [
     { name = "hashbrown",     version = "=0.16.1" },
     { name = "phf",           version = "=0.11.3" },
     { name = "phf_shared",    version = "=0.11.3" },
-    { name = "quick-xml",     version = "=0.36.2" },
+    { name = "quick-xml",     version = "=0.39.4" },
     { name = "r-efi",         version = "=5.3.0" },
     { name = "rand",          version = "=0.8.6" },
     { name = "rand",          version = "=0.9.4" },
