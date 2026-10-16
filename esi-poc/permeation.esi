@@ -1,0 +1,104 @@
+{
+  "esi": "0.1.0",
+  "metadata": {
+    "name": "MOVES_EvaporativePermeation_POC",
+    "description": "The computational core of moves.rs EvaporativePermeationCalculator as an ESI pipeline. Exercises a DIFFERENT capability set from the CriteriaRunning POC: an Arrhenius exponential temperature adjustment (A*exp(B*tankTemp)), two interval/predicate FILTERs (model-year range [minMY,maxMY] in PC-2a, ethanol bin [low,high) in PC-3), null-coalescing (null ETOH volume -> 0), cartesian cross-joins, and operating-mode / fuel-supply weighting. emissionQuant = weightedTemperatureAdjust * (meanBaseRate * weightedFuelAdjustment) * sourceHours. Validated against the calculator's Rust unit tests (see run_permeation.py).",
+    "authors": ["Chris Tessum"],
+    "created": "2026-06-03T00:00:00Z",
+    "references": [
+      { "citation": "moves.rs crates/moves-calculators/src/calculators/evaporative_permeation_calculator.rs (PC-1b/2a/2b/3/4/5/6)" }
+    ]
+  },
+
+  "index_sets": {
+    "polProcess":      { "description": "pollutantID*100 + processID (THC x Evap Permeation = 111)" },
+    "fuelType":        { "description": "fuel type" },
+    "sourceBin":       { "description": "source bin id" },
+    "rateRow":         { "description": "synthetic id distinguishing EmissionRateByAge rows for the same bin (opMode in canonical MOVES); summed away in PC-1b" },
+    "opMode":          { "description": "operating mode bin" },
+    "fuelFormulation": { "description": "fuel formulation id" },
+    "etohThresh":      { "description": "ethanol threshold (bin) id" },
+    "modelYear":       { "description": "vehicle model year" },
+    "scenario":        { "description": "single-row broadcast key for scalar context (geo, sourceHours, tank temperature)" }
+  },
+
+  "tables": {
+    "emissionRateByAge": { "keys": { "sourceBin": "sourceBin", "polProcess": "polProcess", "rateRow": "rateRow" },
+                           "values": { "meanBaseRate": { "units": "g/hr" } } },
+    "sourceBinMap":      { "keys": { "sourceBin": "sourceBin", "fuelType": "fuelType" } },
+    "sourceBinDist":     { "keys": { "sourceBin": "sourceBin", "polProcess": "polProcess" },
+                           "values": { "sourceBinActivityFraction": { "units": "1" } } },
+    "tempAdjust":        { "keys": { "polProcess": "polProcess", "fuelType": "fuelType" },
+                           "values": { "tempAdjustTermA": { "units": "1" }, "tempAdjustTermB": { "units": "1/F" },
+                                       "minModelYear": { "units": "1" }, "maxModelYear": { "units": "1" } } },
+    "avgTankTemp":       { "keys": { "opMode": "opMode", "scenario": "scenario" },
+                           "values": { "averageTankTemperature": { "units": "F" } } },
+    "opModeDist":        { "keys": { "opMode": "opMode", "polProcess": "polProcess" },
+                           "values": { "opModeFraction": { "units": "1" } } },
+    "modelYear":         { "keys": { "modelYear": "modelYear" } },
+    "fuelSupply":        { "keys": { "fuelFormulation": "fuelFormulation" },
+                           "values": { "marketShare": { "units": "1" }, "etohVolume": { "units": "%" } } },
+    "etohBin":           { "keys": { "etohThresh": "etohThresh" },
+                           "values": { "etohThreshLow": { "units": "%" }, "etohThreshHigh": { "units": "%" } } },
+    "hcPermCoeff":       { "keys": { "polProcess": "polProcess", "etohThresh": "etohThresh" },
+                           "values": { "fuelAdjustment": { "units": "1" }, "fuelAdjustmentGPA": { "units": "1" } } },
+    "geo":               { "keys": { "scenario": "scenario" }, "values": { "gpaFract": { "units": "1" } } },
+    "sourceHours":       { "keys": { "scenario": "scenario" }, "values": { "sourceHours": { "units": "hr" } } }
+  },
+
+  "pipelines": {
+    "Permeation": {
+      "description": "emissionQuant = weightedTemperatureAdjust * meanBaseRate * weightedFuelAdjustment * sourceHours",
+      "provides": { "emission": { "units": "g", "keys": ["polProcess", "fuelType", "scenario", "modelYear"] } },
+      "steps": [
+        { "id": "a0", "op": "join", "inputs": ["emissionRateByAge", "sourceBinMap"], "on": ["sourceBin"] },
+        { "id": "a1", "op": "join", "inputs": ["a0", "sourceBinDist"], "on": ["sourceBin", "polProcess"] },
+        { "id": "a2", "op": "derive", "input": "a1", "column": "wRate",
+          "expr": { "op": "*", "args": ["meanBaseRate", "sourceBinActivityFraction"] } },
+        { "id": "mbr", "op": "aggregate", "input": "a2", "over": ["sourceBin", "rateRow"],
+          "reduce": "sum", "value": "wRate", "as": "meanBaseRate" },
+
+        { "id": "b0", "op": "join", "inputs": ["tempAdjust", "avgTankTemp"] },
+        { "id": "b1", "op": "derive", "input": "b0", "column": "tAdj",
+          "expr": { "op": "*", "args": ["tempAdjustTermA",
+            { "op": "exp", "args": [{ "op": "*", "args": ["tempAdjustTermB", "averageTankTemperature"] }] }] } },
+        { "id": "b2", "op": "join", "inputs": ["b1", "modelYear"] },
+        { "id": "b3", "op": "filter", "input": "b2",
+          "predicate": { "op": "and", "args": [
+            { "op": ">=", "args": ["modelYear", "minModelYear"] },
+            { "op": "<=", "args": ["modelYear", "maxModelYear"] }] },
+          "description": "PC-2a model-year range filter: minModelYear <= modelYear <= maxModelYear" },
+        { "id": "b4", "op": "join", "inputs": ["b3", "opModeDist"], "on": ["opMode", "polProcess"] },
+        { "id": "b5", "op": "derive", "input": "b4", "column": "wtaC",
+          "expr": { "op": "*", "args": ["tAdj", "opModeFraction"] } },
+        { "id": "wta", "op": "aggregate", "input": "b5", "over": ["opMode"],
+          "reduce": "sum", "value": "wtaC", "as": "weightedTemperatureAdjust" },
+
+        { "id": "c0", "op": "join", "inputs": ["fuelSupply", "etohBin"] },
+        { "id": "c1", "op": "filter", "input": "c0",
+          "predicate": { "op": "and", "args": [
+            { "op": ">=", "args": [{ "op": "coalesce", "args": ["etohVolume", 0] }, "etohThreshLow"] },
+            { "op": "<", "args": [{ "op": "coalesce", "args": ["etohVolume", 0] }, "etohThreshHigh"] }] },
+          "description": "PC-3 ethanol-bin filter [low,high) with null ETOH coerced to 0" },
+        { "id": "c2", "op": "join", "inputs": ["c1", "hcPermCoeff"], "on": ["etohThresh"] },
+        { "id": "c3", "op": "join", "inputs": ["c2", "geo"] },
+        { "id": "c4", "op": "derive", "input": "c3", "column": "blended",
+          "expr": { "op": "+", "args": ["fuelAdjustment",
+            { "op": "*", "args": ["gpaFract", { "op": "-", "args": ["fuelAdjustmentGPA", "fuelAdjustment"] }] }] } },
+        { "id": "c5", "op": "derive", "input": "c4", "column": "contrib",
+          "expr": { "op": "*", "args": ["marketShare", "blended"] } },
+        { "id": "wfa", "op": "aggregate", "input": "c5", "over": ["fuelFormulation", "etohThresh", "scenario"],
+          "reduce": "sum", "value": "contrib", "as": "weightedFuelAdjustment" },
+
+        { "id": "d0", "op": "join", "inputs": ["mbr", "wfa"], "on": ["polProcess"] },
+        { "id": "d1", "op": "derive", "input": "d0", "column": "fuelAdjRate",
+          "expr": { "op": "*", "args": ["meanBaseRate", "weightedFuelAdjustment"] } },
+        { "id": "d2", "op": "join", "inputs": ["d1", "wta"], "on": ["polProcess", "fuelType"] },
+        { "id": "d3", "op": "join", "inputs": ["d2", "sourceHours"], "on": ["scenario"] },
+        { "id": "emission", "op": "derive", "input": "d3", "column": "emission_quant",
+          "expr": { "op": "*", "args": ["weightedTemperatureAdjust", "fuelAdjRate", "sourceHours"] } }
+      ],
+      "output": { "emission": "emission" }
+    }
+  }
+}

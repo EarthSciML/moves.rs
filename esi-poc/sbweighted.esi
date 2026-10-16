@@ -1,0 +1,67 @@
+{
+  "esi": "0.1.0",
+  "metadata": {
+    "name": "MOVES_SourceBinWeightedRate_EndToEnd_POC",
+    "description": "A MULTI-STEP, MULTI-TABLE ESI chain run against real captured snapshot Parquet: the source-bin-weighted base rate, meanBaseRate = weighted_mean(EmissionRateByAge.meanBaseRate, weight = SourceBinActivityFraction) over source bins, grouped by the decoded cell key. Joins three real captured tables — EmissionRateByAge (the large rate table), SourceBinDistribution, and SourceBin (for the fuelType/regClass split) — via the ESI parquet data-source loader, then a weighted_mean aggregate. Exercises a 3-table join + weighted_mean on real data at scale. (This reproduces the *formula*; the canonical SBWeightedEmissionRateByAge.meanBaseRate additionally carries the BaseRateGenerator's sumSBD normalization / model-year-group keying, so it matches closely but not bit-exactly — see run_sbweighted.py.)",
+    "authors": ["Chris Tessum"],
+    "created": "2026-06-03T00:00:00Z",
+    "references": [
+      { "citation": "moves.rs BaseRateGenerator (SBWeightedEmissionRateByAge / CREC-5 source-bin weighting)",
+        "version": "MOVES5.0.1" }
+    ]
+  },
+
+  "index_sets": {
+    "sourceBinID":            { "description": "packed source-bin surrogate key" },
+    "polProcessID":           { "description": "pollutant*100 + process" },
+    "opModeID":               { "description": "operating mode" },
+    "ageGroupID":             { "description": "age-group bucket" },
+    "sourceTypeModelYearID":  { "description": "packed sourceType*10000 + modelYear" },
+    "fuelTypeID":             { "description": "fuel type (decoded from source bin)" },
+    "regClassID":             { "description": "regulatory class (decoded from source bin)" }
+  },
+
+  "data_sources": {
+    "snapshot": { "type": "parquet", "loader_id": "snapshot-parquet", "config": {},
+      "reference": { "citation": "characterization/snapshots/process-crankcase-running execution DB", "version": "MOVES5.0.1" } }
+  },
+
+  "tables": {
+    "emissionRateByAge": {
+      "description": "REAL captured EmissionRateByAge (590k rows; the harness scopes it to one polProcess for the pure-Python engine).",
+      "keys": { "sourceBinID": "sourceBinID", "polProcessID": "polProcessID",
+                "opModeID": "opModeID", "ageGroupID": "ageGroupID" },
+      "values": { "meanBaseRate": { "units": "g/hr" } },
+      "data": { "source": "snapshot", "table": "emissionratebyage" }
+    },
+    "sourceBinDistribution": {
+      "description": "REAL captured SourceBinDistribution (source-bin activity fractions).",
+      "keys": { "sourceTypeModelYearID": "sourceTypeModelYearID", "polProcessID": "polProcessID",
+                "sourceBinID": "sourceBinID" },
+      "values": { "sourceBinActivityFraction": { "units": "1" } },
+      "data": { "source": "snapshot", "table": "sourcebindistribution" }
+    },
+    "sourceBin": {
+      "description": "REAL captured SourceBin (sourceBin -> fuelType/regClass). fuelType/regClass declared as keys so they survive the source-bin aggregation.",
+      "keys": { "sourceBinID": "sourceBinID", "fuelTypeID": "fuelTypeID", "regClassID": "regClassID" },
+      "data": { "source": "snapshot", "table": "sourcebin" }
+    }
+  },
+
+  "pipelines": {
+    "SBWeighted": {
+      "description": "meanBaseRate = weighted_mean(rate, weight=sourceBinActivityFraction) over source bins.",
+      "provides": { "rate": { "units": "g/hr",
+        "keys": ["sourceTypeModelYearID", "polProcessID", "opModeID", "ageGroupID", "fuelTypeID", "regClassID"] } },
+      "steps": [
+        { "id": "j1", "op": "join", "inputs": ["emissionRateByAge", "sourceBinDistribution"],
+          "on": ["sourceBinID", "polProcessID"] },
+        { "id": "j2", "op": "join", "inputs": ["j1", "sourceBin"], "on": ["sourceBinID"] },
+        { "id": "out", "op": "aggregate", "input": "j2", "over": ["sourceBinID"],
+          "reduce": "weighted_mean", "value": "meanBaseRate", "weight": "sourceBinActivityFraction",
+          "as": "meanBaseRate" }
+      ],
+      "output": { "rate": "out" }
+    }
+  }
+}

@@ -1,0 +1,120 @@
+{
+  "esi": "0.1.0",
+  "metadata": {
+    "name": "MOVES_CriteriaRunning_POC",
+    "description": "The computational core of moves.rs CriteriaRunningCalculator, expressed as an ESI pipeline: market-share-weighted GPA fuel-ratio blend, the quadratic temperature adjustment 1+(T-75)(A+(T-75)B), the heat-index quadratic A/C adjustment, source-bin and operating-mode weighting, the SHO multiply, and the I/M blend with non-negativity clamp. Single-valued output dimensions (county, zone, link, year, month, day, hour, sourceType, modelYear) are held constant and omitted from keys; the surrogate-key resolution joins are pre-applied in the supplied inputs so the pipeline reproduces the calculator's *math*. Validated against the calculator's own Rust unit tests (see run_poc.py).",
+    "authors": ["Chris Tessum"],
+    "created": "2026-06-03T00:00:00Z",
+    "references": [
+      { "citation": "moves.rs crates/moves-calculators/src/calculators/criteria_running_calculator.rs (CREC 2b/3/4d/5/7b/7c/9)" }
+    ]
+  },
+
+  "index_sets": {
+    "polProcess":      { "description": "pollutantID*100 + processID" },
+    "fuelType":        { "description": "fuel type" },
+    "sourceBin":       { "description": "source bin id" },
+    "opMode":          { "description": "operating mode bin" },
+    "fuelFormulation": { "description": "fuel formulation id" },
+    "scenario":        { "description": "single-row broadcast key for scalar context (met, A/C coefficients, geo, SHO)" }
+  },
+
+  "tables": {
+    "emissionRateByAge": { "keys": { "sourceBin": "sourceBin", "opMode": "opMode", "polProcess": "polProcess" },
+                           "values": { "meanBaseRate": { "units": "g/hr" }, "meanBaseRateIM": { "units": "g/hr" } } },
+    "sourceBinMap":      { "keys": { "sourceBin": "sourceBin", "fuelType": "fuelType" } },
+    "sourceBinDist":     { "keys": { "sourceBin": "sourceBin", "polProcess": "polProcess" },
+                           "values": { "sourceBinActivityFraction": { "units": "1" } } },
+    "opModeDist":        { "keys": { "opMode": "opMode", "polProcess": "polProcess" },
+                           "values": { "opModeFraction": { "units": "1" } } },
+    "criteriaRatio":     { "keys": { "fuelFormulation": "fuelFormulation", "polProcess": "polProcess" },
+                           "values": { "ratio": { "units": "1" }, "ratioGPA": { "units": "1" } } },
+    "fuelSupply":        { "keys": { "fuelFormulation": "fuelFormulation" },
+                           "values": { "marketShare": { "units": "1" } } },
+    "geo":               { "keys": { "scenario": "scenario" }, "values": { "gpaFract": { "units": "1" } } },
+    "met":               { "keys": { "scenario": "scenario" }, "values": { "temperature": { "units": "F" }, "heatIndex": { "units": "1" } } },
+    "acCoef":            { "keys": { "scenario": "scenario" }, "values": { "acTermA": { "units": "1" }, "acTermB": { "units": "1" }, "acTermC": { "units": "1" } } },
+    "acPen":             { "keys": { "scenario": "scenario" }, "values": { "acPenetration": { "units": "1" } } },
+    "acFunc":            { "keys": { "scenario": "scenario" }, "values": { "functioningAc": { "units": "1" } } },
+    "tempCoef":          { "keys": { "fuelType": "fuelType", "polProcess": "polProcess" },
+                           "values": { "termA": { "units": "1/F" }, "termB": { "units": "1/F^2" } } },
+    "fullAc":            { "keys": { "opMode": "opMode", "polProcess": "polProcess" },
+                           "values": { "fullAcAdjustment": { "units": "1" } } },
+    "sho":               { "keys": { "scenario": "scenario" }, "values": { "sho": { "units": "hr" } } },
+    "imAdjust":          { "keys": { "polProcess": "polProcess", "fuelType": "fuelType" },
+                           "values": { "imAdjustFract": { "units": "1" } },
+                           "description": "compliance_factor*0.01 * imFactor; 0 models 'no I/M coverage' (numerically identical to skipping the blend)" }
+  },
+
+  "pipelines": {
+    "CriteriaRunning": {
+      "description": "emission_quant = max( quantIM*imFract + quant*(1-imFract), 0 )",
+      "provides": { "emission": { "units": "g", "keys": ["polProcess", "fuelType", "scenario"] } },
+      "steps": [
+        { "id": "r0", "op": "join", "inputs": ["emissionRateByAge", "sourceBinMap"], "on": ["sourceBin"] },
+        { "id": "r1", "op": "join", "inputs": ["r0", "sourceBinDist"], "on": ["sourceBin", "polProcess"] },
+        { "id": "r2", "op": "join", "inputs": ["r1", "opModeDist"], "on": ["opMode", "polProcess"] },
+
+        { "id": "cr0", "op": "join", "inputs": ["criteriaRatio", "fuelSupply"], "on": ["fuelFormulation"] },
+        { "id": "cr1", "op": "join", "inputs": ["cr0", "geo"] },
+        { "id": "cr2", "op": "derive", "input": "cr1", "column": "blended",
+          "expr": { "op": "+", "args": [
+            { "op": "*", "args": ["ratio", { "op": "-", "args": [1, "gpaFract"] }] },
+            { "op": "*", "args": ["ratioGPA", "gpaFract"] } ] } },
+        { "id": "cr3", "op": "derive", "input": "cr2", "column": "contrib",
+          "expr": { "op": "*", "args": ["marketShare", "blended"] } },
+        { "id": "fuelAdj", "op": "aggregate", "input": "cr3", "over": ["fuelFormulation", "scenario"],
+          "reduce": "sum", "value": "contrib", "as": "fuelAdj" },
+
+        { "id": "t0", "op": "join", "inputs": ["tempCoef", "met"] },
+        { "id": "tempAdj", "op": "derive", "input": "t0", "column": "tempAdj",
+          "expr": { "op": "+", "args": [1,
+            { "op": "*", "args": [
+              { "op": "-", "args": ["temperature", 75] },
+              { "op": "+", "args": ["termA", { "op": "*", "args": [{ "op": "-", "args": ["temperature", 75] }, "termB"] }] } ] } ] } },
+
+        { "id": "a0", "op": "join", "inputs": ["acCoef", "met"], "on": ["scenario"] },
+        { "id": "a1", "op": "derive", "input": "a0", "column": "acOn",
+          "expr": { "op": "max", "args": [0,
+            { "op": "min", "args": [1,
+              { "op": "+", "args": ["acTermA",
+                { "op": "*", "args": ["heatIndex", { "op": "+", "args": ["acTermB", { "op": "*", "args": ["heatIndex", "acTermC"] }] }] } ] } ] } ] } },
+        { "id": "a2", "op": "join", "inputs": ["a1", "acPen", "acFunc"], "on": ["scenario"] },
+        { "id": "a3", "op": "derive", "input": "a2", "column": "acActivityFraction",
+          "expr": { "op": "*", "args": ["acOn", "acPenetration", "functioningAc"] } },
+        { "id": "a4", "op": "join", "inputs": ["fullAc", "a3"] },
+        { "id": "acAdj", "op": "derive", "input": "a4", "column": "acAdj",
+          "expr": { "op": "+", "args": [1, { "op": "*", "args": [{ "op": "-", "args": ["fullAcAdjustment", 1] }, "acActivityFraction"] }] } },
+
+        { "id": "j1", "op": "join", "inputs": ["r2", "fuelAdj"], "on": ["polProcess"] },
+        { "id": "j2", "op": "join", "inputs": ["j1", "tempAdj"], "on": ["fuelType", "polProcess"] },
+        { "id": "j3", "op": "join", "inputs": ["j2", "acAdj"], "on": ["opMode", "polProcess", "scenario"] },
+
+        { "id": "rate_a", "op": "derive", "input": "j3", "column": "rate",
+          "expr": { "op": "*", "args": ["meanBaseRate", "fuelAdj", "tempAdj", "acAdj"] } },
+        { "id": "rate_b", "op": "derive", "input": "rate_a", "column": "rateIM",
+          "expr": { "op": "*", "args": ["meanBaseRateIM", "fuelAdj", "tempAdj", "acAdj"] } },
+        { "id": "w_a", "op": "derive", "input": "rate_b", "column": "w",
+          "expr": { "op": "*", "args": ["rate", "sourceBinActivityFraction", "opModeFraction"] } },
+        { "id": "w_b", "op": "derive", "input": "w_a", "column": "wIM",
+          "expr": { "op": "*", "args": ["rateIM", "sourceBinActivityFraction", "opModeFraction"] } },
+        { "id": "mbr", "op": "aggregate", "input": "w_b", "over": ["sourceBin", "opMode"],
+          "reduce": "sum", "value": ["w", "wIM"] },
+
+        { "id": "q0", "op": "join", "inputs": ["mbr", "sho"], "on": ["scenario"] },
+        { "id": "q_a", "op": "derive", "input": "q0", "column": "quant",
+          "expr": { "op": "*", "args": ["sho", "w"] } },
+        { "id": "q_b", "op": "derive", "input": "q_a", "column": "quantIM",
+          "expr": { "op": "*", "args": ["sho", "wIM"] } },
+        { "id": "q1", "op": "join", "inputs": ["q_b", "imAdjust"], "on": ["polProcess", "fuelType"] },
+        { "id": "emission", "op": "derive", "input": "q1", "column": "emission_quant",
+          "expr": { "op": "max", "args": [
+            { "op": "+", "args": [
+              { "op": "*", "args": ["quantIM", "imAdjustFract"] },
+              { "op": "*", "args": ["quant", { "op": "-", "args": [1, "imAdjustFract"] }] } ] },
+            0 ] } }
+      ],
+      "output": { "emission": "emission" }
+    }
+  }
+}
