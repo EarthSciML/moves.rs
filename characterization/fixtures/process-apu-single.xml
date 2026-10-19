@@ -1,13 +1,13 @@
 <runspec version="MOVES5.0.1">
-	<description><![CDATA[Auxiliary Power Exhaust (process 91) at County (SINGLE) scale — non-vacuous variant.
+	<description><![CDATA[Auxiliary Power Exhaust (process 91) at County (SINGLE) scale.
 
-The national default activity for hotelling runs at hourID=7. This variant runs at
-hour 7 with county-scale hotellingHours, so baseRateOutput is non-zero (activity gate
-satisfied by the county hotelling hours), graduating this fixture from QUARANTINED.
-
-Requires scale-input directory with hotellingHours.parquet (county hotelling activity,
-hour 7). Snapshot captured with canonical MOVES 5.0.1 against a county input DB
-containing hotellingHoursPerDay.]]></description>
+Runs hourID 7 (key="6"; keys are hourID-1) on road types 1 (Off-Network, where the
+91 base rates are written) and 4. The county input DB (washtenaw_cdb, from
+county-inputs/washtenaw-county/setup-hotelling.sql) supplies the hotelling inputs
+(hotellingHoursPerDay, hotellingActivityDistribution) plus the population, VMT and
+fuel-supply tables MOVES does not copy from the default DB at SINGLE scale
+(sourceTypeAgeDistribution, HPMSVtypeYear, fuelSupply, from the default DB's own
+Washtenaw 2020 rows).]]></description>
 	<models>
 		<model value="ONROAD"/>
 	</models>

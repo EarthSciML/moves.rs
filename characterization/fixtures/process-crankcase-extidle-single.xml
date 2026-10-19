@@ -1,14 +1,14 @@
 <runspec version="MOVES5.0.1">
-	<description><![CDATA[Crankcase Extended Idle Exhaust (process 17) at County (SINGLE) scale — non-vacuous variant.
+	<description><![CDATA[Crankcase Extended Idle Exhaust (process 17) at County (SINGLE) scale.
 
-Process 17 crankcase extended-idle exhaust is proportional to extended-idle exhaust
-(process 90). Extended-idle activity (hotellingHours) is populated at hourID=7 only.
-This variant runs at hour 7 with county-scale hotellingHours so that crankcase
-extended-idle exhaust is non-vacuous.
-
-Requires scale-input directory with hotellingHours.parquet (county hotelling activity,
-hour 7). Snapshot captured with canonical MOVES 5.0.1 against a county input DB
-containing hotellingHoursPerDay.]]></description>
+Process 17 is chained to extended-idle exhaust (process 90), so THC/CO/NOx
+extended idle (190/290/390) are selected as its parents. Runs hourID 7 (key="6";
+keys are hourID-1) on road types 1 (Off-Network) and 4. The county input DB
+(washtenaw_cdb, from county-inputs/washtenaw-county/setup-hotelling.sql) supplies
+the hotelling inputs (hotellingHoursPerDay, hotellingActivityDistribution) plus the
+population, VMT and fuel-supply tables MOVES does not copy from the default DB at
+SINGLE scale (sourceTypeAgeDistribution, HPMSVtypeYear, fuelSupply, from the
+default DB's own Washtenaw 2020 rows).]]></description>
 	<models>
 		<model value="ONROAD"/>
 	</models>

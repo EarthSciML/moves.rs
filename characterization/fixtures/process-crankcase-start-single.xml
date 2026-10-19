@@ -1,13 +1,13 @@
 <runspec version="MOVES5.0.1">
-	<description><![CDATA[Crankcase Start Exhaust (process 16) at County (SINGLE) scale — non-vacuous variant.
+	<description><![CDATA[Crankcase Start Exhaust (process 16) at County (SINGLE) scale.
 
-The national default starts activity (startsHourFraction) covers hourID=7 only. This
-variant runs at hour 7 with county-scale Starts data, making crankcase start exhaust
-non-vacuous.
-
-Requires scale-input directory with Starts.parquet (pre-synthesized county start
-activity for Washtenaw County, hour 7). Snapshot captured with canonical MOVES 5.0.1
-against a county input DB containing startsPerDay.]]></description>
+Process 16 is chained to start exhaust (process 2), so THC/CO/NOx start exhaust
+(102/202/302) are selected as its parents. Runs hourID 7 (key="6"; keys are
+hourID-1) on road types 1 (Off-Network, where start rates are written) and 4. The
+county input DB (washtenaw_cdb, from county-inputs/washtenaw-county/setup-starts.sql)
+supplies startsPerDay plus the population, VMT and fuel-supply tables MOVES does
+not copy from the default DB at SINGLE scale (sourceTypeAgeDistribution,
+HPMSVtypeYear, fuelSupply, from the default DB's own Washtenaw 2020 rows).]]></description>
 	<models>
 		<model value="ONROAD"/>
 	</models>
