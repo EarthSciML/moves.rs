@@ -1,0 +1,19 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0235_campuscluster_illinois_edu__runspeclink",
+  "schema": [
+    {
+      "name": "linkID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "linkID"
+  ],
+  "row_count": 2,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "93e1aea878a3c0e857db3c0aead842ddc23710cacf470067e0e6b4cf29fa3eb3"
+}

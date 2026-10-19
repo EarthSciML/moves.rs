@@ -2,7 +2,7 @@
   "trace_version": "moves-fixture-capture/v1",
   "fixture_name": "process-apu-single",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "runspec_sha256": "be19292b48e840b8f5e4f391c5a9e087392358d2e923eb601cefbaf29aed285b",
+  "runspec_sha256": "831db28b7a2e424e1272e3a83be0f5839e0af0443b970185e4ac79a8f930c506",
   "java_classes": [
     {
       "name": "gov.epa.otaq.moves.common.BundleManifest",
@@ -13,7 +13,15 @@
       "kind": "common"
     },
     {
+      "name": "gov.epa.otaq.moves.common.BundleManifest$DurationFragment",
+      "kind": "common"
+    },
+    {
       "name": "gov.epa.otaq.moves.common.BundleManifest$MasterFragment",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.BundleManifest$XMLErrorHandler",
       "kind": "common"
     },
     {
@@ -37,6 +45,10 @@
       "kind": "common"
     },
     {
+      "name": "gov.epa.otaq.moves.common.DistributedWorkFilePurpose",
+      "kind": "common"
+    },
+    {
       "name": "gov.epa.otaq.moves.common.DistributedWorkFileState",
       "kind": "common"
     },
@@ -50,6 +62,10 @@
     },
     {
       "name": "gov.epa.otaq.moves.common.InstanceCounter",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.JARUtilities",
       "kind": "common"
     },
     {
@@ -106,6 +122,10 @@
     },
     {
       "name": "gov.epa.otaq.moves.common.PerformanceProfiler",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.PermutationCreator",
       "kind": "common"
     },
     {
@@ -257,6 +277,10 @@
       "kind": "framework"
     },
     {
+      "name": "gov.epa.otaq.moves.master.framework.ExtractedDataCache$CacheEntry",
+      "kind": "framework"
+    },
+    {
       "name": "gov.epa.otaq.moves.master.framework.Generator",
       "kind": "framework"
     },
@@ -390,6 +414,10 @@
     },
     {
       "name": "gov.epa.otaq.moves.master.framework.RoadType",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.SQLForWorker",
       "kind": "framework"
     },
     {
@@ -581,7 +609,23 @@
       "kind": "master"
     },
     {
+      "name": "gov.epa.otaq.moves.utils.ApplicationRunner",
+      "kind": "utils"
+    },
+    {
+      "name": "gov.epa.otaq.moves.utils.StreamGobbler",
+      "kind": "utils"
+    },
+    {
+      "name": "gov.epa.otaq.moves.worker.framework.ExternalCalculator",
+      "kind": "framework"
+    },
+    {
       "name": "gov.epa.otaq.moves.worker.framework.RemoteEmissionsCalculator",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.worker.framework.RemoteEmissionsCalculator$TimerInfo",
       "kind": "framework"
     },
     {

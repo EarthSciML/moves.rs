@@ -2,10 +2,10 @@
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "process-crankcase-extidle-single",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixture-image.lock",
-  "runspec_path": "/scratch/ctessum/moves-county-fixture/process-crankcase-extidle-single/process-crankcase-extidle-single.xml",
-  "runspec_sha256": "777779fa438b5919fddaa3ab6c180e8aa86de5980d9776f9af5a92eac60fa299",
-  "snapshot_aggregate_sha256": "7d639fbed92511965c1e20de2ba3de0857bfd88e8fb7e39f84c0997eb33809bc",
+  "sif_path": "/scratch.local/ctessum/7frecap/moves.rs/characterization/fixture-image.lock",
+  "runspec_path": "/scratch.local/ctessum/7frecap/work/process-crankcase-extidle-single/process-crankcase-extidle-single.xml",
+  "runspec_sha256": "dd2c9d1593914db4acd15281ad9effb80798a26d1df83a725bb592d1fee61350",
+  "snapshot_aggregate_sha256": "08313c154641de50638c88b3670d345ca32fcc11936be013c0efe3a2dbf6c6df",
   "output_database": "out_process_crankcase_extidle_single",
   "scale_input_database": "washtenaw_cdb"
 }

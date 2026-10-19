@@ -2,10 +2,10 @@
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "process-crankcase-start-single",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/zrt/characterization/fixture-image.lock",
-  "runspec_path": "/scratch/ctessum/moves-county-fixture/process-crankcase-start-single/process-crankcase-start-single.xml",
-  "runspec_sha256": "509baff9aff420bb3c14d302b24a245bcb6d0943089f3f3c4e5e17f307ec8f7c",
-  "snapshot_aggregate_sha256": "dc60a36e189fa4aa12405d81c60b993658f6bd8dd06952c3c40ae3815a0b6b64",
+  "sif_path": "/scratch.local/ctessum/7frecap/moves.rs/characterization/fixture-image.lock",
+  "runspec_path": "/scratch.local/ctessum/7frecap/work/process-crankcase-start-single/process-crankcase-start-single.xml",
+  "runspec_sha256": "ba4c93b0bfce769c28548f54fdc3faa11a37aa616e5fede5e6abd3af2870db5f",
+  "snapshot_aggregate_sha256": "c1b7fa4249847ee8607c50a90d1c39b6116aea40768782dce5d936f982224f2b",
   "output_database": "out_process_crankcase_start_single",
   "scale_input_database": "washtenaw_cdb"
 }

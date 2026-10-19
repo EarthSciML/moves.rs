@@ -104,10 +104,10 @@
     }
   ],
   "natural_key": [],
-  "row_count": 0,
+  "row_count": 300,
   "float_encoding": {
     "kind": "shortest_round_trip",
     "max_significant_digits": 17
   },
-  "content_sha256": "eeade7974f2fa07eef640ba5f7130b4b4a482149c018b22ca7609244585a921d"
+  "content_sha256": "c5f392213a7aaad32f39633f7fda517e76583948a68215428655d0f21fab7c6d"
 }
