@@ -645,13 +645,10 @@ fn asserted_fixtures() -> &'static [(&'static str, f64, bool)] {
         ("process-crankcase-extidle", ONROAD_REL_TOL, true),
         ("process-crankcase-start", ONROAD_REL_TOL, true),
         ("process-extended-idle", ONROAD_REL_TOL, true),
-        // SINGLE-scale county variants (added with canonical snapshots by the
-        // HotellingImporter + Starts port). Same empty-canonical / empty-port
-        // vacuous case as their non-single counterparts above.
-        ("process-apu-single", ONROAD_REL_TOL, true),
-        ("process-crankcase-extidle-single", ONROAD_REL_TOL, true),
-        ("process-crankcase-start-single", ONROAD_REL_TOL, true),
-        ("process-extended-idle-single", ONROAD_REL_TOL, true),
+        // The four SINGLE-scale county variants (process-*-single) were
+        // asserted vacuous here until 2026-10-19. They were recaptured
+        // non-empty that day and moved to QUARANTINED_FIXTURES; see
+        // docs/known-divergences.md §1b.2.
     ]
 }
 
@@ -664,6 +661,27 @@ fn asserted_fixtures() -> &'static [(&'static str, f64, bool)] {
 /// data plane is fixed it should graduate from this list into
 /// [`asserted_fixtures`].
 const QUARANTINED_FIXTURES: &[&str] = &[
+    // The four SINGLE-scale county fixtures, recaptured non-empty 2026-10-19
+    // (docs/known-divergences.md §1b.2). Until then canonical and port both
+    // emitted 0 rows and they were asserted vacuous; the county DB lacked the
+    // age distribution / VMT / fuel supply MOVES does not copy at SINGLE
+    // scale, the hour was 8 instead of 7, road type 1 was unselected and
+    // crankcase had no parent. Now canonical emits real rows and the port
+    // diverges (MOVES_DIFF_ONLY=<name>, port run against the snapshot alone):
+    //   process-crankcase-start-single  684/684 rows, every pollutant x2.000
+    //     exactly (102/202/302 and 116/216/316). All rows are road type 1 on
+    //     both sides, and road types 1 and 4 are selected; a per-selected-
+    //     road-type double count of starts is the first suspect.
+    //   process-apu-single  canon 91 / port 50 rows. 91/91 port 4.62 vs canon
+    //     0.174 (x26.6); canon also writes Hotelling Shore Power (91/93,
+    //     50 rows), which the port does not emit at all.
+    //   process-extended-idle-single  50/50 rows, 91/90 +58.8%.
+    //   process-crankcase-extidle-single  300/300 rows, parents 190/290/390
+    //     +265%/+53%/+78%, crankcase 117/217/317 +147%/+29%/-21%.
+    "process-apu-single",
+    "process-crankcase-extidle-single",
+    "process-crankcase-start-single",
+    "process-extended-idle-single",
     // nr-airtoxics-lawn-garden-county — the port emits 2 of canonical's 29
     // pollutants (968 of 14036 rows). Snapshot landed 2026-09-10; the gate
     // reported it UNCLASSIFIED until it was triaged on the same day.

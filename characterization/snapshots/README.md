@@ -33,6 +33,13 @@ fixture → SQL mapping and dispatches to the right runner.
 | `process-crankcase-start-single` | SINGLE | `../county-inputs/washtenaw-county/setup-starts.sql` |
 | `scale-project` | PROJECT | `../county-inputs/washtenaw-project/setup-project.sql` |
 
+The four SINGLE-domain snapshots were recaptured on 2026-10-19. Until then
+all four recorded 0 output rows: the county DB had no age distribution, VMT
+or fuel supply (MOVES does not copy them from the default DB at SINGLE scale),
+the RunSpecs ran hour 8 on road type 4 only, and crankcase had no parent
+process. All four now emit `movesoutput` rows; see
+`docs/known-divergences.md` §1b.2.
+
 `scale-county.xml` is a sixth SINGLE-domain fixture but has never been
 captured and is out of scope here.
 

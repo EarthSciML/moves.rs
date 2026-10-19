@@ -15,7 +15,7 @@ asserted against canonical MOVES and **zero** are quarantined.
 `characterization/fixtures/` holds 51 RunSpec XML files. The canonical-diff gate
 covers the **42** non-scale fixtures that have a populated snapshot directory
 (one per fixture under `characterization/snapshots/` carrying a `manifest.json`):
-**41 asserted**, **1 quarantined** (§4.4). The 3 `scale-*` fixtures
+**37 asserted**, **5 quarantined** (§4.4, §1b.2). The 3 `scale-*` fixtures
 (County-Scale, Project-Scale, Rates) require additional input databases not
 present in the default test environment and are excluded.
 
@@ -50,9 +50,10 @@ fixtures; override the tree with `REGRESSION_SNAPSHOTS_DIR=<path>`):
  data-plane bug — it is OK for CI to be red while results are wrong. Masking a
  divergence with a widened tolerance is worse than no gate, so a quarantined
  fixture stays in the gate (failing CI) and graduates to the asserted set only
- once its data plane is actually fixed. As of 2026-09-10 the quarantine list
- (`QUARANTINED_FIXTURES`) holds exactly one fixture,
- `nr-airtoxics-lawn-garden-county` (§4.4) — so `canonical_snapshot_diff` is
+ once its data plane is actually fixed. As of 2026-10-19 the quarantine list
+ (`QUARANTINED_FIXTURES`) holds five fixtures,
+ `nr-airtoxics-lawn-garden-county` (§4.4) and the four `process-*-single`
+ county fixtures (§1b.2) — so `canonical_snapshot_diff` is
  **red, deliberately**.
 - **Hard-fails as UNCLASSIFIED** on a fixture that is in neither list. This is
  the state a newly captured snapshot lands in: it is a *triage gap*, not a
@@ -84,23 +85,24 @@ snapshot, unchanged at `default_float_tolerance = 0.0`.)
 
 ---
 
-## 1b. Canonical-diff gate state (current — 2026-09-10)
+## 1b. Canonical-diff gate state (current — 2026-10-19)
 
-The gate is **red, by design, on exactly one fixture**. Of the **42** non-scale
+The gate is **red, by design, on five fixtures**. Of the **42** non-scale
 fixtures with a populated snapshot directory:
 
 | | count | |
 |---|---|---|
-| asserted (pass within §4.2 precision tolerance) | **41** | `asserted_fixtures()` |
-| quarantined (known data-plane bug, hard-fails CI) | **1** | `nr-airtoxics-lawn-garden-county`, §4.4 |
+| asserted (pass within §4.2 precision tolerance) | **37** | `asserted_fixtures()` |
+| quarantined (known data-plane bug, hard-fails CI) | **5** | `nr-airtoxics-lawn-garden-county`, §4.4; the four `process-*-single`, §1b.2 |
 | unclassified | **0** | — |
 
 `cargo test -p moves-cli --test full_suite_regression` therefore reports
-**8 passed, 1 failed**, the failure being `canonical_snapshot_diff` on the one
-quarantined fixture. Per the §1 policy that is the correct outcome: the port
-does not compute 27 of that fixture's 29 pollutants, so there is nothing a
-tolerance could legitimately absorb, and masking it would turn the gate into
-decoration.
+**8 passed, 1 failed**, the failure being `canonical_snapshot_diff` on the five
+quarantined fixtures (37 asserted-pass). Per the §1 policy that is the correct
+outcome: the port does not compute 27 of `nr-airtoxics-lawn-garden-county`'s 29
+pollutants, and the four `-single` fixtures are off by factors (§1b.2), so
+there is nothing a tolerance could legitimately absorb, and masking them would
+turn the gate into decoration.
 
 No tolerance was ever widened to absorb a bug; the only tolerances applied
 (`ONROAD_REL_TOL = 1e-3`, `NONROAD_REL_TOL = 1e-2`) cover sub-tolerance
@@ -110,14 +112,19 @@ asserted fixtures (with each one's per-pollutant residual) lives in
 that file's per-fixture comments are the canonical, kept-current record of how
 each one was graduated.
 
-A handful of the start/idle/hotelling fixtures (`process-apu`,
-`process-crankcase-extidle`/`-start`, `process-extended-idle`, and their
-`-single` variants) are asserted **vacuous**: canonical's captured execution DB
+Four start/idle/hotelling fixtures (`process-apu`,
+`process-crankcase-extidle`/`-start`, `process-extended-idle`) are asserted
+**vacuous**: canonical's captured execution DB
 holds the base rate but its activity and output tables are empty, so canonical's
 authoritative output for the process is zero rows, and the port — gated by the
 same activity weighting — reproduces that (canon 0 == port 0). The `vacuous`
 flag makes the gate fail loudly if a recapture ever gives either side a nonzero
-row.
+row. Their `-single` variants were asserted vacuous too until 2026-10-19,
+when they were recaptured non-empty (§1b.2). The DEFAULT-scale four have the
+same road-type and crankcase-parent defects that §1b.2 fixed in the `-single`
+RunSpecs (road type 4 only, where the 90/91/start rates are written on road
+type 1; crankcase 16/17 without processes 2/90) and remain vacuous for that
+reason, not because the processes produce nothing.
 
 ### Triage of 2026-09-08/09-10 snapshot additions
 
@@ -201,6 +208,72 @@ it survived three months. The fixture remains asserted-**vacuous**; no
 test changed.
 
 Snapshot aggregate `a3af712b` -> `dc60a36e`.
+
+### 1b.2 The four `process-*-single` fixtures recaptured non-empty (2026-10-19)
+
+Until 2026-10-19 `process-apu-single`, `process-extended-idle-single`,
+`process-crankcase-extidle-single` and `process-crankcase-start-single` had
+0 rows in `movesoutput`, `movesworkeroutput` and `baserateoutput`, so the
+"non-vacuous variant" descriptions in their RunSpecs were false and the gate
+asserted them vacuous. Five independent causes, all fixed:
+
+1. **No population.** At SINGLE_COUNTY scale `InputDataManager.merge`
+   (`InputDataManager.java:2834-2846`, `:1435`) does not copy the default
+   `SourceTypeAgeDistribution`, `SourceTypeYear`, `HPMSVtypeYear` or
+   `FuelSupply`. `washtenaw_cdb` supplied only `sourceTypeYear`, so the
+   execution DB had no age distribution and every activity table was empty.
+   Both county SQL files now copy the default DB's own rows
+   (`sourceTypeAgeDistribution` and `HPMSVtypeYear` for 2020, `fuelSupply`
+   for Washtenaw's fuel region 270000000 / fuelYear 2020) with `LIKE` +
+   `SELECT`. The default has no I/M rows for Michigan, so `IMCoverage` stays
+   absent.
+2. **Wrong hour.** `<beginhour key="7">` resolves to hourID **8**; the
+   county activity is hour 7. The key is now `6`, as in the DEFAULT twins.
+3. **Wrong road type.** The 90/91 and start rates are written on road type 1
+   (Off-Network); every run selected only 4. Road type 1 is now selected too.
+4. **No crankcase parent.** Crankcase 16/17 are chained to start exhaust (2)
+   and extended idle (90); THC/CO/NOx for those processes are now selected.
+5. **Hour-7 hotellingHoursPerDay.** The county `hotellingHoursPerDay`
+   (79.774271 weekday / 69.606736 weekend) was hour 7's hotelling alone
+   (3.565% of the day). It now holds the 24-hour default total for zone
+   261610 (2237.479224 / 1952.303918), which is what its own comment said
+   it was.
+
+Recaptured with `capture-county-snapshot.sh --fakeroot` and moves-fixture.sif
+`4f92c593` (matching `fixture-image.lock`):
+
+| fixture | movesoutput rows (pollutant/process) |
+|---|---|
+| `process-apu-single` | 91: 91/91 x41, 91/93 (Hotelling Shore Power) x50 |
+| `process-extended-idle-single` | 50: 91/90 |
+| `process-crankcase-extidle-single` | 300: 1/90, 2/90, 3/90, 1/17, 2/17, 3/17, 50 each |
+| `process-crankcase-start-single` | 684: 1/2, 2/2, 3/2 x124; 1/16, 2/16, 3/16 x104 |
+
+**The county DB takes effect.** In each execution DB, `hotellingActivityDistribution`
+holds the county DB's 12 zone-261610 rows (bins 1950-2009 / 2010-2020 /
+2021-9999) in place of the default's zone-990000 rows, 12/12 equal;
+`hotellingHoursPerDay` and `startsPerDay` are the county values (the
+default DB has none); the age distribution, HPMS VMT and fuel supply equal
+the default rows. The MOVES-computed hour-7 `hotellingHours` (123 rows, sum
+398.871372) match `county-inputs/washtenaw-county/hotellingHours.parquet` at
+hourDayID 75 to 3.7e-8, and `starts` (41 rows, sum 68899.24) match
+`Starts.parquet` to 3.7e-6. Before the fix the hotelling parquet was 96% off
+the counterfactual MOVES value.
+
+**Known gap in the port's county inputs.** `county-inputs/washtenaw-county/
+hotellingActivityDistribution.parquet` (and the per-fixture copies) is the
+default's zone-990000 table (36 rows, five diesel bins), not the county DB's
+12 rows, so a `--scale-input` port run does not see the county override.
+
+**The port now diverges, so all four are quarantined.** `canonical_snapshot_diff`
+(port run against the snapshot alone):
+
+| fixture | canon / port rows | per pollutant-process |
+|---|---|---|
+| `process-crankcase-start-single` | 684 / 684 | every pollutant x2.000 exactly; all rows road type 1 on both sides, with road types 1 and 4 selected, so a per-selected-road-type double count of starts is the first suspect |
+| `process-apu-single` | 91 / 50 | 91/91 x26.6; 91/93 shore power missing from the port |
+| `process-extended-idle-single` | 50 / 50 | 91/90 +58.8% |
+| `process-crankcase-extidle-single` | 300 / 300 | 190/290/390 +265%/+53%/+78%; 117/217/317 +147%/+29%/-21% |
 
 ### Resolved (historical)
 

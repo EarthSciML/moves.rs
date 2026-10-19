@@ -1770,10 +1770,9 @@ mod tests {
         ("process-crankcase-extidle", 1e-3, true),
         ("process-crankcase-start", 1e-3, true),
         ("process-extended-idle", 1e-3, true),
-        ("process-apu-single", 1e-3, true),
-        ("process-crankcase-extidle-single", 1e-3, true),
-        ("process-crankcase-start-single", 1e-3, true),
-        ("process-extended-idle-single", 1e-3, true),
+        // The four process-*-single fixtures left this list 2026-10-19: they
+        // were recaptured non-empty and are quarantined in the native gate
+        // (docs/known-divergences.md §1b.2).
     ];
 
     #[test]
