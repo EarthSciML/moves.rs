@@ -5,6 +5,9 @@
 -- 1. Required geography tables (State, County, Zone, ZoneRoadType, RoadTypeDistribution)
 -- 2. County-specific hotelling data (hotellingHoursPerDay, hotellingActivityDistribution)
 --    Values equal national defaults so SINGLE output ≈ DEFAULT at hour 7.
+-- 3. Population, VMT and fuel supply MOVES does not copy from the default DB at
+--    SINGLE scale (sourceTypeAgeDistribution, HPMSVtypeYear, fuelSupply), copied
+--    from the default DB's own Washtenaw/2020 rows; see the end of this file.
 --
 -- WHY LITERAL INSERTs, AND NOT `CREATE TABLE ... LIKE` + `INSERT ... SELECT`
 --
@@ -163,9 +166,15 @@ CREATE TABLE IF NOT EXISTS hotellingHoursPerDay (
     PRIMARY KEY (yearID, zoneID, dayID)
 ) ENGINE=MyISAM DEFAULT CHARSET='utf8mb4';
 TRUNCATE TABLE hotellingHoursPerDay;
--- defaultDailyHours = sum(hotellingHours) / noOfRealDays from national hotellingHours
-INSERT INTO hotellingHoursPerDay VALUES (2020, 261610, 2, 69.606736);
-INSERT INTO hotellingHoursPerDay VALUES (2020, 261610, 5, 79.774271);
+-- defaultDailyHours = sum(hotellingHours) / noOfRealDays over ALL 24 hours of the
+-- default-domain hotelling for zone 261610 (road types 2 and 4, every source
+-- type-62 age, month 8). Until 2026-10-19 these rows read 69.606736 / 79.774271,
+-- which is the same sum restricted to hour 7 alone (rel. diff < 5e-8), i.e.
+-- 3.5654% of the daily total: AdjustHotelling would have scaled the county's
+-- hotelling to 1/28 of the default. Measured with the default DB's
+-- SourceTypeYear x SourceTypeAgeDistribution x HPMSVtypeYear chain.
+INSERT INTO hotellingHoursPerDay VALUES (2020, 261610, 2, 1952.303918);
+INSERT INTO hotellingHoursPerDay VALUES (2020, 261610, 5, 2237.479224);
 
 CREATE TABLE IF NOT EXISTS hotellingHourFraction (
     zoneID       INT      NOT NULL,
@@ -212,3 +221,34 @@ INSERT INTO hotellingActivityDistribution VALUES (261610, 2, 2021, 9999, 200, 0.
 INSERT INTO hotellingActivityDistribution VALUES (261610, 2, 2021, 9999, 201, 0.070000);
 INSERT INTO hotellingActivityDistribution VALUES (261610, 2, 2021, 9999, 203, 0.030000);
 INSERT INTO hotellingActivityDistribution VALUES (261610, 2, 2021, 9999, 204, 0.170000);
+
+-- ---- Population, VMT and fuel supply (added 2026-10-19) ----
+-- At SINGLE_COUNTY scale InputDataManager.merge (InputDataManager.java:
+-- 2834-2846 and :1435) does NOT copy the default database's
+-- SourceTypeAgeDistribution, HPMSVtypeYear or FuelSupply into the execution
+-- database: a county DB must supply them. Before these three tables were added
+-- the execution DB had no age distribution, so population, VMT and therefore
+-- every activity table were empty, and every *-single snapshot recorded zero
+-- output rows. They are copied here from the default database's own rows for
+-- this county and year (all source types, yearID 2020; Washtenaw's fuel region
+-- 270000000 for fuelYearID 2020), with the default database's column types, so
+-- they change nothing relative to DEFAULT scale. Unlike the literal tables
+-- above they are not frozen inputs to older snapshots, so `LIKE` + `SELECT` is
+-- the faithful copy. IMCoverage is also not copied at SINGLE scale; the default
+-- database has no I/M rows for Michigan, so it is left absent.
+
+CREATE TABLE IF NOT EXISTS sourceTypeAgeDistribution LIKE movesdb20241112.sourceTypeAgeDistribution;
+TRUNCATE TABLE sourceTypeAgeDistribution;
+INSERT INTO sourceTypeAgeDistribution
+    SELECT * FROM movesdb20241112.sourceTypeAgeDistribution WHERE yearID = 2020;
+
+CREATE TABLE IF NOT EXISTS HPMSVtypeYear LIKE movesdb20241112.HPMSVtypeYear;
+TRUNCATE TABLE HPMSVtypeYear;
+INSERT INTO HPMSVtypeYear
+    SELECT * FROM movesdb20241112.HPMSVtypeYear WHERE yearID = 2020;
+
+CREATE TABLE IF NOT EXISTS fuelSupply LIKE movesdb20241112.fuelSupply;
+TRUNCATE TABLE fuelSupply;
+INSERT INTO fuelSupply
+    SELECT * FROM movesdb20241112.fuelSupply
+    WHERE fuelRegionID = 270000000 AND fuelYearID = 2020;

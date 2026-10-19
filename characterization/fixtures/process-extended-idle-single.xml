@@ -20,8 +20,8 @@ MOVES 5.0.1 against a county input DB containing hotellingHoursPerDay.]]></descr
 		<year key="2020"/>
 		<month key="7"/>
 		<day id="5"/>
-		<beginhour key="7"/>
-		<endhour key="7"/>
+		<beginhour key="6"/>
+		<endhour key="6"/>
 	</timespan>
 	<onroadvehicleselections>
 		<onroadvehicleselection fueltypeid="2" fueltypedesc="Diesel Fuel" sourcetypeid="62" sourcetypename="Combination Long-haul Truck"/>
@@ -31,6 +31,7 @@ MOVES 5.0.1 against a county input DB containing hotellingHoursPerDay.]]></descr
 	<offroadvehiclesccs>
 	</offroadvehiclesccs>
 	<roadtypes>
+		<roadtype roadtypeid="1" roadtypename="Off-Network" modelCombination="M1"/>
 		<roadtype roadtypeid="4" roadtypename="Urban Restricted Access" modelCombination="M1"/>
 	</roadtypes>
 	<pollutantprocessassociations>

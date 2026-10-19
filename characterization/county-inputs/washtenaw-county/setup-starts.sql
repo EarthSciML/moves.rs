@@ -4,6 +4,9 @@
 -- Provides:
 -- 1. Required geography tables (State, County, Zone, ZoneRoadType, RoadTypeDistribution)
 -- 2. County-specific activity: startsPerDay (= national default, so SINGLE ≈ DEFAULT at hour 7)
+-- 3. Population, VMT and fuel supply MOVES does not copy from the default DB at
+--    SINGLE scale (sourceTypeAgeDistribution, HPMSVtypeYear, fuelSupply), copied
+--    from the default DB's own Washtenaw/2020 rows; see the end of this file.
 --
 -- WHY LITERAL INSERTs, AND NOT `CREATE TABLE ... LIKE` + `INSERT ... SELECT`
 --
@@ -219,3 +222,34 @@ TRUNCATE TABLE startsPerDay;
 --                                 105135300 × 3.130354959 = 329110808 (weekend)
 INSERT INTO startsPerDay VALUES (5, 21, 387305498);
 INSERT INTO startsPerDay VALUES (2, 21, 329110808);
+
+-- ---- Population, VMT and fuel supply (added 2026-10-19) ----
+-- At SINGLE_COUNTY scale InputDataManager.merge (InputDataManager.java:
+-- 2834-2846 and :1435) does NOT copy the default database's
+-- SourceTypeAgeDistribution, HPMSVtypeYear or FuelSupply into the execution
+-- database: a county DB must supply them. Before these three tables were added
+-- the execution DB had no age distribution, so population, VMT and therefore
+-- every activity table were empty, and every *-single snapshot recorded zero
+-- output rows. They are copied here from the default database's own rows for
+-- this county and year (all source types, yearID 2020; Washtenaw's fuel region
+-- 270000000 for fuelYearID 2020), with the default database's column types, so
+-- they change nothing relative to DEFAULT scale. Unlike the literal tables
+-- above they are not frozen inputs to older snapshots, so `LIKE` + `SELECT` is
+-- the faithful copy. IMCoverage is also not copied at SINGLE scale; the default
+-- database has no I/M rows for Michigan, so it is left absent.
+
+CREATE TABLE IF NOT EXISTS sourceTypeAgeDistribution LIKE movesdb20241112.sourceTypeAgeDistribution;
+TRUNCATE TABLE sourceTypeAgeDistribution;
+INSERT INTO sourceTypeAgeDistribution
+    SELECT * FROM movesdb20241112.sourceTypeAgeDistribution WHERE yearID = 2020;
+
+CREATE TABLE IF NOT EXISTS HPMSVtypeYear LIKE movesdb20241112.HPMSVtypeYear;
+TRUNCATE TABLE HPMSVtypeYear;
+INSERT INTO HPMSVtypeYear
+    SELECT * FROM movesdb20241112.HPMSVtypeYear WHERE yearID = 2020;
+
+CREATE TABLE IF NOT EXISTS fuelSupply LIKE movesdb20241112.fuelSupply;
+TRUNCATE TABLE fuelSupply;
+INSERT INTO fuelSupply
+    SELECT * FROM movesdb20241112.fuelSupply
+    WHERE fuelRegionID = 270000000 AND fuelYearID = 2020;

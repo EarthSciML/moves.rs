@@ -22,6 +22,12 @@
 #                     Default: /projects/illinois/eng/cee/ctessum/ctessum/code/
 #                              moves.rs/characterization/apptainer/moves-fixture.sif
 #   -h, --help
+#
+# Environment:
+#   COUNTY_FIXTURE_WORKDIR_ROOT  Scratch root for the per-fixture workdir
+#                     (MariaDB datadir, MOVESTemporary, captures; several GB).
+#                     Default: /scratch/$USER/moves-county-fixture. Never point
+#                     it at a RAM-backed /tmp.
 
 set -euo pipefail
 
@@ -71,7 +77,7 @@ OUTPUT_DIR="${OUTPUT_DIR:-${ROOT}/characterization/snapshots/${FIXTURE_NAME}}"
 COUNTY_DB="washtenaw_cdb"
 
 # ----- Create a temporary RunSpec with the county DB name filled in -----
-WORKDIR="/scratch/${USER}/moves-county-fixture/${FIXTURE_NAME}"
+WORKDIR="${COUNTY_FIXTURE_WORKDIR_ROOT:-/scratch/${USER}/moves-county-fixture}/${FIXTURE_NAME}"
 mkdir -p "${WORKDIR}"
 TEMP_RUNSPEC="${WORKDIR}/${FIXTURE_NAME}.xml"
 sed "s|scaleinputdatabase servername=\"\" databasename=\"\" description=\"\"|scaleinputdatabase servername=\"localhost\" databasename=\"${COUNTY_DB}\" description=\"Washtenaw County CDB\"|g" \

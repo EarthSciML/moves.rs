@@ -21,8 +21,8 @@ containing hotellingHoursPerDay.]]></description>
 		<year key="2020"/>
 		<month key="7"/>
 		<day id="5"/>
-		<beginhour key="7"/>
-		<endhour key="7"/>
+		<beginhour key="6"/>
+		<endhour key="6"/>
 	</timespan>
 	<onroadvehicleselections>
 		<onroadvehicleselection fueltypeid="2" fueltypedesc="Diesel Fuel" sourcetypeid="62" sourcetypename="Combination Long-haul Truck"/>
@@ -32,12 +32,16 @@ containing hotellingHoursPerDay.]]></description>
 	<offroadvehiclesccs>
 	</offroadvehiclesccs>
 	<roadtypes>
+		<roadtype roadtypeid="1" roadtypename="Off-Network" modelCombination="M1"/>
 		<roadtype roadtypeid="4" roadtypename="Urban Restricted Access" modelCombination="M1"/>
 	</roadtypes>
 	<pollutantprocessassociations>
 		<pollutantprocessassociation pollutantkey="3" pollutantname="Oxides of Nitrogen (NOx)" processkey="17" processname="Crankcase Extended Idle Exhaust"/>
 		<pollutantprocessassociation pollutantkey="1" pollutantname="Total Gaseous Hydrocarbons" processkey="17" processname="Crankcase Extended Idle Exhaust"/>
 		<pollutantprocessassociation pollutantkey="2" pollutantname="Carbon Monoxide (CO)" processkey="17" processname="Crankcase Extended Idle Exhaust"/>
+		<pollutantprocessassociation pollutantkey="3" pollutantname="Oxides of Nitrogen (NOx)" processkey="90" processname="Extended Idle Exhaust"/>
+		<pollutantprocessassociation pollutantkey="1" pollutantname="Total Gaseous Hydrocarbons" processkey="90" processname="Extended Idle Exhaust"/>
+		<pollutantprocessassociation pollutantkey="2" pollutantname="Carbon Monoxide (CO)" processkey="90" processname="Extended Idle Exhaust"/>
 	</pollutantprocessassociations>
 	<databaseselections>
 	</databaseselections>
