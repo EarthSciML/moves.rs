@@ -5,7 +5,10 @@ Requests Atmospheric CO2 (pollutant 90) for the Extended Idle Exhaust process
 (process 90), the (pollutant, process) pair CO2AERunningStartExtendedIdleCalculator
 registers for that the Phase 0 hot-path fixtures do not cover. Extended Idle applies
 to Combination Long-haul Trucks (sourcetypeid 62) that idle with their main engine
-running (as distinct from APU, process 91). Runs hourID 7 (key="6"; keys are
+running (as distinct from APU, process 91). Total Energy Consumption for extended
+idle (91/90) is selected beside it because the calculator is chained: it converts
+the energy BaseRateCalculator writes, and with 90/90 alone MOVES generates no base
+rate (emissionRate has none for 90) and emits nothing. Runs hourID 7 (key="6"; keys are
 hourID-1) on road types 1 (Off-Network, where the 90 rates are written) and 4. No
 input database: hotelling activity comes from the default database.]]></description>
 	<models>
@@ -35,6 +38,7 @@ input database: hotelling activity comes from the default database.]]></descript
 		<roadtype roadtypeid="4" roadtypename="Urban Restricted Access" modelCombination="M1"/>
 	</roadtypes>
 	<pollutantprocessassociations>
+		<pollutantprocessassociation pollutantkey="91" pollutantname="Total Energy Consumption" processkey="90" processname="Extended Idle Exhaust"/>
 		<pollutantprocessassociation pollutantkey="90" pollutantname="Atmospheric CO2" processkey="90" processname="Extended Idle Exhaust"/>
 	</pollutantprocessassociations>
 	<databaseselections>
