@@ -1,0 +1,25 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__nrhpcategory",
+  "schema": [
+    {
+      "name": "nrhprangebinid",
+      "kind": "int64"
+    },
+    {
+      "name": "engtechid",
+      "kind": "int64"
+    },
+    {
+      "name": "nrhpcategory",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "nrhprangebinid",
+    "engtechid"
+  ],
+  "row_count": 2268,
+  "float_decimals": 12,
+  "content_sha256": "12419925b6162cf28baf817d5eaa01629c033c72686e04c8410e57a5edbc20b5"
+}

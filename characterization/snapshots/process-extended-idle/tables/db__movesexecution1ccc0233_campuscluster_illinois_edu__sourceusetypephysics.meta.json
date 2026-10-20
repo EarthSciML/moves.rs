@@ -1,0 +1,51 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__sourceusetypephysics",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "regClassID",
+      "kind": "int64"
+    },
+    {
+      "name": "beginModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "endModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "rollingTermA",
+      "kind": "float64"
+    },
+    {
+      "name": "rotatingTermB",
+      "kind": "float64"
+    },
+    {
+      "name": "dragTermC",
+      "kind": "float64"
+    },
+    {
+      "name": "sourceMass",
+      "kind": "float64"
+    },
+    {
+      "name": "fixedMassFactor",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "sourceTypeID",
+    "regClassID",
+    "beginModelYearID",
+    "endModelYearID"
+  ],
+  "row_count": 20,
+  "float_decimals": 12,
+  "content_sha256": "098f9e84b0020e8baf806d598de33881282eee5f27814d1ea26da9851c5975df"
+}

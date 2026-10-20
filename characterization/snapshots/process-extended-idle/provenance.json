@@ -2,10 +2,10 @@
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "process-extended-idle",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixture-image.lock",
-  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixtures/process-extended-idle.xml",
-  "runspec_sha256": "2796ef3688f7781a0bdbbaaef2fdd24f30f599417ef7af98684764e2ac03b961",
-  "snapshot_aggregate_sha256": "823feb5ae00b5ef1d4b99a28be859e1a883db65a175c3f65b45656d06b033195",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/process-extended-idle.xml",
+  "runspec_sha256": "fcbb81942504dc32cf35c3be00c3cfa218c8ae50e60fd96f7ed94be64ebd1ea5",
+  "snapshot_aggregate_sha256": "18cc9829cddd2d325d1c5854e9a4170b07d04c43de844512d9f9e3e375e257e6",
   "output_database": "out_process_extended_idle",
   "scale_input_database": null
 }

@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v2",
+  "format_version": "moves-snapshot/v1",
   "name": "db__out_process_crankcase_extidle__movestablesused",
   "schema": [
     {
@@ -32,10 +32,7 @@
     }
   ],
   "natural_key": [],
-  "row_count": 135,
-  "float_encoding": {
-    "kind": "shortest_round_trip",
-    "max_significant_digits": 17
-  },
-  "content_sha256": "f78d04eae1a8cbc351b4c118296c806bd6236b4ebd31bbbe40ee13ba977f5a3a"
+  "row_count": 140,
+  "float_decimals": 12,
+  "content_sha256": "3863cdb021639842bea79544cf88aa2ff2263be760fffc038e0adc0b968c40f8"
 }

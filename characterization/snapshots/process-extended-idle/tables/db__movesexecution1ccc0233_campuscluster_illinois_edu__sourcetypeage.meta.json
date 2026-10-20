@@ -1,0 +1,37 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__sourcetypeage",
+  "schema": [
+    {
+      "name": "ageID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "survivalRate",
+      "kind": "float64"
+    },
+    {
+      "name": "relativeMAR",
+      "kind": "float64"
+    },
+    {
+      "name": "functioningACFraction",
+      "kind": "float64"
+    },
+    {
+      "name": "functioningACFractionCV",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "ageID",
+    "sourceTypeID"
+  ],
+  "row_count": 533,
+  "float_decimals": 12,
+  "content_sha256": "12f653909246b54c45a86d99866e26e172f029fb75d6da9944a363ddd12fe97f"
+}

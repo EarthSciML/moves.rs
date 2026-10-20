@@ -1,0 +1,44 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__carbonoxidationbyfueltype",
+  "schema": [
+    {
+      "name": "countyID",
+      "kind": "int64"
+    },
+    {
+      "name": "yearID",
+      "kind": "int64"
+    },
+    {
+      "name": "monthGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "pollutantID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "sumcarbonContent",
+      "kind": "float64"
+    },
+    {
+      "name": "sumoxidationFraction",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "countyID",
+    "yearID",
+    "monthGroupID",
+    "pollutantID",
+    "fuelTypeID"
+  ],
+  "row_count": 3,
+  "float_decimals": 12,
+  "content_sha256": "37fa4f6ca315017c34e1dd79866b992075e41bdceac6286b6f75bbf21b7baec1"
+}

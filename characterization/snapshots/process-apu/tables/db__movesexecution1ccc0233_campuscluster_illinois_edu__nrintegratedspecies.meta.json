@@ -1,0 +1,16 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__nrintegratedspecies",
+  "schema": [
+    {
+      "name": "pollutantID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "pollutantID"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "28ea22ab5352ec1be95e6261cf5ad61b4d9738f0797dbbe8e51c1087ab2a585d"
+}

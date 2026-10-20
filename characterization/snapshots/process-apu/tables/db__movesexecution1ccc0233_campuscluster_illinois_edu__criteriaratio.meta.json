@@ -1,0 +1,63 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__criteriaratio",
+  "schema": [
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelFormulationID",
+      "kind": "int64"
+    },
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "pollutantID",
+      "kind": "int64"
+    },
+    {
+      "name": "processID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "ageID",
+      "kind": "int64"
+    },
+    {
+      "name": "ratio",
+      "kind": "float64"
+    },
+    {
+      "name": "ratioGPA",
+      "kind": "float64"
+    },
+    {
+      "name": "ratioNoSulfur",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "fuelTypeID",
+    "fuelFormulationID",
+    "polProcessID",
+    "pollutantID",
+    "processID",
+    "sourceTypeID",
+    "modelYearID",
+    "ageID"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "620455c76b13107aee1321a780926bc878d18d302744d0eb619e3ccb69e1c0af"
+}
