@@ -1,5 +1,11 @@
 <runspec version="MOVES5.0.1">
-	<description><![CDATA[Crankcase Start Exhaust (process 16) criteria pollutants.]]></description>
+	<description><![CDATA[Crankcase Start Exhaust (process 16) at National (DEFAULT) domain.
+
+Process 16 is chained to start exhaust (process 2), so THC/CO/NOx start exhaust
+(102/202/302) are selected as its parents. Runs hourID 7 (key="6"; keys are
+hourID-1) on road types 1 (Off-Network, where start rates are written) and 4. No
+input database: starts come from the default database (the DEFAULT-domain twin of
+process-crankcase-start-single).]]></description>
 	<models>
 		<model value="ONROAD"/>
 	</models>
@@ -23,12 +29,16 @@
 	<offroadvehiclesccs>
 	</offroadvehiclesccs>
 	<roadtypes>
+		<roadtype roadtypeid="1" roadtypename="Off-Network" modelCombination="M1"/>
 		<roadtype roadtypeid="4" roadtypename="Urban Restricted Access" modelCombination="M1"/>
 	</roadtypes>
 	<pollutantprocessassociations>
 		<pollutantprocessassociation pollutantkey="3" pollutantname="Oxides of Nitrogen (NOx)" processkey="16" processname="Crankcase Start Exhaust"/>
 		<pollutantprocessassociation pollutantkey="1" pollutantname="Total Gaseous Hydrocarbons" processkey="16" processname="Crankcase Start Exhaust"/>
 		<pollutantprocessassociation pollutantkey="2" pollutantname="Carbon Monoxide (CO)" processkey="16" processname="Crankcase Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="3" pollutantname="Oxides of Nitrogen (NOx)" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="1" pollutantname="Total Gaseous Hydrocarbons" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="2" pollutantname="Carbon Monoxide (CO)" processkey="2" processname="Start Exhaust"/>
 	</pollutantprocessassociations>
 	<databaseselections>
 	</databaseselections>

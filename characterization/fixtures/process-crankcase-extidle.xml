@@ -1,5 +1,12 @@
 <runspec version="MOVES5.0.1">
-	<description><![CDATA[Crankcase Extended Idle Exhaust (process 17) criteria pollutants.]]></description>
+	<description><![CDATA[Crankcase Extended Idle Exhaust (process 17) at National (DEFAULT) domain.
+
+Process 17 is chained to extended-idle exhaust (process 90), so THC/CO/NOx
+extended idle (190/290/390) are selected as its parents. Selects diesel
+combination long-haul trucks (62), the only source type that extended-idles.
+Runs hourID 7 (key="6"; keys are hourID-1) on road types 1 (Off-Network) and 4.
+No input database: hotelling activity comes from the default database (the
+DEFAULT-domain twin of process-crankcase-extidle-single).]]></description>
 	<models>
 		<model value="ONROAD"/>
 	</models>
@@ -16,19 +23,23 @@
 		<endhour key="6"/>
 	</timespan>
 	<onroadvehicleselections>
-		<onroadvehicleselection fueltypeid="1" fueltypedesc="Gasoline" sourcetypeid="21" sourcetypename="Passenger Car"/>
+		<onroadvehicleselection fueltypeid="2" fueltypedesc="Diesel Fuel" sourcetypeid="62" sourcetypename="Combination Long-haul Truck"/>
 	</onroadvehicleselections>
 	<offroadvehicleselections>
 	</offroadvehicleselections>
 	<offroadvehiclesccs>
 	</offroadvehiclesccs>
 	<roadtypes>
+		<roadtype roadtypeid="1" roadtypename="Off-Network" modelCombination="M1"/>
 		<roadtype roadtypeid="4" roadtypename="Urban Restricted Access" modelCombination="M1"/>
 	</roadtypes>
 	<pollutantprocessassociations>
 		<pollutantprocessassociation pollutantkey="3" pollutantname="Oxides of Nitrogen (NOx)" processkey="17" processname="Crankcase Extended Idle Exhaust"/>
 		<pollutantprocessassociation pollutantkey="1" pollutantname="Total Gaseous Hydrocarbons" processkey="17" processname="Crankcase Extended Idle Exhaust"/>
 		<pollutantprocessassociation pollutantkey="2" pollutantname="Carbon Monoxide (CO)" processkey="17" processname="Crankcase Extended Idle Exhaust"/>
+		<pollutantprocessassociation pollutantkey="3" pollutantname="Oxides of Nitrogen (NOx)" processkey="90" processname="Extended Idle Exhaust"/>
+		<pollutantprocessassociation pollutantkey="1" pollutantname="Total Gaseous Hydrocarbons" processkey="90" processname="Extended Idle Exhaust"/>
+		<pollutantprocessassociation pollutantkey="2" pollutantname="Carbon Monoxide (CO)" processkey="90" processname="Extended Idle Exhaust"/>
 	</pollutantprocessassociations>
 	<databaseselections>
 	</databaseselections>

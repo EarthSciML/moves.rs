@@ -1,11 +1,13 @@
 <runspec version="MOVES5.0.1">
-	<description><![CDATA[Extended Idle Exhaust (process 90) Atmospheric CO2 — exercises CO2AERunningStartExtendedIdleCalculator.
+	<description><![CDATA[Extended Idle Exhaust (process 90) Atmospheric CO2 at National (DEFAULT) domain — exercises CO2AERunningStartExtendedIdleCalculator.
 
-Requests Atmospheric CO2 (pollutant 90) for the Extended Idle Exhaust
-process (process 90), the (pollutant, process) pair CO2AERunningStartExtendedIdleCalculator
-registers for that the Phase 0 hot-path fixtures do not cover. Extended Idle
-applies to Combination Long-haul Trucks (sourcetypeid 62) that idle with their
-main engine running (as distinct from APU, process 91).]]></description>
+Requests Atmospheric CO2 (pollutant 90) for the Extended Idle Exhaust process
+(process 90), the (pollutant, process) pair CO2AERunningStartExtendedIdleCalculator
+registers for that the Phase 0 hot-path fixtures do not cover. Extended Idle applies
+to Combination Long-haul Trucks (sourcetypeid 62) that idle with their main engine
+running (as distinct from APU, process 91). Runs hourID 7 (key="6"; keys are
+hourID-1) on road types 1 (Off-Network, where the 90 rates are written) and 4. No
+input database: hotelling activity comes from the default database.]]></description>
 	<models>
 		<model value="ONROAD"/>
 	</models>
@@ -29,6 +31,7 @@ main engine running (as distinct from APU, process 91).]]></description>
 	<offroadvehiclesccs>
 	</offroadvehiclesccs>
 	<roadtypes>
+		<roadtype roadtypeid="1" roadtypename="Off-Network" modelCombination="M1"/>
 		<roadtype roadtypeid="4" roadtypename="Urban Restricted Access" modelCombination="M1"/>
 	</roadtypes>
 	<pollutantprocessassociations>

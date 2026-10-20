@@ -1,5 +1,9 @@
 <runspec version="MOVES5.0.1">
-	<description><![CDATA[Auxiliary Power Exhaust (process 91) — exercises APU code path for combo long-haul truck.]]></description>
+	<description><![CDATA[Auxiliary Power Exhaust (process 91) at National (DEFAULT) domain.
+
+Runs hourID 7 (key="6"; keys are hourID-1) on road types 1 (Off-Network, where the
+91 base rates are written) and 4. No input database: hotelling activity comes from
+the default database (the DEFAULT-domain twin of process-apu-single).]]></description>
 	<models>
 		<model value="ONROAD"/>
 	</models>
@@ -23,6 +27,7 @@
 	<offroadvehiclesccs>
 	</offroadvehiclesccs>
 	<roadtypes>
+		<roadtype roadtypeid="1" roadtypename="Off-Network" modelCombination="M1"/>
 		<roadtype roadtypeid="4" roadtypename="Urban Restricted Access" modelCombination="M1"/>
 	</roadtypes>
 	<pollutantprocessassociations>
