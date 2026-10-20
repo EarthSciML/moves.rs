@@ -1765,11 +1765,10 @@ mod tests {
         // mixed-onroad: onroad half of the retired mixed-onroad-nonroad run
         // (Total Energy running exhaust, gasoline passenger car).
         ("mixed-onroad", 1e-3, false),
-        // Vacuous (canonical 0 rows / port 0 rows).
-        ("process-apu", 1e-3, true),
-        ("process-crankcase-extidle", 1e-3, true),
-        ("process-crankcase-start", 1e-3, true),
-        ("process-extended-idle", 1e-3, true),
+        // process-apu, process-crankcase-extidle, process-crankcase-start and
+        // process-extended-idle were asserted vacuous here until 2026-10-20:
+        // they were recaptured non-empty and are quarantined in the native
+        // gate (docs/known-divergences.md §1b.3).
         // The four process-*-single fixtures left this list 2026-10-19: they
         // were recaptured non-empty and are quarantined in the native gate
         // (docs/known-divergences.md §1b.2).

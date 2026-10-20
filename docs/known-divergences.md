@@ -15,7 +15,7 @@ asserted against canonical MOVES and **zero** are quarantined.
 `characterization/fixtures/` holds 51 RunSpec XML files. The canonical-diff gate
 covers the **42** non-scale fixtures that have a populated snapshot directory
 (one per fixture under `characterization/snapshots/` carrying a `manifest.json`):
-**37 asserted**, **5 quarantined** (§4.4, §1b.2). The 3 `scale-*` fixtures
+**33 asserted**, **9 quarantined** (§4.4, §1b.2, §1b.3). The 3 `scale-*` fixtures
 (County-Scale, Project-Scale, Rates) require additional input databases not
 present in the default test environment and are excluded.
 
@@ -50,10 +50,10 @@ fixtures; override the tree with `REGRESSION_SNAPSHOTS_DIR=<path>`):
  data-plane bug — it is OK for CI to be red while results are wrong. Masking a
  divergence with a widened tolerance is worse than no gate, so a quarantined
  fixture stays in the gate (failing CI) and graduates to the asserted set only
- once its data plane is actually fixed. As of 2026-10-19 the quarantine list
- (`QUARANTINED_FIXTURES`) holds five fixtures,
- `nr-airtoxics-lawn-garden-county` (§4.4) and the four `process-*-single`
- county fixtures (§1b.2) — so `canonical_snapshot_diff` is
+ once its data plane is actually fixed. As of 2026-10-20 the quarantine list
+ (`QUARANTINED_FIXTURES`) holds nine fixtures,
+ `nr-airtoxics-lawn-garden-county` (§4.4), the four `process-*-single`
+ county fixtures (§1b.2) and their four DEFAULT-scale twins (§1b.3) — so `canonical_snapshot_diff` is
  **red, deliberately**.
 - **Hard-fails as UNCLASSIFIED** on a fixture that is in neither list. This is
  the state a newly captured snapshot lands in: it is a *triage gap*, not a
@@ -85,22 +85,36 @@ snapshot, unchanged at `default_float_tolerance = 0.0`.)
 
 ---
 
-## 1b. Canonical-diff gate state (current — 2026-10-19)
+## 1b. Canonical-diff gate state (current — 2026-10-20)
 
-The gate is **red, by design, on five fixtures**. Of the **42** non-scale
+The gate is **red, by design, on nine fixtures**. Of the **42** non-scale
 fixtures with a populated snapshot directory:
 
 | | count | |
 |---|---|---|
-| asserted (pass within §4.2 precision tolerance) | **37** | `asserted_fixtures()` |
-| quarantined (known data-plane bug, hard-fails CI) | **5** | `nr-airtoxics-lawn-garden-county`, §4.4; the four `process-*-single`, §1b.2 |
+| asserted (pass within §4.2 precision tolerance) | **33** | `asserted_fixtures()` |
+| quarantined (known data-plane bug, hard-fails CI) | **9** | `nr-airtoxics-lawn-garden-county`, §4.4; the four `process-*-single`, §1b.2; their four DEFAULT-scale twins, §1b.3 |
 | unclassified | **0** | — |
 
 `cargo test -p moves-cli --test full_suite_regression` therefore reports
-**8 passed, 1 failed**, the failure being `canonical_snapshot_diff` on the five
-quarantined fixtures (37 asserted-pass). Per the §1 policy that is the correct
+**8 passed, 1 failed**, the failure being `canonical_snapshot_diff` on the nine
+quarantined fixtures (33 asserted-pass).
+
+**Measured 2026-10-20, it is not that.** On local `main` (`dbda2695` plus the
+quarantine of §1b.3, a fresh build) the full gate reports 8 passed, 1 failed,
+but `canonical_snapshot_diff` counts **15 asserted-pass, 9 known-bug, 27
+failures**: 17 asserted onroad fixtures (`process-tirewear`, `expand-counties`,
+`mixed-onroad`, every onroad one but `expand-day`, `expand-month`,
+`sample-runspec` and the two `chain-so2-co2e-mechanism*`) emit TWICE
+canonical's rows, both day types 2 and 5 where the RunSpec's `<day id="5"/>`
+and canonical select 5 alone (`process-tirewear`: 375 canonical rows, 750
+port rows, 125 per pollutant-process per day), and `expand-month` is off by
+-1.2e-3. No port code changed between `a75791bb`, whose message recorded 37
+asserted-pass, and this run; a June-built `target/release/moves` emits the
+same 750 rows for `process-tirewear`. Not diagnosed here. Per the §1 policy that is the correct
 outcome: the port does not compute 27 of `nr-airtoxics-lawn-garden-county`'s 29
-pollutants, and the four `-single` fixtures are off by factors (§1b.2), so
+pollutants, and the four `-single` fixtures and their DEFAULT twins are off by
+factors (§1b.2, §1b.3), so
 there is nothing a tolerance could legitimately absorb, and masking them would
 turn the gate into decoration.
 
@@ -113,8 +127,8 @@ that file's per-fixture comments are the canonical, kept-current record of how
 each one was graduated.
 
 Four start/idle/hotelling fixtures (`process-apu`,
-`process-crankcase-extidle`/`-start`, `process-extended-idle`) are asserted
-**vacuous**: canonical's captured execution DB
+`process-crankcase-extidle`/`-start`, `process-extended-idle`) were asserted
+**vacuous** until 2026-10-20 (§1b.3): canonical's captured execution DB
 holds the base rate but its activity and output tables are empty, so canonical's
 authoritative output for the process is zero rows, and the port — gated by the
 same activity weighting — reproduces that (canon 0 == port 0). The `vacuous`
@@ -123,8 +137,8 @@ row. Their `-single` variants were asserted vacuous too until 2026-10-19,
 when they were recaptured non-empty (§1b.2). The DEFAULT-scale four have the
 same road-type and crankcase-parent defects that §1b.2 fixed in the `-single`
 RunSpecs (road type 4 only, where the 90/91/start rates are written on road
-type 1; crankcase 16/17 without processes 2/90) and remain vacuous for that
-reason, not because the processes produce nothing.
+type 1; crankcase 16/17 without processes 2/90) and were vacuous for that
+reason, not because the processes produce nothing; §1b.3 fixed them.
 
 ### Triage of 2026-09-08/09-10 snapshot additions
 
@@ -274,6 +288,54 @@ default's zone-990000 table (36 rows, five diesel bins), not the county DB's
 | `process-apu-single` | 91 / 50 | 91/91 x26.6; 91/93 shore power missing from the port |
 | `process-extended-idle-single` | 50 / 50 | 91/90 +58.8% |
 | `process-crankcase-extidle-single` | 300 / 300 | 190/290/390 +265%/+53%/+78%; 117/217/317 +147%/+29%/-21% |
+
+### 1b.3 The four DEFAULT-scale twins recaptured non-empty (2026-10-20)
+
+`process-apu`, `process-extended-idle`, `process-crankcase-start` and
+`process-crankcase-extidle` are the §1b.2 fixtures at the DEFAULT domain (no
+input database). They had 0 rows for §1b.2's causes 3 and 4 (road type 4
+only; crankcase without a parent) and two of their own, all fixed in the
+RunSpecs:
+
+1. `process-crankcase-extidle` selected the gasoline passenger car (21),
+   which never extended-idles; it now selects diesel combination long-haul
+   (62).
+2. `process-extended-idle` selected Atmospheric CO2 (90/90) alone. MOVES
+   computed the hotelling hours (123 `hotellingHours` rows) and nothing
+   else: BaseRateGenerator builds rates only for the selected
+   pollutant-processes, the default `emissionRate` has no 9090 rows (488 at
+   9190), and CO2AERunningStartExtendedIdleCalculator converts the Total
+   Energy BaseRateCalculator writes. Total Energy (91/90) is now selected
+   beside it, as `chain-so2-co2e-mechanism` selects 9101 beside 9001.
+
+Recaptured with moves.esm's `build-snapshots.sh` (which drives
+`run-all-fixtures.sh`) and moves-fixture.sif `4f92c593`:
+
+| fixture | movesoutput rows (pollutant/process) |
+|---|---|
+| `process-apu` | 91: 91/91 x41, 91/93 (Hotelling Shore Power) x50, all 0 |
+| `process-extended-idle` | 100: 90/90 x50, 91/90 x50 |
+| `process-crankcase-extidle` | 300: 1/90, 2/90, 3/90, 1/17, 2/17, 3/17, 50 each |
+| `process-crankcase-start` | 684: 1/2, 2/2, 3/2 x124; 1/16, 2/16, 3/16 x104 |
+
+Against the §1b.2 twins, cell by cell: every diesel cell equal within 6e-06 (the six
+digits written), the shore-power rows 0 (the default zone-990000
+`hotellingActivityDistribution` states 0.00 at mode 203, the county DB 0.03
+from 2010), the CNG extended-idle and crankcase-extidle cells 0.800 of the
+county run's (the default states mode 200 at 0.80 for CNG; the county DB has
+no CNG row), and the starts identical at all 684 cells. moves.esm reproduces
+all four from the default database (its PLAN.md §7.3.42).
+
+**The port diverges as on the `-single` twins, so all four are
+quarantined.** Per pollutant-process sums, port run against the snapshot
+alone:
+
+| fixture | canon / port rows | port / canon |
+|---|---|---|
+| `process-crankcase-start` | 684 / 684 | x2.000 on all six |
+| `process-apu` | 91 / 50 | 91/91 x26.6; 91/93 not emitted |
+| `process-extended-idle` | 100 / 100 | 91/90 x1.593, 90/90 x1.596 |
+| `process-crankcase-extidle` | 300 / 300 | 190/290/390 x3.753/x1.531/x1.776; 117/217/317 x2.485/x1.288/x0.791 |
 
 ### Resolved (historical)
 

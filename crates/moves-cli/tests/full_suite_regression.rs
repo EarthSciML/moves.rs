@@ -626,25 +626,11 @@ fn asserted_fixtures() -> &'static [(&'static str, f64, bool)] {
         // fuelType-9 (electricity) 112/118 rows the additive delta cannot
         // cancel. 100/110/111/112/115/118/119 all exact to f64 drift.
         ("process-pm-exhaust", ONROAD_REL_TOL, false),
-        // Vacuous (canon 0 / port 0) hotelling/idle/start-process fixtures.
-        // Canonical's captured execution DB for each carries the base RATE
-        // (e.g. process-apu's baserate_91_2020 has 358 nonzero opMode-201 APU
-        // rows) and the units metadata, but its activity tables — sho,
-        // sourcehours, movesworkeractivityoutput — and every output table —
-        // baserateoutput, rateperhour, ratepervehicle, movesactivityoutput,
-        // movesoutput — are EMPTY. So canonical's authoritative output for the
-        // process is zero rows. The port reproduces that: the BaseRate
-        // activity weighting (universalActivity = SHO / noOfRealDays) multiplies
-        // the captured rate by the captured SHO, which is empty, gating the
-        // output to nothing — exactly the "runspec-derived BRC activity gating"
-        // process-apu previously lacked (it used to emit the ungated APU rate,
-        // which is why it was quarantined). canon 0 == port 0, asserted vacuous.
-        // `vacuous` makes the gate fail loudly if a recapture ever gives either
-        // side a nonzero row, forcing reclassification rather than a silent pass.
-        ("process-apu", ONROAD_REL_TOL, true),
-        ("process-crankcase-extidle", ONROAD_REL_TOL, true),
-        ("process-crankcase-start", ONROAD_REL_TOL, true),
-        ("process-extended-idle", ONROAD_REL_TOL, true),
+        // The four DEFAULT-scale hotelling/idle/start fixtures (process-apu,
+        // process-extended-idle, process-crankcase-start, process-crankcase-
+        // extidle) were asserted vacuous here (canon 0 == port 0) until
+        // 2026-10-20, when they were recaptured non-empty and moved to
+        // QUARANTINED_FIXTURES; see docs/known-divergences.md §1b.3.
         // The four SINGLE-scale county variants (process-*-single) were
         // asserted vacuous here until 2026-10-19. They were recaptured
         // non-empty that day and moved to QUARANTINED_FIXTURES; see
@@ -661,6 +647,25 @@ fn asserted_fixtures() -> &'static [(&'static str, f64, bool)] {
 /// data plane is fixed it should graduate from this list into
 /// [`asserted_fixtures`].
 const QUARANTINED_FIXTURES: &[&str] = &[
+    // The four DEFAULT-scale twins of the -single fixtures, recaptured
+    // non-empty 2026-10-20 (docs/known-divergences.md §1b.3). Until then both
+    // sides emitted 0 rows and they were asserted vacuous: road type 1 was
+    // unselected, crankcase had no parent, crankcase-extidle selected the
+    // gasoline passenger car, and extended-idle selected Atmospheric CO2
+    // without the Total Energy CO2AE converts. Port vs canonical per
+    // pollutant-process sum (port run against the snapshot alone), the same
+    // pattern as the -single twins:
+    //   process-crankcase-start  684/684 rows, every pollutant x2.000.
+    //   process-apu  canon 91 / port 50 rows; 91/91 port 4.62 vs canon 0.174
+    //     (x26.6); 91/93 shore power (50 rows, all 0 at the default's zero
+    //     mode-203 fraction) not emitted by the port.
+    //   process-extended-idle  100/100 rows, 91/90 +59.3%, 90/90 +59.6%.
+    //   process-crankcase-extidle  300/300 rows, parents 190/290/390
+    //     +275%/+53%/+78%, crankcase 117/217/317 +149%/+29%/-21%.
+    "process-apu",
+    "process-crankcase-extidle",
+    "process-crankcase-start",
+    "process-extended-idle",
     // The four SINGLE-scale county fixtures, recaptured non-empty 2026-10-19
     // (docs/known-divergences.md §1b.2). Until then canonical and port both
     // emitted 0 rows and they were asserted vacuous; the county DB lacked the

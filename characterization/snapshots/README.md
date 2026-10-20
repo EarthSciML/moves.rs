@@ -40,6 +40,13 @@ the RunSpecs ran hour 8 on road type 4 only, and crankcase had no parent
 process. All four now emit `movesoutput` rows; see
 `docs/known-divergences.md` §1b.2.
 
+Their DEFAULT-domain twins (`process-apu`, `process-extended-idle`,
+`process-crankcase-start`, `process-crankcase-extidle`; no input DB) were
+recaptured on 2026-10-20 after the same road-type and crankcase-parent fixes,
+source type 62 for crankcase extended idle, and Total Energy (91/90) beside
+extended idle's Atmospheric CO2. They emit 91, 100, 684 and 300 rows; see
+`docs/known-divergences.md` §1b.3.
+
 `scale-county.xml` is a sixth SINGLE-domain fixture but has never been
 captured and is out of scope here.
 
