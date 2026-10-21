@@ -216,6 +216,8 @@ county_sql_for() {
             echo "${HERE}/county-inputs/washtenaw-county/setup-hotelling.sql" ;;
         process-crankcase-start-single)
             echo "${HERE}/county-inputs/washtenaw-county/setup-starts.sql" ;;
+        scale-county)
+            echo "${HERE}/county-inputs/washtenaw-county/setup-county.sql" ;;
         scale-project)
             echo "${HERE}/county-inputs/washtenaw-project/setup-project.sql" ;;
         *)

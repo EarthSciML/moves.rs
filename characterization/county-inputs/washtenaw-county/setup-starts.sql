@@ -1,5 +1,6 @@
 -- County input DB for Washtenaw County (FIPS 26161, zone 261610)
--- Used by process-crankcase-start-single
+-- Used by process-crankcase-start-single (scale-county has its own complete
+-- county database, setup-county.sql)
 --
 -- Provides:
 -- 1. Required geography tables (State, County, Zone, ZoneRoadType, RoadTypeDistribution)
