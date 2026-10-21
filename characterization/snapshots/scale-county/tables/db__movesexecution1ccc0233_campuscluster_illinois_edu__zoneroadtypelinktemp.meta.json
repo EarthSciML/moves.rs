@@ -1,0 +1,25 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__zoneroadtypelinktemp",
+  "schema": [
+    {
+      "name": "roadTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "linkID",
+      "kind": "int64"
+    },
+    {
+      "name": "SHOAllocFactor",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "roadTypeID",
+    "linkID"
+  ],
+  "row_count": 4,
+  "float_decimals": 12,
+  "content_sha256": "a5d4e2dcb885821e9a3cc0484fe528a22efcab0c4256ee8051eb1100f1de9b89"
+}
