@@ -1,0 +1,25 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__startsageadjustment",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "ageID",
+      "kind": "int64"
+    },
+    {
+      "name": "ageAdjustment",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "sourceTypeID",
+    "ageID"
+  ],
+  "row_count": 41,
+  "float_decimals": 12,
+  "content_sha256": "f9772ff13e83ee0c35fb415e53aef7f68998a1d0e1332f64338eb9852096fabf"
+}

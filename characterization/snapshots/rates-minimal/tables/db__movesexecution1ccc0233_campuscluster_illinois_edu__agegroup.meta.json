@@ -1,0 +1,20 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__agegroup",
+  "schema": [
+    {
+      "name": "ageGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "ageGroupName",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "ageGroupID"
+  ],
+  "row_count": 7,
+  "float_decimals": 12,
+  "content_sha256": "44df7d1d16713e7490e543e41134d420c072eaf9011a1c277ecb85ff3d92fd84"
+}

@@ -1,0 +1,29 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__countyyear",
+  "schema": [
+    {
+      "name": "countyID",
+      "kind": "int64"
+    },
+    {
+      "name": "yearID",
+      "kind": "int64"
+    },
+    {
+      "name": "refuelingVaporProgramAdjust",
+      "kind": "float64"
+    },
+    {
+      "name": "refuelingSpillProgramAdjust",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "countyID",
+    "yearID"
+  ],
+  "row_count": 7,
+  "float_decimals": 12,
+  "content_sha256": "4412a2e8ca85f23f0307c184cdaa4b009a1d2c9a412ded066a5475ab29dc84b4"
+}

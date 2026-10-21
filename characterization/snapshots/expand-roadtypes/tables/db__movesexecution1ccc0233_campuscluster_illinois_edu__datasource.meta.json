@@ -1,0 +1,36 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__datasource",
+  "schema": [
+    {
+      "name": "DataSourceId",
+      "kind": "int64"
+    },
+    {
+      "name": "Author",
+      "kind": "utf8"
+    },
+    {
+      "name": "Date",
+      "kind": "utf8"
+    },
+    {
+      "name": "Sponsor",
+      "kind": "utf8"
+    },
+    {
+      "name": "DocumentID",
+      "kind": "utf8"
+    },
+    {
+      "name": "QualityLevel",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "DataSourceId"
+  ],
+  "row_count": 205,
+  "float_decimals": 12,
+  "content_sha256": "74c9de63fd56b67155b89f3b43f6b0d5c9a3f7252a551af987d74a3c341a5d24"
+}

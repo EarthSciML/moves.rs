@@ -1,0 +1,47 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__samplevehiclepopulation",
+  "schema": [
+    {
+      "name": "sourceTypeModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "engTechID",
+      "kind": "int64"
+    },
+    {
+      "name": "regClassID",
+      "kind": "int64"
+    },
+    {
+      "name": "stmyFuelEngFraction",
+      "kind": "float64"
+    },
+    {
+      "name": "stmyFraction",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "sourceTypeModelYearID",
+    "fuelTypeID",
+    "engTechID",
+    "regClassID"
+  ],
+  "row_count": 6068,
+  "float_decimals": 12,
+  "content_sha256": "47a26fd93297a66349eea8dbd0e3d4da40752324a6106568ac55ce15d91e4b92"
+}

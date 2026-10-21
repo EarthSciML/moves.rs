@@ -1,0 +1,29 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__startspervehicle",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "hourDayID",
+      "kind": "int64"
+    },
+    {
+      "name": "startsPerVehicle",
+      "kind": "float64"
+    },
+    {
+      "name": "startsPerVehicleCV",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "sourceTypeID",
+    "hourDayID"
+  ],
+  "row_count": 24,
+  "float_decimals": 12,
+  "content_sha256": "737b3f22bb59065690ddbc9dd8601d4ab03f5a32a1ad3c9becbbf323a06d2fec"
+}

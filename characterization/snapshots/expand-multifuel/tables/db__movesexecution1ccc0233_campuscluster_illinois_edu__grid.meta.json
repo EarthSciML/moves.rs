@@ -1,0 +1,16 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__grid",
+  "schema": [
+    {
+      "name": "gridID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "gridID"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "2acc3c24cf7f91d0f18e8a6ab8ea18d4132ecc1bfc6160bbcde97d5692c3c067"
+}

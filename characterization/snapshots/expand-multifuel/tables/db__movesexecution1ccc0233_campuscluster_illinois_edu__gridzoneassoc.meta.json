@@ -1,0 +1,25 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__gridzoneassoc",
+  "schema": [
+    {
+      "name": "zoneID",
+      "kind": "int64"
+    },
+    {
+      "name": "gridID",
+      "kind": "int64"
+    },
+    {
+      "name": "gridAllocFactor",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "zoneID",
+    "gridID"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "5d9bcf62ec455df7f58c7f8dbefcceb8a621eb1482eb21cda03e1cfaa8c7fd06"
+}

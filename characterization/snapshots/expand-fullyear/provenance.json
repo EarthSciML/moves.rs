@@ -1,0 +1,11 @@
+{
+  "provenance_version": "moves-fixture-capture/v1",
+  "fixture_name": "expand-fullyear",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/expand-fullyear.xml",
+  "runspec_sha256": "23a05e91f3a82ff4b04c5b8224c95d3e9bfa0a887c87c40b112b2bbd8e11e3dd",
+  "snapshot_aggregate_sha256": "4ee4e3ea48e10206993ba948b73c6ec4f34d07c5a9b110633ce26a3bfcaf946f",
+  "output_database": "out_expand_fullyear",
+  "scale_input_database": null
+}

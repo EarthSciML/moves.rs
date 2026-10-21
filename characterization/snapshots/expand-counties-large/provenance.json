@@ -1,0 +1,11 @@
+{
+  "provenance_version": "moves-fixture-capture/v1",
+  "fixture_name": "expand-counties-large",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/expand-counties-large.xml",
+  "runspec_sha256": "98a5a3e5a7ea6e4a7ea62ab03b19ca4e65a7634fc015a0666965fafcc7bd59b8",
+  "snapshot_aggregate_sha256": "319c3c55b704f685faa453f940ff9754ae95cc97eb8db38c2c27c676612af5b7",
+  "output_database": "out_expand_counties_large",
+  "scale_input_database": null
+}

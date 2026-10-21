@@ -1,0 +1,40 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__sizeweightfraction",
+  "schema": [
+    {
+      "name": "sourceTypeModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "engTechID",
+      "kind": "int64"
+    },
+    {
+      "name": "engSizeID",
+      "kind": "int64"
+    },
+    {
+      "name": "weightClassID",
+      "kind": "int64"
+    },
+    {
+      "name": "sizeWeightFraction",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "sourceTypeModelYearID",
+    "fuelTypeID",
+    "engTechID",
+    "engSizeID",
+    "weightClassID"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "09f158d21c8653a7651ad95c3bff36bd211340b7b491e0d5f6af8b03bcd9281f"
+}

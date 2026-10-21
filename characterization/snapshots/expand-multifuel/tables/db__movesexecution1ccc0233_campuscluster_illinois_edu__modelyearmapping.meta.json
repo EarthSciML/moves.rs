@@ -1,0 +1,29 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__modelyearmapping",
+  "schema": [
+    {
+      "name": "startUserModelYear",
+      "kind": "int64"
+    },
+    {
+      "name": "endUserModelYear",
+      "kind": "int64"
+    },
+    {
+      "name": "startStandardModelYear",
+      "kind": "int64"
+    },
+    {
+      "name": "endStandardModelYear",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "startUserModelYear",
+    "endUserModelYear"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "a44da2ce5459e99eff7a6d7005bb76590a08b2c98e5b3990e714a88d72c0eed7"
+}

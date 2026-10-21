@@ -1,0 +1,16 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__runspeccounty",
+  "schema": [
+    {
+      "name": "countyID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "countyID"
+  ],
+  "row_count": 7,
+  "float_decimals": 12,
+  "content_sha256": "2a5a59a5cfff0e0ba696ca726bd16b5e841ec5f7c33df26f1abbaff6df859fa7"
+}
