@@ -1,0 +1,57 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution__ratesopmodedistribution",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "roadTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "avgSpeedBinID",
+      "kind": "int64"
+    },
+    {
+      "name": "hourDayID",
+      "kind": "int64"
+    },
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "opModeID",
+      "kind": "int64"
+    },
+    {
+      "name": "opModeFraction",
+      "kind": "float64"
+    },
+    {
+      "name": "opModeFractionCV",
+      "kind": "float64"
+    },
+    {
+      "name": "avgBinSpeed",
+      "kind": "float64"
+    },
+    {
+      "name": "avgSpeedFraction",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "sourceTypeID",
+    "roadTypeID",
+    "avgSpeedBinID",
+    "hourDayID",
+    "polProcessID",
+    "opModeID"
+  ],
+  "row_count": 22,
+  "float_decimals": 12,
+  "content_sha256": "122276a45cd5a90393df2e8b49ec5637d70e1eea139429ccfb3daf4083ef5b94"
+}

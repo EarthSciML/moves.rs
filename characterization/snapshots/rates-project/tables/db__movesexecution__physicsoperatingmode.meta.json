@@ -1,0 +1,52 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution__physicsoperatingmode",
+  "schema": [
+    {
+      "name": "opModeID",
+      "kind": "int64"
+    },
+    {
+      "name": "opModeName",
+      "kind": "utf8"
+    },
+    {
+      "name": "VSPLower",
+      "kind": "float64"
+    },
+    {
+      "name": "VSPUpper",
+      "kind": "float64"
+    },
+    {
+      "name": "speedLower",
+      "kind": "float64"
+    },
+    {
+      "name": "speedUpper",
+      "kind": "float64"
+    },
+    {
+      "name": "brakeRate1Sec",
+      "kind": "float64"
+    },
+    {
+      "name": "brakeRate3Sec",
+      "kind": "float64"
+    },
+    {
+      "name": "minSoakTime",
+      "kind": "int64"
+    },
+    {
+      "name": "maxSoakTime",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "opModeID"
+  ],
+  "row_count": 85,
+  "float_decimals": 12,
+  "content_sha256": "9b919ddb1a671c7bcb27ac1bc7a5e2d2813d173ceb2a5c3c9f4e284abb2ca722"
+}

@@ -1,0 +1,22 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution__tempexistingopmode",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "linkID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "4b5c6d3385f2612cac0e3de23675d4c60a550d55d567f896f04625e7084f92ac"
+}

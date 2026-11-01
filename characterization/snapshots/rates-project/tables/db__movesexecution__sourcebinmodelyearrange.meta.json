@@ -1,0 +1,33 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution__sourcebinmodelyearrange",
+  "schema": [
+    {
+      "name": "sourceBinID",
+      "kind": "int64"
+    },
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "minModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "maxModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "howManyModelYears",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "sourceBinID",
+    "polProcessID"
+  ],
+  "row_count": 125,
+  "float_decimals": 12,
+  "content_sha256": "e0896c9e8f55ed81dd0c8db4a898f027c2f7c761f4143bf8337b71366d41fd65"
+}

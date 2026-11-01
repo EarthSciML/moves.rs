@@ -32,6 +32,9 @@
 #                         generate-corpus.sh (nonroad-fidelity/) to the
 #                         /opt/moves/MOVESTemporary/<fixture>.tsv path that is
 #                         bind-mounted back to the host scratch directory.
+#   EXECUTION_DB_NAME     The execution database's name in the MOVES config
+#                         (default `*`, per host). Set to MOVESExecution for a
+#                         run whose SQL hardcodes that name (rates-project).
 #   NONROAD_EXE           If set, bind-mounts this host path as the canonical
 #                         /opt/moves/NONROAD/NR08a/NONROAD.exe inside the
 #                         container, overriding the SIF's built-in binary.
@@ -118,11 +121,18 @@ fi
 # Custom maketodo.txt: lower-case nonroadExePath so the bundle copies
 # the shim as "nonroad.exe" and the worker can find it.
 MAKETODO_CFG="${MOVES_TEMP}/maketodo.txt"
-cat > "${MAKETODO_CFG}" <<'EOF'
+# The execution database's name. `*` (the default) makes MOVES name it per host
+# (InstanceCounter.getDB: movesexecution<instance><machine>), which every
+# snapshot in the corpus was captured with. A RunSpec that reaches SQL hardcoding
+# the name needs it literal: RatePostProcessorRatesFirst.sql's PROJECT branch
+# reads `MOVESExecution.link`, so a PROJECT-domain Rates run (rates-project)
+# fails under `*` with every rate table empty.
+EXECUTION_DB_NAME="${EXECUTION_DB_NAME:-*}"
+cat > "${MAKETODO_CFG}" <<EOF
 defaultServerName = localhost
 defaultDatabaseName = movesdb20241112
 executionServerName = localhost
-executionDatabaseName = *
+executionDatabaseName = ${EXECUTION_DB_NAME}
 outputServerName = localhost
 outputDatabaseName = MOVESOutput
 nonroadExePath = NONROAD/NR08a/nonroad.exe

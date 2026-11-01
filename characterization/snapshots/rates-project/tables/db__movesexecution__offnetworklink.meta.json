@@ -1,0 +1,37 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution__offnetworklink",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "zoneID",
+      "kind": "int64"
+    },
+    {
+      "name": "vehiclePopulation",
+      "kind": "float64"
+    },
+    {
+      "name": "startFraction",
+      "kind": "float64"
+    },
+    {
+      "name": "extendedIdleFraction",
+      "kind": "float64"
+    },
+    {
+      "name": "parkedVehicleFraction",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "sourceTypeID",
+    "zoneID"
+  ],
+  "row_count": 1,
+  "float_decimals": 12,
+  "content_sha256": "324f3c2be8e4963e7580eb706719af0c21746b49b8343c1ce3a0c6b43b107bb0"
+}

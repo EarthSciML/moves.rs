@@ -77,14 +77,12 @@ declare -a SKIP_BY_DEFAULT=(
     # rates-minimal: rates-mode (MESOSCALE_LOOKUP) requires county-scale CDB
     # input setup, same as scale-rates. Rust port tests planning only.
     "rates-minimal"
-    # rates-project: PROJECT domain at Rates scale. MOVES fails it here, and not
-    # for want of input: RatePostProcessorRatesFirst.sql's PROJECT branch
-    # hardcodes `MOVESExecution.link`, while this capture's
-    # `executionDatabaseName = *` gives the execution database a per-host name
-    # (movesexecution<host>), so the post-processor stops with "Table
-    # 'movesexecution.link' doesn't exist" and every rate table is left empty.
-    # It is routed to the project database below so it can be captured once
-    # that is resolved.
+    # rates-project: PROJECT domain at Rates scale. RatePostProcessorRatesFirst.sql's
+    # PROJECT branch hardcodes `MOVESExecution.link`, and under the corpus'
+    # per-host `executionDatabaseName = *` MOVES stops there with every rate
+    # table empty -- so the driver loop below captures it with the execution
+    # database named MOVESExecution, and its tables are `db__movesexecution__*`.
+    # Skipped by default, as scale-project is, for the project-database seed.
     "rates-project"
     # error-*: deliberately invalid RunSpecs that are expected to fail parsing.
     # They are tested by the Rust regression suite's error_fixtures_return_expected_errors
@@ -265,6 +263,13 @@ for xml in "${FIXTURES[@]}"; do
         [ -n "${WORKDIR_ROOT}" ] && ARGS+=( --workdir "${WORKDIR_ROOT}/${name}" )
         [ -n "${OUTPUT_ROOT}" ] && ARGS+=( --output-dir "${OUTPUT_ROOT}/${name}" )
     fi
+
+    # The execution database's name (apptainer/run-moves.sh): `*`, per host,
+    # for every fixture but the one whose SQL hardcodes `MOVESExecution`.
+    case "${name}" in
+        rates-project) export EXECUTION_DB_NAME=MOVESExecution ;;
+        *)             export EXECUTION_DB_NAME='*' ;;
+    esac
 
     if "${RUNNER}" "${ARGS[@]}"; then
         SUCCEEDED=$((SUCCEEDED + 1))

@@ -1,0 +1,53 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution__starts",
+  "schema": [
+    {
+      "name": "hourDayID",
+      "kind": "int64"
+    },
+    {
+      "name": "monthID",
+      "kind": "int64"
+    },
+    {
+      "name": "yearID",
+      "kind": "int64"
+    },
+    {
+      "name": "ageID",
+      "kind": "int64"
+    },
+    {
+      "name": "zoneID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "starts",
+      "kind": "float64"
+    },
+    {
+      "name": "StartsCV",
+      "kind": "float64"
+    },
+    {
+      "name": "isUserInput",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "hourDayID",
+    "monthID",
+    "yearID",
+    "ageID",
+    "zoneID",
+    "sourceTypeID"
+  ],
+  "row_count": 41,
+  "float_decimals": 12,
+  "content_sha256": "0fc6606f848eec508db6b43994776a64c2734793b88bf8a0ec3c4ecf01117241"
+}

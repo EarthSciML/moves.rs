@@ -1,0 +1,26 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution__tempdriveschedulesecondlinkcount",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "linkID",
+      "kind": "int64"
+    },
+    {
+      "name": "opModeID",
+      "kind": "int64"
+    },
+    {
+      "name": "secondCount",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [],
+  "row_count": 20,
+  "float_decimals": 12,
+  "content_sha256": "dd68e5d6fc3acee1f2f2d59a5adc8faad67bf99b5ecc55a011820c9116cf3a25"
+}

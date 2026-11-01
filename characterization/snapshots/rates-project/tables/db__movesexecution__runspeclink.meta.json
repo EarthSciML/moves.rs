@@ -1,0 +1,16 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution__runspeclink",
+  "schema": [
+    {
+      "name": "linkID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "linkID"
+  ],
+  "row_count": 1,
+  "float_decimals": 12,
+  "content_sha256": "8e18536e057118c2cd6041ed43694e4b88aff1fe986d0446b7e10babe512c769"
+}
