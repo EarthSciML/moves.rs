@@ -1,0 +1,11 @@
+{
+  "provenance_version": "moves-fixture-capture/v1",
+  "fixture_name": "rates-running",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/rates-running.xml",
+  "runspec_sha256": "28fde49d2b930f93708e6b2c0cb307779f7fd967644a0896f083bddb51331e4d",
+  "snapshot_aggregate_sha256": "3b49b67f1249f290cc2bd4059cbf292a6bee4eaccb3bbcf8d9ed509a59300270",
+  "output_database": "out_rates_running",
+  "scale_input_database": null
+}

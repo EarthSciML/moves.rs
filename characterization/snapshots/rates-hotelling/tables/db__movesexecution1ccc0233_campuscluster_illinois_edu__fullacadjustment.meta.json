@@ -1,0 +1,34 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__fullacadjustment",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "opModeID",
+      "kind": "int64"
+    },
+    {
+      "name": "fullACAdjustment",
+      "kind": "float64"
+    },
+    {
+      "name": "fullACAdjustmentCV",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "sourceTypeID",
+    "polProcessID",
+    "opModeID"
+  ],
+  "row_count": 5,
+  "float_decimals": 12,
+  "content_sha256": "4fead8d32f195a2feb1f50cdc48e92ac4e78187d0e2d9130d133ff60b473b3bb"
+}

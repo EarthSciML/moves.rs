@@ -1,0 +1,68 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__operatingtemperature",
+  "schema": [
+    {
+      "name": "monthID",
+      "kind": "int64"
+    },
+    {
+      "name": "tankTemperatureGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "vehID",
+      "kind": "int64"
+    },
+    {
+      "name": "tripID",
+      "kind": "int64"
+    },
+    {
+      "name": "hourDayID",
+      "kind": "int64"
+    },
+    {
+      "name": "priorTripID",
+      "kind": "int64"
+    },
+    {
+      "name": "keyOnTime",
+      "kind": "int64"
+    },
+    {
+      "name": "keyOffTime",
+      "kind": "int64"
+    },
+    {
+      "name": "endOfHour",
+      "kind": "int64"
+    },
+    {
+      "name": "startOfTrip",
+      "kind": "int64"
+    },
+    {
+      "name": "endOfTrip",
+      "kind": "int64"
+    },
+    {
+      "name": "keyOnTemp",
+      "kind": "float64"
+    },
+    {
+      "name": "keyOffTemp",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "monthID",
+    "tankTemperatureGroupID",
+    "vehID",
+    "tripID",
+    "hourDayID"
+  ],
+  "row_count": 10370,
+  "float_decimals": 12,
+  "content_sha256": "d8950745aef4c0e1628f741f8a55b859bfd243f03cb81a34c92dede2fe214ada"
+}

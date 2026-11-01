@@ -1,0 +1,52 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__nrdioxinemissionrate",
+  "schema": [
+    {
+      "name": "pollutantID",
+      "kind": "int64"
+    },
+    {
+      "name": "processID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "engtechID",
+      "kind": "int64"
+    },
+    {
+      "name": "nrHPCategory",
+      "kind": "utf8"
+    },
+    {
+      "name": "units",
+      "kind": "utf8"
+    },
+    {
+      "name": "meanBaseRate",
+      "kind": "float64"
+    },
+    {
+      "name": "meanBaseRateCV",
+      "kind": "float64"
+    },
+    {
+      "name": "dataSourceID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "pollutantID",
+    "processID",
+    "fuelTypeID",
+    "engtechID",
+    "nrHPCategory"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "6e96dd03febc615356b467237881e6bb0536a0ec4629a49b30d08314fa853c52"
+}

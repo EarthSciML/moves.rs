@@ -77,6 +77,15 @@ declare -a SKIP_BY_DEFAULT=(
     # rates-minimal: rates-mode (MESOSCALE_LOOKUP) requires county-scale CDB
     # input setup, same as scale-rates. Rust port tests planning only.
     "rates-minimal"
+    # rates-project: PROJECT domain at Rates scale. MOVES fails it here, and not
+    # for want of input: RatePostProcessorRatesFirst.sql's PROJECT branch
+    # hardcodes `MOVESExecution.link`, while this capture's
+    # `executionDatabaseName = *` gives the execution database a per-host name
+    # (movesexecution<host>), so the post-processor stops with "Table
+    # 'movesexecution.link' doesn't exist" and every rate table is left empty.
+    # It is routed to the project database below so it can be captured once
+    # that is resolved.
+    "rates-project"
     # error-*: deliberately invalid RunSpecs that are expected to fail parsing.
     # They are tested by the Rust regression suite's error_fixtures_return_expected_errors
     # test, not by canonical-MOVES runs.
@@ -218,7 +227,7 @@ county_sql_for() {
             echo "${HERE}/county-inputs/washtenaw-county/setup-starts.sql" ;;
         scale-county)
             echo "${HERE}/county-inputs/washtenaw-county/setup-county.sql" ;;
-        scale-project)
+        scale-project|rates-project)
             echo "${HERE}/county-inputs/washtenaw-project/setup-project.sql" ;;
         *)
             echo "" ;;

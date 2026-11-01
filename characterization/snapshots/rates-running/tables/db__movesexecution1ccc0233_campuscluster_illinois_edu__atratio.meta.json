@@ -1,0 +1,50 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__atratio",
+  "schema": [
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelFormulationID",
+      "kind": "int64"
+    },
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "minModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "maxModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "ageID",
+      "kind": "int64"
+    },
+    {
+      "name": "monthGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "atRatio",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "fuelTypeID",
+    "fuelFormulationID",
+    "polProcessID",
+    "minModelYearID",
+    "maxModelYearID",
+    "ageID",
+    "monthGroupID"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "a900c38d7ec2fa5e3f4c4098f88e4f8a394a259441d9926f816385ebf549cdb6"
+}

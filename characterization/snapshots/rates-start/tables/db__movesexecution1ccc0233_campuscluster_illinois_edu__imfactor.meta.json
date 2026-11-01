@@ -1,0 +1,50 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__imfactor",
+  "schema": [
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "inspectFreq",
+      "kind": "int64"
+    },
+    {
+      "name": "testStandardsID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "IMModelYearGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "ageGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "IMFactor",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "polProcessID",
+    "inspectFreq",
+    "testStandardsID",
+    "sourceTypeID",
+    "fuelTypeID",
+    "IMModelYearGroupID",
+    "ageGroupID"
+  ],
+  "row_count": 22608,
+  "float_decimals": 12,
+  "content_sha256": "f77ff9a3098e8adeb067ca35b55e544233a7a31f32b5aaaf13786e2ddfe4eb22"
+}

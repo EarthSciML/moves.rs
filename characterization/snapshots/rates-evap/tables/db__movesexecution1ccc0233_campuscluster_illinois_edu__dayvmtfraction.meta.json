@@ -1,0 +1,35 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__dayvmtfraction",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "monthID",
+      "kind": "int64"
+    },
+    {
+      "name": "roadTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "dayID",
+      "kind": "int64"
+    },
+    {
+      "name": "dayVMTFraction",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "sourceTypeID",
+    "monthID",
+    "roadTypeID",
+    "dayID"
+  ],
+  "row_count": 4,
+  "float_decimals": 12,
+  "content_sha256": "fcc85b6dc93b7faa1fae337d3133aabab3c84e5435f9a428d8150afbded6c81c"
+}

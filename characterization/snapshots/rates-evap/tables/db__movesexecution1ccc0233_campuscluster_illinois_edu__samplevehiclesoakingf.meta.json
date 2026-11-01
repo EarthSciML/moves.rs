@@ -1,0 +1,50 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__samplevehiclesoakingf",
+  "schema": [
+    {
+      "name": "soakDayID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "dayID",
+      "kind": "int64"
+    },
+    {
+      "name": "F",
+      "kind": "float64"
+    },
+    {
+      "name": "GammaFn1",
+      "kind": "float64"
+    },
+    {
+      "name": "GammaFn",
+      "kind": "float64"
+    },
+    {
+      "name": "NextF",
+      "kind": "float64"
+    },
+    {
+      "name": "P1",
+      "kind": "float64"
+    },
+    {
+      "name": "P24",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "soakDayID",
+    "sourceTypeID",
+    "dayID"
+  ],
+  "row_count": 5,
+  "float_decimals": 12,
+  "content_sha256": "86ad04c5dc146be6e94132aba6aa13ea440a0d95c7929cec048e6f8ce446d7ea"
+}

@@ -1,0 +1,46 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__samplevehicletrip",
+  "schema": [
+    {
+      "name": "vehID",
+      "kind": "int64"
+    },
+    {
+      "name": "dayID",
+      "kind": "int64"
+    },
+    {
+      "name": "tripID",
+      "kind": "int64"
+    },
+    {
+      "name": "hourID",
+      "kind": "int64"
+    },
+    {
+      "name": "priorTripID",
+      "kind": "int64"
+    },
+    {
+      "name": "keyontime",
+      "kind": "int64"
+    },
+    {
+      "name": "keyOffTime",
+      "kind": "int64"
+    },
+    {
+      "name": "tripType",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "vehID",
+    "dayID",
+    "tripID"
+  ],
+  "row_count": 26958,
+  "float_decimals": 12,
+  "content_sha256": "0f507a38e176fa6ee8ada382ea49979ee8d107625674725a2141234222f6ab94"
+}

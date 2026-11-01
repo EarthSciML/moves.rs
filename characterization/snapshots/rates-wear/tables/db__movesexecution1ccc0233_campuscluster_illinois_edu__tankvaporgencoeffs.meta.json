@@ -1,0 +1,33 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__tankvaporgencoeffs",
+  "schema": [
+    {
+      "name": "ethanolLevelID",
+      "kind": "int64"
+    },
+    {
+      "name": "altitude",
+      "kind": "utf8"
+    },
+    {
+      "name": "tvgTermA",
+      "kind": "float64"
+    },
+    {
+      "name": "tvgTermB",
+      "kind": "float64"
+    },
+    {
+      "name": "tvgTermC",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "ethanolLevelID",
+    "altitude"
+  ],
+  "row_count": 4,
+  "float_decimals": 12,
+  "content_sha256": "a1365295431d2595886c401e14e4356b610cc1f21b15418c00b53641e90d2f95"
+}

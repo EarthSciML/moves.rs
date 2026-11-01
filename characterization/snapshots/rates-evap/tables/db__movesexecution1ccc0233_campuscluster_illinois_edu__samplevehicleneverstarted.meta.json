@@ -1,0 +1,29 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__samplevehicleneverstarted",
+  "schema": [
+    {
+      "name": "dayID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "vehiclesNeverStarted",
+      "kind": "int64"
+    },
+    {
+      "name": "fractionNeverStarted",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "dayID",
+    "sourceTypeID"
+  ],
+  "row_count": 1,
+  "float_decimals": 12,
+  "content_sha256": "f901fce07c35230d8a86c275cdcf793604387fd529b0c3cf8e8585dc15a20d30"
+}

@@ -1,0 +1,46 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__emissionrate",
+  "schema": [
+    {
+      "name": "sourceBinID",
+      "kind": "int64"
+    },
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "opModeID",
+      "kind": "int64"
+    },
+    {
+      "name": "meanBaseRate",
+      "kind": "float64"
+    },
+    {
+      "name": "meanBaseRateCV",
+      "kind": "float64"
+    },
+    {
+      "name": "meanBaseRateIM",
+      "kind": "float64"
+    },
+    {
+      "name": "meanBaseRateIMCV",
+      "kind": "float64"
+    },
+    {
+      "name": "dataSourceId",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "sourceBinID",
+    "polProcessID",
+    "opModeID"
+  ],
+  "row_count": 1945,
+  "float_decimals": 12,
+  "content_sha256": "06494c561b3d0ce238f315d4cd272825dc35b4036a6b89b190fc3a8b72924a08"
+}

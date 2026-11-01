@@ -1,0 +1,44 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__shobyageday",
+  "schema": [
+    {
+      "name": "yearID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "ageID",
+      "kind": "int64"
+    },
+    {
+      "name": "monthID",
+      "kind": "int64"
+    },
+    {
+      "name": "dayID",
+      "kind": "int64"
+    },
+    {
+      "name": "SHO",
+      "kind": "float64"
+    },
+    {
+      "name": "VMT",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "yearID",
+    "sourceTypeID",
+    "ageID",
+    "monthID",
+    "dayID"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "ffaa450f3511ff1ca0989ae1b31343dca941a0b0163512d753eaab57febedac8"
+}
