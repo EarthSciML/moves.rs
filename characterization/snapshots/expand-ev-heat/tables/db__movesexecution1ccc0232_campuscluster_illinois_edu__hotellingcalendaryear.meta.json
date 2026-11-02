@@ -1,0 +1,23 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__hotellingcalendaryear",
+  "schema": [
+    {
+      "name": "yearID",
+      "kind": "int64"
+    },
+    {
+      "name": "hotellingRate",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "yearID"
+  ],
+  "row_count": 1,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "31fcb76ec4a6013374ca15962abe3874c65e5eff3c6c67c0da3c106a67d5dd19"
+}

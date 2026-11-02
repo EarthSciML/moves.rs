@@ -1,0 +1,25 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__evsalesfraction",
+  "schema": [
+    {
+      "name": "modelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "fleetAvgGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "evFraction",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [],
+  "row_count": 115,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "c8fbb3ab89d50acde919ea5b10a55402e238b681032d06ac5c3d4e90252550b7"
+}

@@ -1,0 +1,33 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__nrusmonthallocation",
+  "schema": [
+    {
+      "name": "SCC",
+      "kind": "utf8"
+    },
+    {
+      "name": "stateID",
+      "kind": "int64"
+    },
+    {
+      "name": "monthID",
+      "kind": "int64"
+    },
+    {
+      "name": "monthFraction",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "SCC",
+    "stateID",
+    "monthID"
+  ],
+  "row_count": 840,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "2937d9480123fa56959b8df763d5a65eb1a579f5bbc10e11ee631eb620e89e90"
+}

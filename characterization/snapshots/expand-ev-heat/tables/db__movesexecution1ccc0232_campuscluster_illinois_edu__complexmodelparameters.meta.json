@@ -1,0 +1,45 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__complexmodelparameters",
+  "schema": [
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelModelID",
+      "kind": "int64"
+    },
+    {
+      "name": "cmpID",
+      "kind": "int64"
+    },
+    {
+      "name": "coeff1",
+      "kind": "float64"
+    },
+    {
+      "name": "coeff2",
+      "kind": "float64"
+    },
+    {
+      "name": "coeff3",
+      "kind": "float64"
+    },
+    {
+      "name": "dataSourceID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "polProcessID",
+    "fuelModelID",
+    "cmpID"
+  ],
+  "row_count": 1090,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "350a4657782348c3daee5b9f960af6f6737097e9c60e7be9c0ec93831a3a953f"
+}

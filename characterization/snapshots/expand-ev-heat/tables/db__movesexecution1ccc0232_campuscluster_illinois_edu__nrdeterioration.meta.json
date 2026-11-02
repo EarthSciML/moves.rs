@@ -1,0 +1,36 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__nrdeterioration",
+  "schema": [
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "engTechID",
+      "kind": "int64"
+    },
+    {
+      "name": "DFCoefficient",
+      "kind": "float64"
+    },
+    {
+      "name": "DFAgeExponent",
+      "kind": "float64"
+    },
+    {
+      "name": "emissionCap",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "polProcessID",
+    "engTechID"
+  ],
+  "row_count": 424,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "2ed4cbe9bf74de9b4fa12278907734a95bb1767ed7bd5c2c4583dd3718bca966"
+}

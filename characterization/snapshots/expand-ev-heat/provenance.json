@@ -1,0 +1,11 @@
+{
+  "provenance_version": "moves-fixture-capture/v1",
+  "fixture_name": "expand-ev-heat",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/expand-ev-heat.xml",
+  "runspec_sha256": "b43146932cf06041602694dee0cc8fdcb68bd08aa448496d2e177d9e4c4634e9",
+  "snapshot_aggregate_sha256": "f662d30ccaaff0e44f0159964bd0ce52ce39152880bbb0fe1a65e590dbb264d5",
+  "output_database": "out_expand_ev_heat",
+  "scale_input_database": null
+}

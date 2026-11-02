@@ -1,0 +1,37 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__fuelmodelwtfactor",
+  "schema": [
+    {
+      "name": "fuelModelID",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "ageID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelModelWtFactor",
+      "kind": "float64"
+    },
+    {
+      "name": "dataSourceID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "fuelModelID",
+    "modelYearGroupID",
+    "ageID"
+  ],
+  "row_count": 1804,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "06cac4740ec0c902fb2fa7ead065be3fb956976089b4ebaece4b34505999cc2d"
+}
