@@ -1,0 +1,11 @@
+{
+  "provenance_version": "moves-fixture-capture/v1",
+  "fixture_name": "rates-nonhaptog",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/rates-nonhaptog.xml",
+  "runspec_sha256": "e91509d3224177e41e972a2a63c696d34e410e448198348c263f2d8a72b86a79",
+  "snapshot_aggregate_sha256": "74c10857ad0b58adacc238a64d16871f084c1cd7ff1be6c03bc207a105d500d4",
+  "output_database": "out_rates_nonhaptog",
+  "scale_input_database": null
+}

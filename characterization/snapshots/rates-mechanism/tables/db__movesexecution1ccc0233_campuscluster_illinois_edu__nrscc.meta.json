@@ -1,0 +1,28 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__nrscc",
+  "schema": [
+    {
+      "name": "SCC",
+      "kind": "utf8"
+    },
+    {
+      "name": "NREquipTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "description",
+      "kind": "utf8"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "SCC"
+  ],
+  "row_count": 214,
+  "float_decimals": 12,
+  "content_sha256": "018689834aedf40826c7f28c7396e397d04c2de69fd544cabb71c90c3a9fb5bd"
+}

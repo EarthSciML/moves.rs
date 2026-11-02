@@ -1,0 +1,11 @@
+{
+  "provenance_version": "moves-fixture-capture/v1",
+  "fixture_name": "rates-pm",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/rates-pm.xml",
+  "runspec_sha256": "190f75efc84fdc2631c4cfa3120d0bf94f5d90254bdd865a7f3590d6dd226ec2",
+  "snapshot_aggregate_sha256": "36abe38c2610b47c6773481592bf9a627f38117a46be14f99fb35772aedd05dd",
+  "output_database": "out_rates_pm",
+  "scale_input_database": null
+}

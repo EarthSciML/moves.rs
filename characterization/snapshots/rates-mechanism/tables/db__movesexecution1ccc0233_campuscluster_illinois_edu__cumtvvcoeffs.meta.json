@@ -1,0 +1,111 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__cumtvvcoeffs",
+  "schema": [
+    {
+      "name": "regClassID",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "ageGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "tvvTermA",
+      "kind": "float64"
+    },
+    {
+      "name": "tvvTermB",
+      "kind": "float64"
+    },
+    {
+      "name": "tvvTermC",
+      "kind": "float64"
+    },
+    {
+      "name": "tvvTermACV",
+      "kind": "float64"
+    },
+    {
+      "name": "tvvTermBCV",
+      "kind": "float64"
+    },
+    {
+      "name": "tvvTermCCV",
+      "kind": "float64"
+    },
+    {
+      "name": "tvvTermAIM",
+      "kind": "float64"
+    },
+    {
+      "name": "tvvTermBIM",
+      "kind": "float64"
+    },
+    {
+      "name": "tvvTermCIM",
+      "kind": "float64"
+    },
+    {
+      "name": "tvvTermAIMCV",
+      "kind": "float64"
+    },
+    {
+      "name": "tvvTermBIMCV",
+      "kind": "float64"
+    },
+    {
+      "name": "tvvTermCIMCV",
+      "kind": "float64"
+    },
+    {
+      "name": "backPurgeFactor",
+      "kind": "float64"
+    },
+    {
+      "name": "averageCanisterCapacity",
+      "kind": "float64"
+    },
+    {
+      "name": "tvvEquation",
+      "kind": "utf8"
+    },
+    {
+      "name": "leakEquation",
+      "kind": "utf8"
+    },
+    {
+      "name": "leakFraction",
+      "kind": "float64"
+    },
+    {
+      "name": "tankSize",
+      "kind": "float64"
+    },
+    {
+      "name": "tankFillFraction",
+      "kind": "float64"
+    },
+    {
+      "name": "leakFractionIM",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "regClassID",
+    "modelYearGroupID",
+    "ageGroupID",
+    "polProcessID"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "5cb2571cabceb857179865525a9eef85f866566af7264d9d04268ce8c9a30295"
+}
