@@ -1,0 +1,48 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__soakactivityfraction",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "zoneID",
+      "kind": "int64"
+    },
+    {
+      "name": "monthID",
+      "kind": "int64"
+    },
+    {
+      "name": "hourDayID",
+      "kind": "int64"
+    },
+    {
+      "name": "opModeID",
+      "kind": "int64"
+    },
+    {
+      "name": "soakActivityFraction",
+      "kind": "float64"
+    },
+    {
+      "name": "soakActivityFractionCV",
+      "kind": "float64"
+    },
+    {
+      "name": "isUserInput",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "sourceTypeID",
+    "zoneID",
+    "monthID",
+    "hourDayID",
+    "opModeID"
+  ],
+  "row_count": 96,
+  "float_decimals": 12,
+  "content_sha256": "2d65759fb5871ce38b0f1456aac6c61555c15875f9f63ddbb2e6503c3c66d141"
+}

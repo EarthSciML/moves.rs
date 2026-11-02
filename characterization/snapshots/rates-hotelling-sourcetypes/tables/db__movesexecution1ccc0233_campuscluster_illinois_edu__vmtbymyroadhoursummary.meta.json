@@ -1,0 +1,49 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__vmtbymyroadhoursummary",
+  "schema": [
+    {
+      "name": "yearID",
+      "kind": "int64"
+    },
+    {
+      "name": "roadTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "monthID",
+      "kind": "int64"
+    },
+    {
+      "name": "dayID",
+      "kind": "int64"
+    },
+    {
+      "name": "hourID",
+      "kind": "int64"
+    },
+    {
+      "name": "hourDayID",
+      "kind": "int64"
+    },
+    {
+      "name": "totalVMT",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "yearID",
+    "roadTypeID",
+    "sourceTypeID",
+    "monthID",
+    "dayID",
+    "hourID"
+  ],
+  "row_count": 288,
+  "float_decimals": 12,
+  "content_sha256": "ceaba83663af9b2fc9faaa20039c4c5e0dbb23213f8ebe4105b1b4244eb1e769"
+}

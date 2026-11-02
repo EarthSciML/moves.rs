@@ -1,0 +1,11 @@
+{
+  "provenance_version": "moves-fixture-capture/v1",
+  "fixture_name": "process-evap-fvv-day",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/process-evap-fvv-day.xml",
+  "runspec_sha256": "09eb773b34f550681765df2f4017982e765fae60c8f2688e030912330b85f705",
+  "snapshot_aggregate_sha256": "690fbb9f52f552b4816ff9f91d160db7291a0a21da284f1f19c8df6a99741ab7",
+  "output_database": "out_process_evap_fvv_day",
+  "scale_input_database": null
+}

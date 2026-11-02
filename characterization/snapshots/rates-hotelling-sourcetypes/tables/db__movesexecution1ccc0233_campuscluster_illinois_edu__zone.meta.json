@@ -1,0 +1,32 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__zone",
+  "schema": [
+    {
+      "name": "zoneID",
+      "kind": "int64"
+    },
+    {
+      "name": "countyID",
+      "kind": "int64"
+    },
+    {
+      "name": "startAllocFactor",
+      "kind": "float64"
+    },
+    {
+      "name": "idleAllocFactor",
+      "kind": "float64"
+    },
+    {
+      "name": "SHPAllocFactor",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "zoneID"
+  ],
+  "row_count": 1,
+  "float_decimals": 12,
+  "content_sha256": "d298d96abcfe4e390480ba595a5db90d467d86d9d9c15c8f5690692e2cdebd83"
+}

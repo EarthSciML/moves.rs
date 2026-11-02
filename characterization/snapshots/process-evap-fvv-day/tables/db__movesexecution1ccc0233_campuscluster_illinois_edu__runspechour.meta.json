@@ -1,0 +1,16 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__runspechour",
+  "schema": [
+    {
+      "name": "hourID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "hourID"
+  ],
+  "row_count": 24,
+  "float_decimals": 12,
+  "content_sha256": "538c3b2509410f59438bb7ca00a682733615ea2a5f3e6da60da205cf8d00cd77"
+}

@@ -1,0 +1,70 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__sbweightedemissionratebyage",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "opModeID",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "ageGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "regClassID",
+      "kind": "int64"
+    },
+    {
+      "name": "meanBaseRate",
+      "kind": "float64"
+    },
+    {
+      "name": "meanBaseRateIM",
+      "kind": "float64"
+    },
+    {
+      "name": "meanBaseRateACAdj",
+      "kind": "float64"
+    },
+    {
+      "name": "meanBaseRateIMACAdj",
+      "kind": "float64"
+    },
+    {
+      "name": "sumSBD",
+      "kind": "float64"
+    },
+    {
+      "name": "sumSBDRaw",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "sourceTypeID",
+    "polProcessID",
+    "opModeID",
+    "modelYearID",
+    "fuelTypeID",
+    "ageGroupID",
+    "regClassID"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "b2f54fa310769349fb974d6fd37ae485d201d29c9dafdaa41830ab3619757066"
+}

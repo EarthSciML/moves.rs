@@ -1,0 +1,25 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__monthvmtfraction",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "monthID",
+      "kind": "int64"
+    },
+    {
+      "name": "monthVMTFraction",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "sourceTypeID",
+    "monthID"
+  ],
+  "row_count": 3,
+  "float_decimals": 12,
+  "content_sha256": "43ff2689cf46d4401897229660cccff1f062694426b837b2df4d40efa78fd970"
+}

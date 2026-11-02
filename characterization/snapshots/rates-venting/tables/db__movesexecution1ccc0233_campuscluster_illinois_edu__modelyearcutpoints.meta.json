@@ -1,0 +1,20 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__modelyearcutpoints",
+  "schema": [
+    {
+      "name": "cutPointName",
+      "kind": "utf8"
+    },
+    {
+      "name": "modelYearID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "cutPointName"
+  ],
+  "row_count": 7,
+  "float_decimals": 12,
+  "content_sha256": "825383e790438fa21986183d8ec9ad40d77ed00cf9e1cda2f19aeace29c73999"
+}

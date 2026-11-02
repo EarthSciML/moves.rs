@@ -1,0 +1,30 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__startsbyagehour",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "yearID",
+      "kind": "int64"
+    },
+    {
+      "name": "hourDayID",
+      "kind": "int64"
+    },
+    {
+      "name": "ageID",
+      "kind": "int64"
+    },
+    {
+      "name": "starts",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [],
+  "row_count": 2952,
+  "float_decimals": 12,
+  "content_sha256": "7ec8ea848322b215e2d964fb9d4cd22572677502fe8335f4df6075546c5bb21d"
+}

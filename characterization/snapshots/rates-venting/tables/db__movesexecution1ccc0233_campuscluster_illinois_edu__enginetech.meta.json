@@ -1,0 +1,32 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__enginetech",
+  "schema": [
+    {
+      "name": "engTechID",
+      "kind": "int64"
+    },
+    {
+      "name": "tierID",
+      "kind": "int64"
+    },
+    {
+      "name": "strokes",
+      "kind": "int64"
+    },
+    {
+      "name": "engTechName",
+      "kind": "utf8"
+    },
+    {
+      "name": "engTechDesc",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "engTechID"
+  ],
+  "row_count": 130,
+  "float_decimals": 12,
+  "content_sha256": "eae12eacb41b90a2c01bd38079f9d1655e97ebcd42a34f25067210777c9ca47a"
+}

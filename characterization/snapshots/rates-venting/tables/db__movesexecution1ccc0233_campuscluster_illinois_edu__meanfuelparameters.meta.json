@@ -1,0 +1,47 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__meanfuelparameters",
+  "schema": [
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelParameterID",
+      "kind": "int64"
+    },
+    {
+      "name": "baseValue",
+      "kind": "float64"
+    },
+    {
+      "name": "centeringValue",
+      "kind": "float64"
+    },
+    {
+      "name": "stdDevValue",
+      "kind": "float64"
+    },
+    {
+      "name": "dataSourceID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "polProcessID",
+    "fuelTypeID",
+    "modelYearGroupID",
+    "fuelParameterID"
+  ],
+  "row_count": 30,
+  "float_decimals": 12,
+  "content_sha256": "11eff12d61d75994dbc9db26bfd8e7321ed5b2ad3db0ca22b648ae8e39b167f7"
+}

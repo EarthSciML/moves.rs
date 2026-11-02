@@ -1,0 +1,11 @@
+{
+  "provenance_version": "moves-fixture-capture/v1",
+  "fixture_name": "rates-venting",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/rates-venting.xml",
+  "runspec_sha256": "054333258d8fe2f4d85fa5d2668b7a39e7c8eb461846fb2e4c6c7a59376bc475",
+  "snapshot_aggregate_sha256": "1268f4054497bc54bf34132e0dc3d16662fb889a0462edba99b5fc11cadad97d",
+  "output_database": "out_rates_venting",
+  "scale_input_database": null
+}

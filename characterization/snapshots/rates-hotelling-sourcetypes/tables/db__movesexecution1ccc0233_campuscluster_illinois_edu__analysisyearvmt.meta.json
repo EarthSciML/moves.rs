@@ -1,0 +1,25 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__analysisyearvmt",
+  "schema": [
+    {
+      "name": "yearID",
+      "kind": "int64"
+    },
+    {
+      "name": "HPMSVTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "VMT",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "yearID",
+    "HPMSVTypeID"
+  ],
+  "row_count": 2,
+  "float_decimals": 12,
+  "content_sha256": "95ddf9880265c879480298c2fa33959cb8e026ec09eb489f1a7e2c6c085c0a60"
+}
