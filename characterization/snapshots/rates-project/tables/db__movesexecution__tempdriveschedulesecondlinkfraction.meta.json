@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution__tempdriveschedulesecondlinkfraction",
   "schema": [
     {
@@ -21,6 +21,9 @@
   ],
   "natural_key": [],
   "row_count": 20,
-  "float_decimals": 12,
-  "content_sha256": "bac6d475ae2b7f8beb814a147e7bc0f80c408562df9bbe4db39090f71ba11a1f"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "9c4213a21a8b49abe4aa21157e1afdc2c896e3324b81336fdceef023ee64f3ab"
 }

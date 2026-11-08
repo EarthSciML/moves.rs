@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "moves_temporary__manyworkers__workerfolder__workertemp9__baserateoutput_tbl",
   "schema": [
     {
@@ -77,6 +77,9 @@
   ],
   "natural_key": [],
   "row_count": 540,
-  "float_decimals": 12,
-  "content_sha256": "b2a2a13ae2c270f52d5f4b665d843309cbea7195967733780db1433f3b32b629"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "93bfe3e4b2753a8ad8ea08893bbd1a8a8b42460c88132c2ec7fc61bb314ac09a"
 }

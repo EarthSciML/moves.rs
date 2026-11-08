@@ -5,7 +5,7 @@
   "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
   "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/expand-multifuel.xml",
   "runspec_sha256": "6e74482c195218b0a0f26ba8615d417fb0da1254df60bee84798568efed382b3",
-  "snapshot_aggregate_sha256": "73715e16aac3d475754eedaef51337bead47392f0a72a588788b2c551e2a1d09",
+  "snapshot_aggregate_sha256": "224f9928b87f654dd3e451b073af3fa3370080ed982b86add532d7943e4ab11b",
   "output_database": "out_expand_multifuel",
   "scale_input_database": null
 }

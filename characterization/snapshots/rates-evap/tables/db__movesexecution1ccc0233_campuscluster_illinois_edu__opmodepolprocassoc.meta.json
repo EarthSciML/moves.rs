@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__opmodepolprocassoc",
   "schema": [
     {
@@ -16,6 +16,9 @@
     "opModeID"
   ],
   "row_count": 67,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "44cbceaeb023f5b183ff3858c09a2561c37dcf8d1ab577ca6b3b55d5bc45f69a"
 }

@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__emissionratebyage",
   "schema": [
     {
@@ -46,6 +46,9 @@
     "ageGroupID"
   ],
   "row_count": 205464,
-  "float_decimals": 12,
-  "content_sha256": "21ccc3c87bd01225f300f976a4f5ccbd675a62cd7664c9dd3839a530d6d2f5b1"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "4f2ea8768cb959124b06af6a36d7bf35a9c532fa5df485eb9350088b15679fcf"
 }

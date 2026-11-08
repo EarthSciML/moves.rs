@@ -5,7 +5,7 @@
   "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
   "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/scale-rates.xml",
   "runspec_sha256": "e74cd643d37fc0c4549e1af320c75f5c6bf03e226eeec5af2956fc62673322ea",
-  "snapshot_aggregate_sha256": "7780086d973cd9f4323cd3ae172b05cb26c32565c9633957da83ceb191e39d39",
+  "snapshot_aggregate_sha256": "dcfa7aba360c62639bfe0653f5e7c4c442c338a32c07668496fcf469822974e5",
   "output_database": "out_scale_rates",
   "scale_input_database": null
 }

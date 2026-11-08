@@ -5,7 +5,7 @@
   "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
   "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/rates-venting.xml",
   "runspec_sha256": "054333258d8fe2f4d85fa5d2668b7a39e7c8eb461846fb2e4c6c7a59376bc475",
-  "snapshot_aggregate_sha256": "1268f4054497bc54bf34132e0dc3d16662fb889a0462edba99b5fc11cadad97d",
+  "snapshot_aggregate_sha256": "8c341573f0e68c23a8a64b285ac6ad12f9f0f2ca6ea0c0ab03881b6aa4c23220",
   "output_database": "out_rates_venting",
   "scale_input_database": null
 }

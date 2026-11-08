@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__samplevehicletripbyhour",
   "schema": [
     {
@@ -49,6 +49,9 @@
   ],
   "natural_key": [],
   "row_count": 7329,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "cd0e999d1e200c0be504b5e0585f01bf2a515f9ad60dc4519122c93e9c958338"
 }

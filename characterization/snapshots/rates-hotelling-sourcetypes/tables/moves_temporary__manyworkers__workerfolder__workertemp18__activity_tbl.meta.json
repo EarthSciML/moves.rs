@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "moves_temporary__manyworkers__workerfolder__workertemp18__activity_tbl",
   "schema": [
     {
@@ -89,6 +89,9 @@
   ],
   "natural_key": [],
   "row_count": 150,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "640bb5435b51bfea75ea6e2c40846639a971f70d9691060738cfa0b003ed28ed"
 }

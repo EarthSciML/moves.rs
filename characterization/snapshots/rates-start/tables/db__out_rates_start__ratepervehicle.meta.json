@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_rates_start__ratepervehicle",
   "schema": [
     {
@@ -73,6 +73,9 @@
   ],
   "natural_key": [],
   "row_count": 684,
-  "float_decimals": 12,
-  "content_sha256": "a922bb60b83b9b7b4f63bd66f46254bb51fdebb0c957b2d613c0edd34e9ffbb7"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "825ecc825301ac252028187cc3e1220732e49ad53082fcfb10bef51302d59764"
 }

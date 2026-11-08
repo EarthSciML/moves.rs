@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution__pollutantprocessassoc",
   "schema": [
     {
@@ -51,6 +51,9 @@
     "polProcessID"
   ],
   "row_count": 2,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "10e34297cb3bffce208f9b45cffa7afa27425361e0e7f765a1356a58c0112751"
 }

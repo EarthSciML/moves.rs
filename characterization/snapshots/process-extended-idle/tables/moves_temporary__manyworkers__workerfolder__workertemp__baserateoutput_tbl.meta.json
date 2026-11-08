@@ -1,14 +1,85 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "moves_temporary__manyworkers__workerfolder__workertemp__baserateoutput_tbl",
   "schema": [
     {
       "name": "col_0",
       "kind": "utf8"
+    },
+    {
+      "name": "col_1",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_2",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_3",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_4",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_5",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_6",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_7",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_8",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_9",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_10",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_11",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_12",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_13",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_14",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_15",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_16",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_17",
+      "kind": "utf8"
     }
   ],
   "natural_key": [],
-  "row_count": 0,
-  "float_decimals": 12,
-  "content_sha256": "9db4b506d041e133f04bcca42b7f8d3d4448d692b393eaa63cadfde73abda0d4"
+  "row_count": 100,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "b7acbf05f0d7670906c52a20e7d8083232a71eca65504b9d1ee02c1a98cb0565"
 }

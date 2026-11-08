@@ -5,7 +5,7 @@
   "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
   "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/process-crankcase-extidle.xml",
   "runspec_sha256": "3eb4c0279398f6ae7e1eabcdd578867fc5e93e5326f3a67eaab5fd4fca0d74a4",
-  "snapshot_aggregate_sha256": "772960629e5d3584e392fca7ddbae909d3d123c26e4bdf06f435e7efe477d77c",
+  "snapshot_aggregate_sha256": "5d53b1a1e45929fd6f92f62f62c8d3207bfebb810f04ed05299d749e073a016f",
   "output_database": "out_process_crankcase_extidle",
   "scale_input_database": null
 }

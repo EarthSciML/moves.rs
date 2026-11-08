@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesworker1ccc0233_campuscluster_illinois_edu__ethanolweightedtvgtemp",
   "schema": [
     {
@@ -69,6 +69,9 @@
     "polProcessID"
   ],
   "row_count": 17024,
-  "float_decimals": 12,
-  "content_sha256": "dcd53c0a405e0767d4c431ba40ebabbe80119645b97e3cf840468952a2483ff7"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "99ebe5d0f00445ca74a2169dc3e6db95ea39d1b44f35553f0ff50d50597d5b16"
 }

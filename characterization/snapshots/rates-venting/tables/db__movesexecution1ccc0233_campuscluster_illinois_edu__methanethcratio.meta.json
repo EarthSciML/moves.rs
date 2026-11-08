@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__methanethcratio",
   "schema": [
     {
@@ -39,6 +39,9 @@
     "endModelYearID"
   ],
   "row_count": 221,
-  "float_decimals": 12,
-  "content_sha256": "73501354d2e729661117dd19d3a720bddf8ccb19023eb9bbd0cd01d6301406e0"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "4a43d00d80bc3af0937c54112d8b813ce51212c43b6b68fd53b26fc4688c1a8a"
 }

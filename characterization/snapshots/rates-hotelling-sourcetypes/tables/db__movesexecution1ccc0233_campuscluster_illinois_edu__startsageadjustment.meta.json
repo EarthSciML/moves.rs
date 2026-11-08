@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__startsageadjustment",
   "schema": [
     {
@@ -20,6 +20,9 @@
     "ageID"
   ],
   "row_count": 123,
-  "float_decimals": 12,
-  "content_sha256": "86106c7135f726a23e79abb2550339872f7dc7c78a94f1aceac9ef90cd6cdbe1"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "dab402e4a936a7c6109d8dc3e5b3db32eb39cc17bd679dd156723d8f52d2aebe"
 }

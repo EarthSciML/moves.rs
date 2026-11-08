@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_rates_project__movestablesused",
   "schema": [
     {
@@ -33,6 +33,9 @@
   ],
   "natural_key": [],
   "row_count": 150,
-  "float_decimals": 12,
-  "content_sha256": "a5f404d28bf82e7398a3e631ae2a33a516552cc88383593c3391d52ff5bdb55b"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "3de97c6cee00b160981dd1fa4fd67e0cb089c9b1e41b72da3efddbc27ebab0a3"
 }

@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution__tempopmodedistribution2",
   "schema": [
     {
@@ -43,6 +43,9 @@
     "opModeID"
   ],
   "row_count": 100,
-  "float_decimals": 12,
-  "content_sha256": "cd440d0a6dc1c4c8b23159f91425accc8559e15cb03a13152daf9e2656e11737"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "cca78afff96bee6d7e13a07e0cd2395094d8b6db4444fdee4db619a01a98a7d3"
 }

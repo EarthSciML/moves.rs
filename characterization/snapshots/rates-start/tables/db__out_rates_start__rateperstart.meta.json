@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_rates_start__rateperstart",
   "schema": [
     {
@@ -73,6 +73,9 @@
   ],
   "natural_key": [],
   "row_count": 684,
-  "float_decimals": 12,
-  "content_sha256": "0c84ae988ccf6f06834d526e745c6301b91ad67305a72876105a8ef2dda44271"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "09332aa2f574d204a5d52bc761c1df661c8eff657dfa2b9ce5cf9c5d961a4a5f"
 }

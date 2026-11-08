@@ -5,7 +5,7 @@
   "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
   "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/process-apu.xml",
   "runspec_sha256": "951b99505d8d5675a43c210f5c6483c98a2b3ea1ee7bced40b6eff0270e970b4",
-  "snapshot_aggregate_sha256": "106e2bcac051d19df6b6e20da94e826cd618e54e1bacf02241adc88b18f58f11",
+  "snapshot_aggregate_sha256": "de0753850bde4c023a6cd8ca75cdcab88240eace55b71155e4297ee3c4e69388",
   "output_database": "out_process_apu",
   "scale_input_database": null
 }

@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_process_evap_fvv_day__movesoutput",
   "schema": [
     {
@@ -105,6 +105,9 @@
   ],
   "natural_key": [],
   "row_count": 6144,
-  "float_decimals": 12,
-  "content_sha256": "6baec4ebb43c20e298e2e259d121c3b016b5753ad51b65eb6a799b8eb68cd263"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "06521537ded0249a16acb959541e8c12e8925969152325c6fd27c45166bc5bac"
 }

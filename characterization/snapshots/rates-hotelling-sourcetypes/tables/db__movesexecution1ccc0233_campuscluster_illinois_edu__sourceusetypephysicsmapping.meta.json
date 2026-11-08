@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__sourceusetypephysicsmapping",
   "schema": [
     {
@@ -54,6 +54,9 @@
     "endModelYearID"
   ],
   "row_count": 31,
-  "float_decimals": 12,
-  "content_sha256": "bcc00f093278f35c8e4d808c3deb50b311c57e959841b469d7e9990c4a14fc3b"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "6eb7782de455797cb6481a137a111b880068e72dd7b2bab2e999ce2a7dfde0ca"
 }

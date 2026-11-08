@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__hotellingcalendaryear",
   "schema": [
     {
@@ -15,6 +15,9 @@
     "yearID"
   ],
   "row_count": 2,
-  "float_decimals": 12,
-  "content_sha256": "88dd388897d8785cd460a9110ac31c799050c605fac2a03294cbbff5c6ee52a5"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "26346cf3c30990292fba43bed347c472cf3c5a2141e4b6564e221cd48bd1fafb"
 }

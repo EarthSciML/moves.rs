@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution__sho",
   "schema": [
     {
@@ -52,6 +52,9 @@
     "sourceTypeID"
   ],
   "row_count": 41,
-  "float_decimals": 12,
-  "content_sha256": "6d96bf625692d9ed78b35f83d2c505e82546bb20f54450e825c086ab3236e8d7"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "b375c1caff1736f3127c03f3a799bbe97d3da975c39eff770b5fa13d1afb140e"
 }

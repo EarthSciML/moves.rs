@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__hotsoaktemperature",
   "schema": [
     {
@@ -60,6 +60,9 @@
     "hotSoakTime"
   ],
   "row_count": 182532,
-  "float_decimals": 12,
-  "content_sha256": "38f440ebccc73f069e66cc3c1a6013455b4f5e32cea4c9bda767e35baf5ed019"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "f24a43b2f4f1750a3f0b49961519ff8d625bfba68ff24a98465e2c68d442c1e5"
 }

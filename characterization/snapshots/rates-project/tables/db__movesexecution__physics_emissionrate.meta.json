@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution__physics_emissionrate",
   "schema": [
     {
@@ -41,6 +41,9 @@
     "opModeID"
   ],
   "row_count": 2875,
-  "float_decimals": 12,
-  "content_sha256": "21a7e4439fa37175371abccb66ee57151b1577cd8289b03c7c7ecb5fa81dceea"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "3b741ab33f5740d56ec00d88bcd84ed6b9271b797eddb278753a84c645a258ab"
 }

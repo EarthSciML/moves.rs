@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__givenfuelsupply",
   "schema": [
     {
@@ -26,6 +26,9 @@
     "fuelTypeID"
   ],
   "row_count": 28,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "4d9fe12f773914cc76e047e1634da47e76475421255970578f3a21d78276e53d"
 }

@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution__offnetworklink",
   "schema": [
     {
@@ -32,6 +32,9 @@
     "zoneID"
   ],
   "row_count": 1,
-  "float_decimals": 12,
-  "content_sha256": "324f3c2be8e4963e7580eb706719af0c21746b49b8343c1ce3a0c6b43b107bb0"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "674fa51fb41cd3e0fa8463e477176b62cf588af274bb5679990f9166a68e1792"
 }

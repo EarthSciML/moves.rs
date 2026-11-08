@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_rates_start__startspervehicle",
   "schema": [
     {
@@ -57,6 +57,9 @@
   ],
   "natural_key": [],
   "row_count": 125,
-  "float_decimals": 12,
-  "content_sha256": "56d682a2e8609cfca79cbc4c5d54f280d35d31a1ba70c617fec7dfd0d4fd8ef8"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "c7fc0659b3ed9e540241100f14340d16a2afef1b544497a462553f328d432afc"
 }

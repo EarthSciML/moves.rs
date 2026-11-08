@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution__hotellingactivitydistribution",
   "schema": [
     {
@@ -35,6 +35,9 @@
     "opModeID"
   ],
   "row_count": 0,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "e85c2d1ca850eecfe720ffac4ca780ac8bd2de7278e6c303d894eaebcf354b01"
 }

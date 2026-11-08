@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__generalfuelratio",
   "schema": [
     {
@@ -64,6 +64,9 @@
     "sourceTypeID"
   ],
   "row_count": 39,
-  "float_decimals": 12,
-  "content_sha256": "629641b8c63318f8dcaa83ebc227e573ebb780862e3416f183a1a21c47f005f2"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "271eed4988d003ad5838cc2d2acbe738a87b6a566994287ec713703af7180ada"
 }

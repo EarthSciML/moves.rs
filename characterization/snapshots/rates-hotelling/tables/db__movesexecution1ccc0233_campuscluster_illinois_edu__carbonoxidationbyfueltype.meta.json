@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__carbonoxidationbyfueltype",
   "schema": [
     {
@@ -39,6 +39,9 @@
     "fuelTypeID"
   ],
   "row_count": 3,
-  "float_decimals": 12,
-  "content_sha256": "37fa4f6ca315017c34e1dd79866b992075e41bdceac6286b6f75bbf21b7baec1"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "861cbb3242982602a170e5abb61b1c5dc666d78a8dd70fe7f98b2d5af48ab95c"
 }

@@ -2,7 +2,7 @@ INFO:    User not listed in /etc/subuid, trying root-mapped namespace
 INFO:    Using fakeroot command combined with root-mapped namespace
 [init-mariadb] First run — seeding /var/lib/mysql from /var/lib/mysql-seed ...
 [init-mariadb] Seed copy complete.
-[start-mariadb-bg] mariadbd ready (PID 3339021).
+[start-mariadb-bg] mariadbd ready (PID 672707).
 Picked up JAVA_TOOL_OPTIONS: -Xlog:class+load=info:file=/opt/moves/MOVESTemporary/instrumentation/class-load-%p.log
 Buildfile: /opt/moves/build.xml
 
@@ -12,574 +12,574 @@ main1worker:
      [echo] MySQL is already running and will not be automatically shutdown by this instance.
      [echo] Launching MOVES, which will launch a worker...
      [java] Picked up JAVA_TOOL_OPTIONS: -Xlog:class+load=info:file=/opt/moves/MOVESTemporary/instrumentation/class-load-%p.log
-     [java] 11/1/26, 3:50 PM INFO: Loading system configuration...
-     [java] 11/1/26, 3:50 PM INFO: System configuration setting up the instance counter...
-     [java] 11/1/26, 3:50 PM INFO: System configuration clearing prior IDs...
-     [java] 11/1/26, 3:50 PM INFO: System configuration reading computer ID...
-     [java] 11/1/26, 3:50 PM INFO: Using alternate master configuration file: maketodo.txt
-     [java] 11/1/26, 3:50 PM INFO: Using master configuration file: maketodo.txt
-     [java] 11/1/26, 3:50 PM INFO: System configuration loading configuration files...
-     [java] 11/1/26, 3:50 PM INFO: System configuration setting up temporary files...
-     [java] 11/1/26, 3:50 PM INFO: Folder for temporary files: /opt/moves/MOVESTemporary
-     [java] 11/1/26, 3:50 PM INFO: System configuration acquiring distributed master ID...
-     [java] 11/1/26, 3:50 PM INFO: Done loading system configuration.
-     [java] 11/1/26, 3:50 PM INFO: Using alternate worker configuration file: manyworkers.txt
-     [java] 11/1/26, 3:50 PM INFO: Initializing default database connections...
-     [java] 11/1/26, 3:50 PM INFO: Reading default database table definitions...
-     [java] 11/1/26, 3:50 PM INFO: Done initializing database connections.
-     [java] 11/1/26, 3:50 PM WARNING: Added missing vehicle selection: Passenger Car - Diesel Fuel
-     [java] 11/1/26, 3:50 PM WARNING: Added missing vehicle selection: Passenger Car - Ethanol (E-85)
-     [java] 11/1/26, 3:50 PM WARNING: Added missing vehicle selection: Passenger Car - Electricity
-     [java] 11/1/26, 3:50 PM INFO: ***Starting MOVES run***
-     [java] 11/1/26, 3:50 PM INFO: Master Release: MOVES5.0.1
-     [java] 11/1/26, 3:50 PM INFO: Master Computer ID: ccc0233.campuscluster.illinois.edu
-     [java] 11/1/26, 3:50 PM INFO: Master ID: 4679633295388720344
-     [java] 11/1/26, 3:50 PM INFO: RunSpec: /projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/rates-start.xml
-     [java] 11/1/26, 3:50 PM INFO: Initializing output database connections...
-     [java] 11/1/26, 3:50 PM INFO: Done initializing database connections.
-     [java] 11/1/26, 3:50 PM INFO: Thread starting for class gov.epa.otaq.moves.master.framework.HeartbeatDetectionThread.
-     [java] 11/1/26, 3:50 PM INFO: HeartbeatDetectionThread !hasWorkerOnThisComputer
-     [java] 11/1/26, 3:50 PM INFO: Initializing default database connections...
-     [java] 11/1/26, 3:50 PM INFO: Database connections already established.
-     [java] 11/1/26, 3:50 PM INFO: Initializing MOVESExecution connections...
-     [java] 11/1/26, 3:50 PM INFO: Creating the execution database...
-     [java] 11/1/26, 3:50 PM INFO: Removing tables from the execution database...
-     [java] 11/1/26, 3:50 PM INFO: Creating empty tables in the execution database...
-     [java] 11/1/26, 3:50 PM INFO: Finalizing the execution database...
-     [java] 11/1/26, 3:50 PM INFO: Reading execution database table definitions...
-     [java] 11/1/26, 3:50 PM INFO: Done initializing database connections.
-     [java] 11/1/26, 3:50 PM INFO: Initializing output database connections...
-     [java] 11/1/26, 3:50 PM INFO: Database connections already established.
-     [java] 11/1/26, 3:50 PM INFO: Thread starting for class gov.epa.otaq.moves.master.framework.MasterLoop.
-     [java] 11/1/26, 3:50 PM INFO: Thread starting for class gov.epa.otaq.moves.master.framework.EmissionCalculatorInboundUnbundler.
-     [java] 11/1/26, 3:50 PM INFO: InputDataManager transferred all default tables.
-     [java] 11/1/26, 3:50 PM INFO: InputDataManager transferred all default tables.
-     [java] 11/1/26, 3:50 PM INFO: InputDataManager transferred all NonRoad tables.
-     [java] 11/1/26, 3:50 PM DEBUG: Starting WorkerCommandLine...
-     [java] 11/1/26, 3:50 PM INFO: testConnection = com.mysql.jdbc.JDBC4Connection@5805f87f
-     [java] 11/1/26, 3:50 PM INFO: WorkerConfiguration loaded. distributedWorkerId = 17437960403442597474
-     [java] 11/1/26, 3:50 PM INFO: Worker Release: MOVES5.0.1
-     [java] 11/1/26, 3:50 PM INFO: Worker Computer ID: ccc0233.campuscluster.illinois.edu
-     [java] 11/1/26, 3:50 PM INFO: Worker ID: 17437960403442597474
-     [java] 11/1/26, 3:50 PM INFO: Thread starting for class gov.epa.otaq.moves.worker.framework.WorkerHeartbeatThread.
-     [java] 11/1/26, 3:50 PM INFO: Thread starting for class gov.epa.otaq.moves.worker.framework.RemoteEmissionsCalculator.
-     [java] 11/1/26, 3:50 PM INFO: Setting worker flag for 17437960403442597474 on port 13132
-     [java] 11/1/26, 3:50 PM INFO: Class gov.epa.otaq.moves.master.implementation.general.MeteorologyGenerator has been instantiated.
-     [java] 11/1/26, 3:50 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.ActivityCalculator has been instantiated.
-     [java] 11/1/26, 3:50 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.BaseRateCalculator has been instantiated.
-     [java] 11/1/26, 3:50 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator has been instantiated.
-     [java] 11/1/26, 3:50 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.CrankcaseEmissionCalculatorNonPM has been instantiated.
-     [java] 11/1/26, 3:50 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator has been instantiated.
-     [java] 11/1/26, 3:50 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.RatesOperatingModeDistributionGenerator has been instantiated.
-     [java] 11/1/26, 3:50 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator has been instantiated.
-     [java] 11/1/26, 3:50 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.StartOperatingModeDistributionGenerator has been instantiated.
-     [java] 11/1/26, 3:50 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.TotalActivityGenerator has been instantiated.
-     [java] 11/1/26, 3:50 PM DEBUG: gov.epa.otaq.moves.master.implementation.general.MeteorologyGenerator subscribed to Running Exhaust at PROCESS/100
-     [java] 11/1/26, 3:50 PM DEBUG: gov.epa.otaq.moves.master.implementation.general.MeteorologyGenerator subscribed to Extended Idle Exhaust at PROCESS/100
-     [java] 11/1/26, 3:50 PM DEBUG: gov.epa.otaq.moves.master.implementation.general.MeteorologyGenerator subscribed to Start Exhaust at PROCESS/100
-     [java] 11/1/26, 3:50 PM DEBUG: gov.epa.otaq.moves.master.implementation.general.MeteorologyGenerator subscribed to Auxiliary Power Exhaust at PROCESS/100
-     [java] 11/1/26, 3:50 PM DEBUG: gov.epa.otaq.moves.master.implementation.general.MeteorologyGenerator subscribed to Tirewear at PROCESS/100
-     [java] 11/1/26, 3:50 PM DEBUG: gov.epa.otaq.moves.master.implementation.general.MeteorologyGenerator subscribed to Brakewear at PROCESS/100
-     [java] 11/1/26, 3:50 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.ActivityCalculator subscribed to Start Exhaust at YEAR/10
-     [java] 11/1/26, 3:50 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateCalculator subscribed to Start Exhaust at MONTH/10
-     [java] 11/1/26, 3:50 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator subscribed to Running Exhaust at YEAR/98
-     [java] 11/1/26, 3:50 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator subscribed to Start Exhaust at YEAR/98
-     [java] 11/1/26, 3:50 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator subscribed to Extended Idle Exhaust at YEAR/98
-     [java] 11/1/26, 3:50 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator subscribed to Auxiliary Power Exhaust at YEAR/98
-     [java] 11/1/26, 3:50 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator subscribed to Brakewear at YEAR/98
-     [java] 11/1/26, 3:50 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator subscribed to Tirewear at YEAR/98
-     [java] 11/1/26, 3:50 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator subscribed to Start Exhaust at PROCESS/99
-     [java] 11/1/26, 3:50 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator subscribed to Crankcase Start Exhaust at PROCESS/99
-     [java] 11/1/26, 3:50 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.RatesOperatingModeDistributionGenerator subscribed to Running Exhaust at YEAR/100
-     [java] 11/1/26, 3:50 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.RatesOperatingModeDistributionGenerator subscribed to Extended Idle Exhaust at YEAR/100
-     [java] 11/1/26, 3:50 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.RatesOperatingModeDistributionGenerator subscribed to Auxiliary Power Exhaust at YEAR/100
-     [java] 11/1/26, 3:50 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Running Exhaust at YEAR/101
-     [java] 11/1/26, 3:50 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Start Exhaust at YEAR/101
-     [java] 11/1/26, 3:50 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Extended Idle Exhaust at YEAR/101
-     [java] 11/1/26, 3:50 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Auxiliary Power Exhaust at YEAR/101
-     [java] 11/1/26, 3:50 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Evap Permeation at YEAR/101
-     [java] 11/1/26, 3:50 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Evap Fuel Vapor Venting at YEAR/101
-     [java] 11/1/26, 3:50 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Evap Fuel Leaks at YEAR/101
-     [java] 11/1/26, 3:50 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Brakewear at YEAR/101
-     [java] 11/1/26, 3:50 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Tirewear at YEAR/101
-     [java] 11/1/26, 3:50 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.StartOperatingModeDistributionGenerator subscribed to Start Exhaust at PROCESS/100
-     [java] 11/1/26, 3:50 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.TotalActivityGenerator subscribed to Start Exhaust at YEAR/100
-     [java] 11/1/26, 3:50 PM INFO: 18 bundles will be used.
-     [java] 11/1/26, 3:50 PM INFO: Thread starting for class gov.epa.otaq.moves.master.framework.MasterLoopableThread.
-     [java] 11/1/26, 3:50 PM INFO: StartOperatingModeDistributionGenerator setupTime=6887 totalTime=1
-     [java] 11/1/26, 3:50 PM INFO: MetGen setupTime=21 bundleTime=0
-     [java] 11/1/26, 3:50 PM INFO: doGeneralFuelRatio
-     [java] 11/1/26, 3:50 PM INFO: FuelTypeID 1 has 1 formulations
-     [java] 11/1/26, 3:50 PM INFO: FuelTypeID 2 has 1 formulations
-     [java] 11/1/26, 3:50 PM INFO: FuelTypeID 5 has 1 formulations
-     [java] 11/1/26, 3:50 PM INFO: doAirToxicsCalculations
-     [java] 11/1/26, 3:50 PM INFO: 19502000 (1980 to 2000)
-     [java] 11/1/26, 3:50 PM INFO: 20012050 (2001 to 2020)
-     [java] 11/1/26, 3:50 PM INFO: FuelTypeID 1 has 1 formulations
-     [java] 11/1/26, 3:50 PM INFO: doCOCalculations
-     [java] 11/1/26, 3:50 PM INFO: 19502000 (1980 to 2000)
-     [java] 11/1/26, 3:50 PM INFO: 20012050 (2001 to 2020)
-     [java] 11/1/26, 3:50 PM INFO: FuelTypeID 1 has 1 formulations
-     [java] 11/1/26, 3:50 PM INFO: Dropping criteriaRatio indexes
-     [java] 11/1/26, 3:50 PM INFO: Checked sulfur model input table tempCOA
-     [java] 11/1/26, 3:50 PM INFO: Checked sulfur model output table criteriaRatio
-     [java] 11/1/26, 3:50 PM INFO: Checked sulfur model input table tempCOA
-     [java] 11/1/26, 3:50 PM INFO: Checked sulfur model output table criteriaRatio
-     [java] 11/1/26, 3:50 PM INFO: doPredictiveCalculations: predictHC, 101,102 / 1000101,1000102
-     [java] 11/1/26, 3:50 PM INFO: 19502000 (1980 to 2000)
-     [java] 11/1/26, 3:50 PM INFO: 20012050 (2001 to 2020)
-     [java] 11/1/26, 3:50 PM INFO: FuelTypeID 1 has 1 formulations
-     [java] 11/1/26, 3:50 PM INFO: Checked sulfur model input table tempHCA
-     [java] 11/1/26, 3:50 PM INFO: Checked sulfur model output table criteriaRatio
-     [java] 11/1/26, 3:50 PM INFO: Checked sulfur model input table tempHCA
-     [java] 11/1/26, 3:50 PM INFO: Checked sulfur model output table criteriaRatio
-     [java] 11/1/26, 3:50 PM INFO: doPredictiveCalculations: predictNOx, 301,302 / 
-     [java] 11/1/26, 3:50 PM INFO: 19502000 (1980 to 2000)
-     [java] 11/1/26, 3:50 PM INFO: 20012050 (2001 to 2020)
-     [java] 11/1/26, 3:50 PM INFO: FuelTypeID 1 has 1 formulations
-     [java] 11/1/26, 3:50 PM INFO: Checked sulfur model input table tempNOxA
-     [java] 11/1/26, 3:50 PM INFO: Checked sulfur model output table criteriaRatio
-     [java] 11/1/26, 3:50 PM INFO: Checked sulfur model input table tempNOxA
-     [java] 11/1/26, 3:50 PM INFO: Checked sulfur model output table criteriaRatio
-     [java] 11/1/26, 3:50 PM INFO: doMTBECalculations
-     [java] 11/1/26, 3:50 PM INFO: doEvapBenzeneCalculations
-     [java] 11/1/26, 3:50 PM INFO: Creating criteriaRatio indexes
-     [java] 11/1/26, 3:50 PM INFO: Removed potential overlaps between ATRatioNonGas and ATRatio
-     [java] 11/1/26, 3:50 PM INFO: FuelEffectsGenerator totalTime=2240
-     [java] 11/1/26, 3:50 PM DEBUG: newSBD Generator called for process: Start Exhaust
-     [java] 11/1/26, 3:50 PM DEBUG: Processing pollutant-process: Carbon Monoxide (CO) - Start Exhaust
-     [java] 11/1/26, 3:50 PM DEBUG: Processing pollutant-process: Oxides of Nitrogen (NOx) - Start Exhaust
-     [java] 11/1/26, 3:50 PM DEBUG: Processing pollutant-process: Total Gaseous Hydrocarbons - Start Exhaust
-     [java] 11/1/26, 3:50 PM INFO: newSBDG setupTime=0 bundleTime=46
-     [java] 11/1/26, 3:50 PM INFO: TAG SourceTypeHour2 ms=6
-     [java] 11/1/26, 3:50 PM INFO: TAG AverageSpeed ms=3
-     [java] 11/1/26, 3:50 PM INFO: TAG SHOByAgeRoadwayHour ms=13
-     [java] 11/1/26, 3:50 PM INFO: TAG IdleHoursByAgeHour ms=2
-     [java] 11/1/26, 3:50 PM INFO: TAG StartsPerSampleVehicle ms=11
-     [java] 11/1/26, 3:50 PM INFO: TAG SourceTypesInStartsPerVehicle ms=2
-     [java] 11/1/26, 3:50 PM INFO: TAG StartsPerVehicle ms=8
-     [java] 11/1/26, 3:50 PM INFO: TAG StartsByAgeHour ms=6
-     [java] 11/1/26, 3:50 PM INFO: TAG SHPByAgeHour ms=7
-     [java] 11/1/26, 3:50 PM INFO: TAG setupTime=24 growthTime=74 bundleTime=103 focusTime=0
-     [java] 11/1/26, 3:50 PM DEBUG: BaseRateGenerator.addIndexes: alter table avgSpeedBin add key speed1 (avgSpeedBinID, avgBinSpeed)
-     [java] 11/1/26, 3:50 PM DEBUG: BaseRateGenerator.addIndexes ms=2
-     [java] 11/1/26, 3:50 PM DEBUG: BaseRateGenerator.addIndexes: alter table avgSpeedBin add key speed2 (avgBinSpeed, avgSpeedBinID)
-     [java] 11/1/26, 3:50 PM DEBUG: BaseRateGenerator.addIndexes ms=2
-     [java] 11/1/26, 3:50 PM DEBUG: BaseRateGenerator.addIndexes: analyze table avgSpeedBin
-     [java] 11/1/26, 3:50 PM DEBUG: BaseRateGenerator.addIndexes ms=0
-     [java] 11/1/26, 3:50 PM DEBUG: Base Rate Generator called for process: Start Exhaust
-     [java] 11/1/26, 3:50 PM DEBUG: Normalizing sourcebin-weighted emission rates
-     [java] 11/1/26, 3:50 PM INFO: Running Statement: #CORE: 1 of 6
-     [java] 11/1/26, 3:50 PM INFO: Running Statement: #CORE: 2 of 6
-     [java] 11/1/26, 3:50 PM INFO: Running Statement: #CORE: 3 of 6
-     [java] 11/1/26, 3:50 PM INFO: Running Statement: #CORE: 4 of 6
-     [java] 11/1/26, 3:50 PM INFO: Running Statement: #CORE: 5 of 6
-     [java] 11/1/26, 3:50 PM INFO: Running Statement: #CORE: 6 of 6
-     [java] 11/1/26, 3:50 PM INFO: Running Statement: #CORE: 1 of 2
-     [java] 11/1/26, 3:50 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 1 of 1
-     [java] 11/1/26, 3:50 PM INFO: Running Statement: #SBWEIGHTEDDISTANCERATE: 1 of 1
-     [java] 11/1/26, 3:50 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 1 of 1
-     [java] 11/1/26, 3:50 PM INFO: Running Statement: #CORE: 2 of 2
-     [java] 11/1/26, 3:50 PM INFO: BRG SBW running concurrent statements...
-     [java] 11/1/26, 3:50 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 1 of 3
-     [java] 11/1/26, 3:50 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 1 of 3
-     [java] 11/1/26, 3:50 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 2 of 3
-     [java] 11/1/26, 3:50 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 3 of 3
-     [java] 11/1/26, 3:50 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 2 of 3
-     [java] 11/1/26, 3:50 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 3 of 3
-     [java] 11/1/26, 3:50 PM INFO: BRG SBW done running concurrent statements.
-     [java] 11/1/26, 3:50 PM INFO: Statements done: 17
-     [java] 11/1/26, 3:50 PM INFO: Avg. Concurrent Statements: 1.411764705882353
-     [java] 11/1/26, 3:50 PM INFO: Max. Concurrent Statements: 2
-     [java] 11/1/26, 3:50 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=59
-     [java] 11/1/26, 3:50 PM DEBUG: BaseRateGenerator: processID=2, applyAvgSpeedDistribution=false, useAvgSpeedBin=false, applySourceBinDistribution=true, keepOpModeID=true, avgSpeedFraction="", sumSBD="*sumSBD"
-     [java] 11/1/26, 3:50 PM DEBUG: BaseRateGenerator processID=2, roadTypeID=0, yearID=2020 has 3 iterations
-     [java] 11/1/26, 3:50 PM DEBUG: BaseRateGenerator executing concurrent SQL...
-     [java] 11/1/26, 3:50 PM INFO: Running Statement: #BASERATE: 1 of 6
-     [java] 11/1/26, 3:50 PM INFO: Running Statement: #BASERATEBYAGE: 1 of 3
-     [java] 11/1/26, 3:50 PM DEBUG: BaseRateGenerator executing BaseRateByAgeHelper...
-     [java] 11/1/26, 3:50 PM INFO: Running Statement: #BASERATE: 2 of 6
-     [java] 11/1/26, 3:50 PM INFO: Running Statement: #BASERATE: 3 of 6
-     [java] 11/1/26, 3:50 PM INFO: Running Statement: #BASERATE: 4 of 6
-     [java] 11/1/26, 3:50 PM INFO: Running Statement: #BASERATE: 5 of 6
-     [java] 11/1/26, 3:50 PM INFO: Running Statement: #BASERATE: 6 of 6
-     [java] 11/1/26, 3:50 PM DEBUG: BaseRateGenerator executing BaseRateByAgeHelper Done
-     [java] 11/1/26, 3:50 PM INFO: Running Statement: #BASERATEBYAGE: 2 of 3
-     [java] 11/1/26, 3:50 PM DEBUG: BaseRateGenerator executing BaseRateByAgeHelper...
-     [java] 11/1/26, 3:50 PM DEBUG: BaseRateGenerator executing BaseRateByAgeHelper Done
-     [java] 11/1/26, 3:50 PM INFO: Running Statement: #BASERATEBYAGE: 3 of 3
-     [java] 11/1/26, 3:50 PM DEBUG: BaseRateGenerator executing BaseRateByAgeHelper...
-     [java] 11/1/26, 3:50 PM DEBUG: BaseRateGenerator executing BaseRateByAgeHelper Done
-     [java] 11/1/26, 3:50 PM DEBUG: BaseRateGenerator concurrent SQL done.
-     [java] 11/1/26, 3:50 PM INFO: Statements done: 9
-     [java] 11/1/26, 3:50 PM INFO: Avg. Concurrent Statements: 1.6666666666666667
-     [java] 11/1/26, 3:50 PM INFO: Max. Concurrent Statements: 2
-     [java] 11/1/26, 3:50 PM DEBUG: Done with BaseRateGenerator processID=2, roadTypeID=0, yearID=2020
-     [java] 11/1/26, 3:50 PM DEBUG: BaseRateGenerator.generateBaseRates ms=75
-     [java] 11/1/26, 3:50 PM INFO: BRG setupTime=5 bundleTime=134
-     [java] 11/1/26, 3:50 PM INFO: Saved bundle file 4679633295388720344_1_TODO
-     [java] 11/1/26, 3:50 PM INFO: Created bundle 1 for workers to process
-     [java] 11/1/26, 3:50 PM INFO: Saved bundle file 4679633295388720344_2_TODO
-     [java] 11/1/26, 3:50 PM INFO: Created bundle 2 for workers to process
-     [java] 11/1/26, 3:50 PM INFO: newSBDG setupTime=0 bundleTime=0
-     [java] 11/1/26, 3:50 PM INFO: TAG setupTime=24 growthTime=74 bundleTime=103 focusTime=0
-     [java] 11/1/26, 3:50 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
-     [java] 11/1/26, 3:50 PM INFO: BRG setupTime=5 bundleTime=134
-     [java] 11/1/26, 3:50 PM INFO: Saved bundle file 4679633295388720344_3_TODO
-     [java] 11/1/26, 3:50 PM INFO: Created bundle 3 for workers to process
-     [java] 11/1/26, 3:50 PM INFO: newSBDG setupTime=0 bundleTime=0
-     [java] 11/1/26, 3:50 PM INFO: TAG setupTime=24 growthTime=74 bundleTime=103 focusTime=0
-     [java] 11/1/26, 3:50 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
-     [java] 11/1/26, 3:50 PM INFO: BRG setupTime=5 bundleTime=135
-     [java] 11/1/26, 3:50 PM INFO: Saved bundle file 4679633295388720344_4_TODO
-     [java] 11/1/26, 3:50 PM INFO: Created bundle 4 for workers to process
-     [java] 11/1/26, 3:50 PM INFO: newSBDG setupTime=0 bundleTime=0
-     [java] 11/1/26, 3:50 PM INFO: TAG setupTime=24 growthTime=74 bundleTime=103 focusTime=0
-     [java] 11/1/26, 3:50 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
-     [java] 11/1/26, 3:50 PM INFO: BRG setupTime=5 bundleTime=135
-     [java] 11/1/26, 3:50 PM INFO: Saved bundle file 4679633295388720344_5_TODO
-     [java] 11/1/26, 3:50 PM INFO: Created bundle 5 for workers to process
-     [java] 11/1/26, 3:50 PM INFO: newSBDG setupTime=0 bundleTime=0
-     [java] 11/1/26, 3:50 PM INFO: TAG setupTime=24 growthTime=74 bundleTime=103 focusTime=0
-     [java] 11/1/26, 3:50 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
-     [java] 11/1/26, 3:50 PM INFO: BRG setupTime=5 bundleTime=135
-     [java] 11/1/26, 3:50 PM INFO: Saved bundle file 4679633295388720344_6_TODO
-     [java] 11/1/26, 3:50 PM INFO: Created bundle 6 for workers to process
-     [java] 11/1/26, 3:50 PM INFO: newSBDG setupTime=0 bundleTime=0
-     [java] 11/1/26, 3:50 PM INFO: TAG setupTime=24 growthTime=74 bundleTime=103 focusTime=0
-     [java] 11/1/26, 3:50 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
-     [java] 11/1/26, 3:50 PM INFO: BRG setupTime=5 bundleTime=136
-     [java] 11/1/26, 3:50 PM INFO: Saved bundle file 4679633295388720344_7_TODO
-     [java] 11/1/26, 3:50 PM INFO: Created bundle 7 for workers to process
-     [java] 11/1/26, 3:50 PM INFO: newSBDG setupTime=0 bundleTime=0
-     [java] 11/1/26, 3:50 PM INFO: TAG setupTime=24 growthTime=74 bundleTime=103 focusTime=0
-     [java] 11/1/26, 3:50 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
-     [java] 11/1/26, 3:50 PM INFO: BRG setupTime=5 bundleTime=136
-     [java] 11/1/26, 3:50 PM INFO: Saved bundle file 4679633295388720344_8_TODO
-     [java] 11/1/26, 3:50 PM INFO: Created bundle 8 for workers to process
-     [java] 11/1/26, 3:50 PM INFO: newSBDG setupTime=0 bundleTime=0
-     [java] 11/1/26, 3:50 PM INFO: TAG setupTime=24 growthTime=74 bundleTime=103 focusTime=0
-     [java] 11/1/26, 3:50 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
-     [java] 11/1/26, 3:50 PM INFO: BRG setupTime=5 bundleTime=136
-     [java] 11/1/26, 3:50 PM INFO: Saved bundle file 4679633295388720344_9_TODO
-     [java] 11/1/26, 3:50 PM INFO: Created bundle 9 for workers to process
-     [java] 11/1/26, 3:50 PM INFO: newSBDG setupTime=0 bundleTime=0
-     [java] 11/1/26, 3:50 PM INFO: TAG setupTime=24 growthTime=74 bundleTime=103 focusTime=0
-     [java] 11/1/26, 3:50 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
-     [java] 11/1/26, 3:50 PM INFO: BRG setupTime=5 bundleTime=136
-     [java] 11/1/26, 3:50 PM INFO: Saved bundle file 4679633295388720344_10_TODO
-     [java] 11/1/26, 3:50 PM INFO: Created bundle 10 for workers to process
-     [java] 11/1/26, 3:50 PM INFO: newSBDG setupTime=0 bundleTime=0
-     [java] 11/1/26, 3:50 PM INFO: TAG setupTime=24 growthTime=74 bundleTime=103 focusTime=0
-     [java] 11/1/26, 3:50 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
-     [java] 11/1/26, 3:50 PM INFO: BRG setupTime=5 bundleTime=137
-     [java] 11/1/26, 3:50 PM INFO: Saved bundle file 4679633295388720344_11_TODO
-     [java] 11/1/26, 3:50 PM INFO: Created bundle 11 for workers to process
-     [java] 11/1/26, 3:50 PM INFO: newSBDG setupTime=0 bundleTime=0
-     [java] 11/1/26, 3:50 PM INFO: TAG setupTime=24 growthTime=74 bundleTime=103 focusTime=0
-     [java] 11/1/26, 3:50 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
-     [java] 11/1/26, 3:50 PM INFO: BRG setupTime=5 bundleTime=137
-     [java] 11/1/26, 3:50 PM INFO: Saved bundle file 4679633295388720344_12_TODO
-     [java] 11/1/26, 3:50 PM INFO: Created bundle 12 for workers to process
-     [java] 11/1/26, 3:50 PM INFO: newSBDG setupTime=0 bundleTime=0
-     [java] 11/1/26, 3:50 PM INFO: TAG setupTime=24 growthTime=74 bundleTime=103 focusTime=0
-     [java] 11/1/26, 3:50 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
-     [java] 11/1/26, 3:50 PM INFO: BRG setupTime=5 bundleTime=137
-     [java] 11/1/26, 3:50 PM INFO: Saved bundle file 4679633295388720344_13_TODO
-     [java] 11/1/26, 3:50 PM INFO: Created bundle 13 for workers to process
-     [java] 11/1/26, 3:50 PM INFO: newSBDG setupTime=0 bundleTime=0
-     [java] 11/1/26, 3:50 PM INFO: TAG setupTime=24 growthTime=74 bundleTime=103 focusTime=0
-     [java] 11/1/26, 3:50 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
-     [java] 11/1/26, 3:50 PM INFO: BRG setupTime=5 bundleTime=137
-     [java] 11/1/26, 3:50 PM INFO: Saved bundle file 4679633295388720344_14_TODO
-     [java] 11/1/26, 3:50 PM INFO: Created bundle 14 for workers to process
-     [java] 11/1/26, 3:50 PM INFO: newSBDG setupTime=0 bundleTime=0
-     [java] 11/1/26, 3:50 PM INFO: TAG setupTime=24 growthTime=74 bundleTime=103 focusTime=0
-     [java] 11/1/26, 3:50 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
-     [java] 11/1/26, 3:50 PM INFO: BRG setupTime=5 bundleTime=137
-     [java] 11/1/26, 3:50 PM INFO: Saved bundle file 4679633295388720344_15_TODO
-     [java] 11/1/26, 3:50 PM INFO: Created bundle 15 for workers to process
-     [java] 11/1/26, 3:50 PM INFO: newSBDG setupTime=0 bundleTime=0
-     [java] 11/1/26, 3:50 PM INFO: TAG setupTime=24 growthTime=74 bundleTime=103 focusTime=0
-     [java] 11/1/26, 3:50 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
-     [java] 11/1/26, 3:50 PM INFO: BRG setupTime=5 bundleTime=137
-     [java] 11/1/26, 3:50 PM INFO: Saved bundle file 4679633295388720344_16_TODO
-     [java] 11/1/26, 3:50 PM INFO: Created bundle 16 for workers to process
-     [java] 11/1/26, 3:50 PM INFO: newSBDG setupTime=0 bundleTime=0
-     [java] 11/1/26, 3:50 PM INFO: TAG setupTime=24 growthTime=74 bundleTime=103 focusTime=0
-     [java] 11/1/26, 3:50 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
-     [java] 11/1/26, 3:50 PM INFO: BRG setupTime=5 bundleTime=138
-     [java] 11/1/26, 3:50 PM INFO: Saved bundle file 4679633295388720344_17_TODO
-     [java] 11/1/26, 3:50 PM INFO: Created bundle 17 for workers to process
-     [java] 11/1/26, 3:50 PM INFO: newSBDG setupTime=0 bundleTime=0
-     [java] 11/1/26, 3:50 PM INFO: TAG setupTime=24 growthTime=74 bundleTime=103 focusTime=0
-     [java] 11/1/26, 3:50 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
-     [java] 11/1/26, 3:50 PM INFO: BRG setupTime=5 bundleTime=138
-     [java] 11/1/26, 3:50 PM INFO: Saved bundle file 4679633295388720344_18_TODO
-     [java] 11/1/26, 3:50 PM INFO: Created bundle 18 for workers to process
-     [java] 11/1/26, 3:50 PM INFO: Thread shutdown starting for class gov.epa.otaq.moves.master.framework.MasterLoop.
-     [java] 11/1/26, 3:50 PM INFO: Thread shutdown starting for class gov.epa.otaq.moves.master.framework.MasterLoopableThread.
-     [java] 11/1/26, 3:50 PM INFO: Thread shutdown complete for class gov.epa.otaq.moves.master.framework.MasterLoopableThread.
-     [java] 11/1/26, 3:50 PM INFO: Thread shutdown complete for class gov.epa.otaq.moves.master.framework.MasterLoop.
-     [java] 11/1/26, 3:51 PM DEBUG: Worker found 18 TODO files.
-     [java] 11/1/26, 3:51 PM INFO: Found work file: 4679633295388720344_1_TODO
-     [java] 11/1/26, 3:51 PM INFO: Worker Processing 4679633295388720344_1_InProgress_17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: WorkerVersion=MOVES5.0.1
-     [java] 11/1/26, 3:51 PM INFO: WorkerComputerID=ccc0233.campuscluster.illinois.edu
-     [java] 11/1/26, 3:51 PM INFO: WorkerID=17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from MOVESWorkerOutput
-     [java] 11/1/26, 3:51 PM INFO: Extracted 250 rows from MOVESWorkerActivityOutput
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from BaseRateOutput
-     [java] 11/1/26, 3:51 PM INFO: Worker finished processing: 4679633295388720344_1_InProgress_17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: Worker is idle
-     [java] 11/1/26, 3:51 PM INFO: Found work file: 4679633295388720344_2_TODO
-     [java] 11/1/26, 3:51 PM INFO: Worker Processing 4679633295388720344_2_InProgress_17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: WorkerVersion=MOVES5.0.1
-     [java] 11/1/26, 3:51 PM INFO: WorkerComputerID=ccc0233.campuscluster.illinois.edu
-     [java] 11/1/26, 3:51 PM INFO: WorkerID=17437960403442597474
-     [java] 11/1/26, 3:51 PM DEBUG: Run /opt/moves/calc/externalcalculatorgo64.exe in /opt/moves/MOVESTemporary/manyworkers/workerfolder/WorkerTemp1
-     [java] 11/1/26, 3:51 PM DEBUG: Command line = 
-     [java] 11/1/26, 3:51 PM DEBUG: -isproject=0
-     [java] 11/1/26, 3:51 PM DEBUG: 
-     [java] 11/1/26, 3:51 PM INFO: Time spent on running the external calculator (sec): 0.06599999964237213
-     [java] 11/1/26, 3:51 PM INFO: Time spent on absorbing external calculator results (sec): 0.004999999888241291
-     [java] 11/1/26, 3:51 PM INFO: Extracted 684 rows from MOVESWorkerOutput
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
-     [java] 11/1/26, 3:51 PM INFO: Extracted 684 rows from BaseRateOutput
-     [java] 11/1/26, 3:51 PM INFO: Worker finished processing: 4679633295388720344_2_InProgress_17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: Worker is idle
-     [java] 11/1/26, 3:51 PM INFO: Found work file: 4679633295388720344_3_TODO
-     [java] 11/1/26, 3:51 PM INFO: Worker Processing 4679633295388720344_3_InProgress_17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: WorkerVersion=MOVES5.0.1
-     [java] 11/1/26, 3:51 PM INFO: WorkerComputerID=ccc0233.campuscluster.illinois.edu
-     [java] 11/1/26, 3:51 PM INFO: WorkerID=17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from MOVESWorkerOutput
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from BaseRateOutput
-     [java] 11/1/26, 3:51 PM INFO: Worker finished processing: 4679633295388720344_3_InProgress_17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: Worker is idle
-     [java] 11/1/26, 3:51 PM INFO: Found work file: 4679633295388720344_4_TODO
-     [java] 11/1/26, 3:51 PM INFO: Worker Processing 4679633295388720344_4_InProgress_17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: WorkerVersion=MOVES5.0.1
-     [java] 11/1/26, 3:51 PM INFO: WorkerComputerID=ccc0233.campuscluster.illinois.edu
-     [java] 11/1/26, 3:51 PM INFO: WorkerID=17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from MOVESWorkerOutput
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from BaseRateOutput
-     [java] 11/1/26, 3:51 PM INFO: Worker finished processing: 4679633295388720344_4_InProgress_17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: Worker is idle
-     [java] 11/1/26, 3:51 PM INFO: Found work file: 4679633295388720344_5_TODO
-     [java] 11/1/26, 3:51 PM INFO: Worker Processing 4679633295388720344_5_InProgress_17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: WorkerVersion=MOVES5.0.1
-     [java] 11/1/26, 3:51 PM INFO: WorkerComputerID=ccc0233.campuscluster.illinois.edu
-     [java] 11/1/26, 3:51 PM INFO: WorkerID=17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from MOVESWorkerOutput
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from BaseRateOutput
-     [java] 11/1/26, 3:51 PM INFO: Worker finished processing: 4679633295388720344_5_InProgress_17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: Worker is idle
-     [java] 11/1/26, 3:51 PM INFO: Found work file: 4679633295388720344_6_TODO
-     [java] 11/1/26, 3:51 PM INFO: Worker Processing 4679633295388720344_6_InProgress_17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: WorkerVersion=MOVES5.0.1
-     [java] 11/1/26, 3:51 PM INFO: WorkerComputerID=ccc0233.campuscluster.illinois.edu
-     [java] 11/1/26, 3:51 PM INFO: WorkerID=17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from MOVESWorkerOutput
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from BaseRateOutput
-     [java] 11/1/26, 3:51 PM INFO: Worker finished processing: 4679633295388720344_6_InProgress_17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: Worker is idle
-     [java] 11/1/26, 3:51 PM INFO: Found work file: 4679633295388720344_7_TODO
-     [java] 11/1/26, 3:51 PM INFO: Worker Processing 4679633295388720344_7_InProgress_17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: WorkerVersion=MOVES5.0.1
-     [java] 11/1/26, 3:51 PM INFO: WorkerComputerID=ccc0233.campuscluster.illinois.edu
-     [java] 11/1/26, 3:51 PM INFO: WorkerID=17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from MOVESWorkerOutput
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from BaseRateOutput
-     [java] 11/1/26, 3:51 PM INFO: Worker finished processing: 4679633295388720344_7_InProgress_17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: Worker is idle
-     [java] 11/1/26, 3:51 PM INFO: Found work file: 4679633295388720344_8_TODO
-     [java] 11/1/26, 3:51 PM INFO: Worker Processing 4679633295388720344_8_InProgress_17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: WorkerVersion=MOVES5.0.1
-     [java] 11/1/26, 3:51 PM INFO: WorkerComputerID=ccc0233.campuscluster.illinois.edu
-     [java] 11/1/26, 3:51 PM INFO: WorkerID=17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from MOVESWorkerOutput
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from BaseRateOutput
-     [java] 11/1/26, 3:51 PM INFO: Worker finished processing: 4679633295388720344_8_InProgress_17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: Worker is idle
-     [java] 11/1/26, 3:51 PM INFO: Found work file: 4679633295388720344_9_TODO
-     [java] 11/1/26, 3:51 PM INFO: Worker Processing 4679633295388720344_9_InProgress_17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: WorkerVersion=MOVES5.0.1
-     [java] 11/1/26, 3:51 PM INFO: WorkerComputerID=ccc0233.campuscluster.illinois.edu
-     [java] 11/1/26, 3:51 PM INFO: WorkerID=17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from MOVESWorkerOutput
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from BaseRateOutput
-     [java] 11/1/26, 3:51 PM INFO: Worker finished processing: 4679633295388720344_9_InProgress_17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: Worker is idle
-     [java] 11/1/26, 3:51 PM INFO: Found work file: 4679633295388720344_10_TODO
-     [java] 11/1/26, 3:51 PM INFO: Worker Processing 4679633295388720344_10_InProgress_17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: WorkerVersion=MOVES5.0.1
-     [java] 11/1/26, 3:51 PM INFO: WorkerComputerID=ccc0233.campuscluster.illinois.edu
-     [java] 11/1/26, 3:51 PM INFO: WorkerID=17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from MOVESWorkerOutput
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from BaseRateOutput
-     [java] 11/1/26, 3:51 PM INFO: Worker finished processing: 4679633295388720344_10_InProgress_17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: Worker is idle
-     [java] 11/1/26, 3:51 PM INFO: Found work file: 4679633295388720344_11_TODO
-     [java] 11/1/26, 3:51 PM INFO: Worker Processing 4679633295388720344_11_InProgress_17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: WorkerVersion=MOVES5.0.1
-     [java] 11/1/26, 3:51 PM INFO: WorkerComputerID=ccc0233.campuscluster.illinois.edu
-     [java] 11/1/26, 3:51 PM INFO: WorkerID=17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from MOVESWorkerOutput
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from BaseRateOutput
-     [java] 11/1/26, 3:51 PM INFO: Worker finished processing: 4679633295388720344_11_InProgress_17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: Worker is idle
-     [java] 11/1/26, 3:51 PM INFO: Found work file: 4679633295388720344_12_TODO
-     [java] 11/1/26, 3:51 PM INFO: Worker Processing 4679633295388720344_12_InProgress_17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: WorkerVersion=MOVES5.0.1
-     [java] 11/1/26, 3:51 PM INFO: WorkerComputerID=ccc0233.campuscluster.illinois.edu
-     [java] 11/1/26, 3:51 PM INFO: WorkerID=17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from MOVESWorkerOutput
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from BaseRateOutput
-     [java] 11/1/26, 3:51 PM INFO: Worker finished processing: 4679633295388720344_12_InProgress_17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: Worker is idle
-     [java] 11/1/26, 3:51 PM INFO: Found work file: 4679633295388720344_13_TODO
-     [java] 11/1/26, 3:51 PM INFO: Worker Processing 4679633295388720344_13_InProgress_17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: WorkerVersion=MOVES5.0.1
-     [java] 11/1/26, 3:51 PM INFO: WorkerComputerID=ccc0233.campuscluster.illinois.edu
-     [java] 11/1/26, 3:51 PM INFO: WorkerID=17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from MOVESWorkerOutput
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from BaseRateOutput
-     [java] 11/1/26, 3:51 PM INFO: Worker finished processing: 4679633295388720344_13_InProgress_17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: Worker is idle
-     [java] 11/1/26, 3:51 PM INFO: Found work file: 4679633295388720344_14_TODO
-     [java] 11/1/26, 3:51 PM INFO: Worker Processing 4679633295388720344_14_InProgress_17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: WorkerVersion=MOVES5.0.1
-     [java] 11/1/26, 3:51 PM INFO: WorkerComputerID=ccc0233.campuscluster.illinois.edu
-     [java] 11/1/26, 3:51 PM INFO: WorkerID=17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from MOVESWorkerOutput
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from BaseRateOutput
-     [java] 11/1/26, 3:51 PM INFO: Worker finished processing: 4679633295388720344_14_InProgress_17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: Worker is idle
-     [java] 11/1/26, 3:51 PM INFO: Found work file: 4679633295388720344_15_TODO
-     [java] 11/1/26, 3:51 PM INFO: Worker Processing 4679633295388720344_15_InProgress_17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: WorkerVersion=MOVES5.0.1
-     [java] 11/1/26, 3:51 PM INFO: WorkerComputerID=ccc0233.campuscluster.illinois.edu
-     [java] 11/1/26, 3:51 PM INFO: WorkerID=17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from MOVESWorkerOutput
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from BaseRateOutput
-     [java] 11/1/26, 3:51 PM INFO: Worker finished processing: 4679633295388720344_15_InProgress_17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: Worker is idle
-     [java] 11/1/26, 3:51 PM INFO: Found work file: 4679633295388720344_16_TODO
-     [java] 11/1/26, 3:51 PM INFO: Worker Processing 4679633295388720344_16_InProgress_17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: WorkerVersion=MOVES5.0.1
-     [java] 11/1/26, 3:51 PM INFO: WorkerComputerID=ccc0233.campuscluster.illinois.edu
-     [java] 11/1/26, 3:51 PM INFO: WorkerID=17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from MOVESWorkerOutput
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from BaseRateOutput
-     [java] 11/1/26, 3:51 PM INFO: Worker finished processing: 4679633295388720344_16_InProgress_17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: Worker is idle
-     [java] 11/1/26, 3:51 PM INFO: Found work file: 4679633295388720344_17_TODO
-     [java] 11/1/26, 3:51 PM INFO: Worker Processing 4679633295388720344_17_InProgress_17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: WorkerVersion=MOVES5.0.1
-     [java] 11/1/26, 3:51 PM INFO: WorkerComputerID=ccc0233.campuscluster.illinois.edu
-     [java] 11/1/26, 3:51 PM INFO: WorkerID=17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from MOVESWorkerOutput
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from BaseRateOutput
-     [java] 11/1/26, 3:51 PM INFO: Worker finished processing: 4679633295388720344_17_InProgress_17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: Worker is idle
-     [java] 11/1/26, 3:51 PM INFO: Found work file: 4679633295388720344_18_TODO
-     [java] 11/1/26, 3:51 PM INFO: Worker Processing 4679633295388720344_18_InProgress_17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: WorkerVersion=MOVES5.0.1
-     [java] 11/1/26, 3:51 PM INFO: WorkerComputerID=ccc0233.campuscluster.illinois.edu
-     [java] 11/1/26, 3:51 PM INFO: WorkerID=17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from MOVESWorkerOutput
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
-     [java] 11/1/26, 3:51 PM INFO: Extracted 0 rows from BaseRateOutput
-     [java] 11/1/26, 3:51 PM INFO: Worker finished processing: 4679633295388720344_18_InProgress_17437960403442597474
-     [java] 11/1/26, 3:51 PM INFO: Worker is idle
-     [java] 11/1/26, 3:51 PM INFO: Received bundle from worker
-     [java] 11/1/26, 3:51 PM INFO: Bundle 10 is from worker: 'ccc0233.campuscluster.illinois.edu'/'MOVES5.0.1'/'17437960403442597474'
-     [java] 11/1/26, 3:51 PM INFO: Received bundle from worker
-     [java] 11/1/26, 3:51 PM INFO: Bundle 11 is from worker: 'ccc0233.campuscluster.illinois.edu'/'MOVES5.0.1'/'17437960403442597474'
-     [java] 11/1/26, 3:51 PM INFO: Received bundle from worker
-     [java] 11/1/26, 3:51 PM INFO: Bundle 12 is from worker: 'ccc0233.campuscluster.illinois.edu'/'MOVES5.0.1'/'17437960403442597474'
-     [java] 11/1/26, 3:51 PM INFO: Received bundle from worker
-     [java] 11/1/26, 3:51 PM INFO: Bundle 13 is from worker: 'ccc0233.campuscluster.illinois.edu'/'MOVES5.0.1'/'17437960403442597474'
-     [java] 11/1/26, 3:51 PM INFO: Received bundle from worker
-     [java] 11/1/26, 3:51 PM INFO: Bundle 14 is from worker: 'ccc0233.campuscluster.illinois.edu'/'MOVES5.0.1'/'17437960403442597474'
-     [java] 11/1/26, 3:51 PM INFO: Received bundle from worker
-     [java] 11/1/26, 3:51 PM INFO: Bundle 15 is from worker: 'ccc0233.campuscluster.illinois.edu'/'MOVES5.0.1'/'17437960403442597474'
-     [java] 11/1/26, 3:51 PM INFO: Received bundle from worker
-     [java] 11/1/26, 3:51 PM INFO: Bundle 16 is from worker: 'ccc0233.campuscluster.illinois.edu'/'MOVES5.0.1'/'17437960403442597474'
-     [java] 11/1/26, 3:51 PM INFO: Received bundle from worker
-     [java] 11/1/26, 3:51 PM INFO: Bundle 17 is from worker: 'ccc0233.campuscluster.illinois.edu'/'MOVES5.0.1'/'17437960403442597474'
-     [java] 11/1/26, 3:51 PM INFO: Received bundle from worker
-     [java] 11/1/26, 3:51 PM INFO: Bundle 18 is from worker: 'ccc0233.campuscluster.illinois.edu'/'MOVES5.0.1'/'17437960403442597474'
-     [java] 11/1/26, 3:51 PM INFO: Received bundle from worker
-     [java] 11/1/26, 3:51 PM INFO: Bundle 1 is from worker: 'ccc0233.campuscluster.illinois.edu'/'MOVES5.0.1'/'17437960403442597474'
-     [java] 11/1/26, 3:51 PM INFO: Received bundle from worker
-     [java] 11/1/26, 3:51 PM INFO: Bundle 2 is from worker: 'ccc0233.campuscluster.illinois.edu'/'MOVES5.0.1'/'17437960403442597474'
-     [java] 11/1/26, 3:51 PM INFO: Received bundle from worker
-     [java] 11/1/26, 3:51 PM INFO: Bundle 3 is from worker: 'ccc0233.campuscluster.illinois.edu'/'MOVES5.0.1'/'17437960403442597474'
-     [java] 11/1/26, 3:51 PM INFO: Received bundle from worker
-     [java] 11/1/26, 3:51 PM INFO: Bundle 4 is from worker: 'ccc0233.campuscluster.illinois.edu'/'MOVES5.0.1'/'17437960403442597474'
-     [java] 11/1/26, 3:51 PM INFO: Received bundle from worker
-     [java] 11/1/26, 3:51 PM INFO: Bundle 5 is from worker: 'ccc0233.campuscluster.illinois.edu'/'MOVES5.0.1'/'17437960403442597474'
-     [java] 11/1/26, 3:51 PM INFO: Received bundle from worker
-     [java] 11/1/26, 3:51 PM INFO: Bundle 6 is from worker: 'ccc0233.campuscluster.illinois.edu'/'MOVES5.0.1'/'17437960403442597474'
-     [java] 11/1/26, 3:51 PM INFO: Received bundle from worker
-     [java] 11/1/26, 3:51 PM INFO: Bundle 7 is from worker: 'ccc0233.campuscluster.illinois.edu'/'MOVES5.0.1'/'17437960403442597474'
-     [java] 11/1/26, 3:51 PM INFO: Received bundle from worker
-     [java] 11/1/26, 3:51 PM INFO: Bundle 8 is from worker: 'ccc0233.campuscluster.illinois.edu'/'MOVES5.0.1'/'17437960403442597474'
-     [java] 11/1/26, 3:51 PM INFO: Received bundle from worker
-     [java] 11/1/26, 3:51 PM INFO: Bundle 9 is from worker: 'ccc0233.campuscluster.illinois.edu'/'MOVES5.0.1'/'17437960403442597474'
-     [java] 11/1/26, 3:51 PM INFO: Final aggregation is being done by default.
-     [java] 11/1/26, 3:51 PM INFO: Final Aggregation starting...
-     [java] 11/1/26, 3:51 PM INFO: Final Aggregation complete.
-     [java] 11/1/26, 3:51 PM INFO: Unit conversions starting...
-     [java] 11/1/26, 3:51 PM INFO: Time Measurement System = Seconds
-     [java] 11/1/26, 3:51 PM INFO: Output Time Step = Hour
-     [java] 11/1/26, 3:51 PM INFO: Output Time Step average hours = 1.0
-     [java] 11/1/26, 3:51 PM INFO: Unit conversions done.
-     [java] 11/1/26, 3:51 PM INFO: Final Post processing starting...
-     [java] 11/1/26, 3:51 PM INFO: Analyzing mesoscale output tables
-     [java] 11/1/26, 3:51 PM INFO: Zeroing null values in rate output tables
-     [java] 11/1/26, 3:51 PM INFO: Done building rate output tables
-     [java] 11/1/26, 3:51 PM INFO: Final Post processing done.
-     [java] 11/1/26, 3:51 PM INFO: Removing data from MOVESOutput per Advanced Performance Features setting...
-     [java] 11/1/26, 3:51 PM INFO: Truncating empty MOVESOutput per Advanced Performance Features setting.
-     [java] 11/1/26, 3:51 PM INFO: Removed data from MOVESOutput per Advanced Performance Features setting.
-     [java] 11/1/26, 3:51 PM INFO: Removing data from MOVESActivityOutput per Advanced Performance Features setting...
-     [java] 11/1/26, 3:51 PM INFO: Truncating empty MOVESActivityOutput per Advanced Performance Features setting.
-     [java] 11/1/26, 3:51 PM INFO: Removed data from MOVESActivityOutput per Advanced Performance Features setting.
-     [java] 11/1/26, 3:51 PM INFO: Removing data from BaseRateOutput per Advanced Performance Features setting...
-     [java] 11/1/26, 3:51 PM INFO: Truncating empty BaseRateOutput per Advanced Performance Features setting.
-     [java] 11/1/26, 3:51 PM INFO: Removed data from BaseRateOutput per Advanced Performance Features setting.
-     [java] 11/1/26, 3:51 PM INFO: Removing data from BaseRateUnits per Advanced Performance Features setting...
-     [java] 11/1/26, 3:51 PM INFO: Truncating empty BaseRateUnits per Advanced Performance Features setting.
-     [java] 11/1/26, 3:51 PM INFO: Removed data from BaseRateUnits per Advanced Performance Features setting.
-     [java] 11/1/26, 3:51 PM INFO: Unbundler has detected completion conditions. Exiting.
-     [java] 11/1/26, 3:51 PM INFO: Generated bundles = 18 Retrieved bundles = 18
-     [java] 11/1/26, 3:51 PM INFO: Thread shutdown starting for class gov.epa.otaq.moves.master.framework.EmissionCalculatorInboundUnbundler.
-     [java] 11/1/26, 3:51 PM INFO: Thread shutdown complete for class gov.epa.otaq.moves.master.framework.EmissionCalculatorInboundUnbundler.
-     [java] 11/1/26, 3:51 PM INFO: Thread shutdown starting for class gov.epa.otaq.moves.master.framework.HeartbeatDetectionThread.
-     [java] 11/1/26, 3:51 PM INFO: Thread shutdown complete for class gov.epa.otaq.moves.master.framework.HeartbeatDetectionThread.
+     [java] 11/2/26, 9:53 PM INFO: Loading system configuration...
+     [java] 11/2/26, 9:53 PM INFO: System configuration setting up the instance counter...
+     [java] 11/2/26, 9:53 PM INFO: System configuration clearing prior IDs...
+     [java] 11/2/26, 9:53 PM INFO: System configuration reading computer ID...
+     [java] 11/2/26, 9:53 PM INFO: Using alternate master configuration file: maketodo.txt
+     [java] 11/2/26, 9:53 PM INFO: Using master configuration file: maketodo.txt
+     [java] 11/2/26, 9:53 PM INFO: System configuration loading configuration files...
+     [java] 11/2/26, 9:53 PM INFO: System configuration setting up temporary files...
+     [java] 11/2/26, 9:53 PM INFO: Folder for temporary files: /opt/moves/MOVESTemporary
+     [java] 11/2/26, 9:53 PM INFO: System configuration acquiring distributed master ID...
+     [java] 11/2/26, 9:53 PM INFO: Done loading system configuration.
+     [java] 11/2/26, 9:53 PM INFO: Using alternate worker configuration file: manyworkers.txt
+     [java] 11/2/26, 9:53 PM INFO: Initializing default database connections...
+     [java] 11/2/26, 9:53 PM INFO: Reading default database table definitions...
+     [java] 11/2/26, 9:53 PM INFO: Done initializing database connections.
+     [java] 11/2/26, 9:53 PM WARNING: Added missing vehicle selection: Passenger Car - Diesel Fuel
+     [java] 11/2/26, 9:53 PM WARNING: Added missing vehicle selection: Passenger Car - Ethanol (E-85)
+     [java] 11/2/26, 9:53 PM WARNING: Added missing vehicle selection: Passenger Car - Electricity
+     [java] 11/2/26, 9:53 PM INFO: ***Starting MOVES run***
+     [java] 11/2/26, 9:53 PM INFO: Master Release: MOVES5.0.1
+     [java] 11/2/26, 9:53 PM INFO: Master Computer ID: ccc0232.campuscluster.illinois.edu
+     [java] 11/2/26, 9:53 PM INFO: Master ID: 4454931386605935533
+     [java] 11/2/26, 9:53 PM INFO: RunSpec: /projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/rates-start.xml
+     [java] 11/2/26, 9:53 PM INFO: Initializing output database connections...
+     [java] 11/2/26, 9:53 PM INFO: Done initializing database connections.
+     [java] 11/2/26, 9:53 PM INFO: Thread starting for class gov.epa.otaq.moves.master.framework.HeartbeatDetectionThread.
+     [java] 11/2/26, 9:53 PM INFO: Initializing default database connections...
+     [java] 11/2/26, 9:53 PM INFO: Database connections already established.
+     [java] 11/2/26, 9:53 PM INFO: HeartbeatDetectionThread !hasWorkerOnThisComputer
+     [java] 11/2/26, 9:53 PM INFO: Initializing MOVESExecution connections...
+     [java] 11/2/26, 9:53 PM INFO: Creating the execution database...
+     [java] 11/2/26, 9:53 PM INFO: Removing tables from the execution database...
+     [java] 11/2/26, 9:53 PM INFO: Creating empty tables in the execution database...
+     [java] 11/2/26, 9:53 PM INFO: Finalizing the execution database...
+     [java] 11/2/26, 9:53 PM INFO: Reading execution database table definitions...
+     [java] 11/2/26, 9:53 PM INFO: Done initializing database connections.
+     [java] 11/2/26, 9:53 PM INFO: Initializing output database connections...
+     [java] 11/2/26, 9:53 PM INFO: Database connections already established.
+     [java] 11/2/26, 9:53 PM INFO: Thread starting for class gov.epa.otaq.moves.master.framework.MasterLoop.
+     [java] 11/2/26, 9:53 PM INFO: Thread starting for class gov.epa.otaq.moves.master.framework.EmissionCalculatorInboundUnbundler.
+     [java] 11/2/26, 9:53 PM INFO: InputDataManager transferred all default tables.
+     [java] 11/2/26, 9:53 PM INFO: InputDataManager transferred all default tables.
+     [java] 11/2/26, 9:53 PM DEBUG: Starting WorkerCommandLine...
+     [java] 11/2/26, 9:53 PM INFO: testConnection = com.mysql.jdbc.JDBC4Connection@5805f87f
+     [java] 11/2/26, 9:53 PM INFO: WorkerConfiguration loaded. distributedWorkerId = 4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: Worker Release: MOVES5.0.1
+     [java] 11/2/26, 9:53 PM INFO: Worker Computer ID: ccc0232.campuscluster.illinois.edu
+     [java] 11/2/26, 9:53 PM INFO: Worker ID: 4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: Thread starting for class gov.epa.otaq.moves.worker.framework.WorkerHeartbeatThread.
+     [java] 11/2/26, 9:53 PM INFO: Thread starting for class gov.epa.otaq.moves.worker.framework.RemoteEmissionsCalculator.
+     [java] 11/2/26, 9:53 PM INFO: Setting worker flag for 4621779352432077299 on port 13132
+     [java] 11/2/26, 9:53 PM INFO: InputDataManager transferred all NonRoad tables.
+     [java] 11/2/26, 9:53 PM INFO: Class gov.epa.otaq.moves.master.implementation.general.MeteorologyGenerator has been instantiated.
+     [java] 11/2/26, 9:53 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.ActivityCalculator has been instantiated.
+     [java] 11/2/26, 9:53 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.BaseRateCalculator has been instantiated.
+     [java] 11/2/26, 9:53 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator has been instantiated.
+     [java] 11/2/26, 9:53 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.CrankcaseEmissionCalculatorNonPM has been instantiated.
+     [java] 11/2/26, 9:53 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator has been instantiated.
+     [java] 11/2/26, 9:53 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.RatesOperatingModeDistributionGenerator has been instantiated.
+     [java] 11/2/26, 9:53 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator has been instantiated.
+     [java] 11/2/26, 9:53 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.StartOperatingModeDistributionGenerator has been instantiated.
+     [java] 11/2/26, 9:53 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.TotalActivityGenerator has been instantiated.
+     [java] 11/2/26, 9:53 PM DEBUG: gov.epa.otaq.moves.master.implementation.general.MeteorologyGenerator subscribed to Running Exhaust at PROCESS/100
+     [java] 11/2/26, 9:53 PM DEBUG: gov.epa.otaq.moves.master.implementation.general.MeteorologyGenerator subscribed to Extended Idle Exhaust at PROCESS/100
+     [java] 11/2/26, 9:53 PM DEBUG: gov.epa.otaq.moves.master.implementation.general.MeteorologyGenerator subscribed to Start Exhaust at PROCESS/100
+     [java] 11/2/26, 9:53 PM DEBUG: gov.epa.otaq.moves.master.implementation.general.MeteorologyGenerator subscribed to Auxiliary Power Exhaust at PROCESS/100
+     [java] 11/2/26, 9:53 PM DEBUG: gov.epa.otaq.moves.master.implementation.general.MeteorologyGenerator subscribed to Tirewear at PROCESS/100
+     [java] 11/2/26, 9:53 PM DEBUG: gov.epa.otaq.moves.master.implementation.general.MeteorologyGenerator subscribed to Brakewear at PROCESS/100
+     [java] 11/2/26, 9:53 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.ActivityCalculator subscribed to Start Exhaust at YEAR/10
+     [java] 11/2/26, 9:53 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateCalculator subscribed to Start Exhaust at MONTH/10
+     [java] 11/2/26, 9:53 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator subscribed to Running Exhaust at YEAR/98
+     [java] 11/2/26, 9:53 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator subscribed to Start Exhaust at YEAR/98
+     [java] 11/2/26, 9:53 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator subscribed to Extended Idle Exhaust at YEAR/98
+     [java] 11/2/26, 9:53 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator subscribed to Auxiliary Power Exhaust at YEAR/98
+     [java] 11/2/26, 9:53 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator subscribed to Brakewear at YEAR/98
+     [java] 11/2/26, 9:53 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator subscribed to Tirewear at YEAR/98
+     [java] 11/2/26, 9:53 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator subscribed to Start Exhaust at PROCESS/99
+     [java] 11/2/26, 9:53 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator subscribed to Crankcase Start Exhaust at PROCESS/99
+     [java] 11/2/26, 9:53 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.RatesOperatingModeDistributionGenerator subscribed to Running Exhaust at YEAR/100
+     [java] 11/2/26, 9:53 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.RatesOperatingModeDistributionGenerator subscribed to Extended Idle Exhaust at YEAR/100
+     [java] 11/2/26, 9:53 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.RatesOperatingModeDistributionGenerator subscribed to Auxiliary Power Exhaust at YEAR/100
+     [java] 11/2/26, 9:53 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Running Exhaust at YEAR/101
+     [java] 11/2/26, 9:53 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Start Exhaust at YEAR/101
+     [java] 11/2/26, 9:53 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Extended Idle Exhaust at YEAR/101
+     [java] 11/2/26, 9:53 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Auxiliary Power Exhaust at YEAR/101
+     [java] 11/2/26, 9:53 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Evap Permeation at YEAR/101
+     [java] 11/2/26, 9:53 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Evap Fuel Vapor Venting at YEAR/101
+     [java] 11/2/26, 9:53 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Evap Fuel Leaks at YEAR/101
+     [java] 11/2/26, 9:53 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Brakewear at YEAR/101
+     [java] 11/2/26, 9:53 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Tirewear at YEAR/101
+     [java] 11/2/26, 9:53 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.StartOperatingModeDistributionGenerator subscribed to Start Exhaust at PROCESS/100
+     [java] 11/2/26, 9:53 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.TotalActivityGenerator subscribed to Start Exhaust at YEAR/100
+     [java] 11/2/26, 9:53 PM INFO: 18 bundles will be used.
+     [java] 11/2/26, 9:53 PM INFO: Thread starting for class gov.epa.otaq.moves.master.framework.MasterLoopableThread.
+     [java] 11/2/26, 9:53 PM INFO: MetGen setupTime=27 bundleTime=0
+     [java] 11/2/26, 9:53 PM INFO: StartOperatingModeDistributionGenerator setupTime=8055 totalTime=2
+     [java] 11/2/26, 9:53 PM INFO: doGeneralFuelRatio
+     [java] 11/2/26, 9:53 PM INFO: FuelTypeID 1 has 1 formulations
+     [java] 11/2/26, 9:53 PM INFO: FuelTypeID 2 has 1 formulations
+     [java] 11/2/26, 9:53 PM INFO: FuelTypeID 5 has 1 formulations
+     [java] 11/2/26, 9:53 PM INFO: doAirToxicsCalculations
+     [java] 11/2/26, 9:53 PM INFO: 19502000 (1980 to 2000)
+     [java] 11/2/26, 9:53 PM INFO: 20012050 (2001 to 2020)
+     [java] 11/2/26, 9:53 PM INFO: FuelTypeID 1 has 1 formulations
+     [java] 11/2/26, 9:53 PM INFO: doCOCalculations
+     [java] 11/2/26, 9:53 PM INFO: 19502000 (1980 to 2000)
+     [java] 11/2/26, 9:53 PM INFO: 20012050 (2001 to 2020)
+     [java] 11/2/26, 9:53 PM INFO: FuelTypeID 1 has 1 formulations
+     [java] 11/2/26, 9:53 PM INFO: Dropping criteriaRatio indexes
+     [java] 11/2/26, 9:53 PM INFO: Checked sulfur model input table tempCOA
+     [java] 11/2/26, 9:53 PM INFO: Checked sulfur model output table criteriaRatio
+     [java] 11/2/26, 9:53 PM INFO: Checked sulfur model input table tempCOA
+     [java] 11/2/26, 9:53 PM INFO: Checked sulfur model output table criteriaRatio
+     [java] 11/2/26, 9:53 PM INFO: doPredictiveCalculations: predictHC, 101,102 / 1000101,1000102
+     [java] 11/2/26, 9:53 PM INFO: 19502000 (1980 to 2000)
+     [java] 11/2/26, 9:53 PM INFO: 20012050 (2001 to 2020)
+     [java] 11/2/26, 9:53 PM INFO: FuelTypeID 1 has 1 formulations
+     [java] 11/2/26, 9:53 PM INFO: Checked sulfur model input table tempHCA
+     [java] 11/2/26, 9:53 PM INFO: Checked sulfur model output table criteriaRatio
+     [java] 11/2/26, 9:53 PM INFO: Checked sulfur model input table tempHCA
+     [java] 11/2/26, 9:53 PM INFO: Checked sulfur model output table criteriaRatio
+     [java] 11/2/26, 9:53 PM INFO: doPredictiveCalculations: predictNOx, 301,302 / 
+     [java] 11/2/26, 9:53 PM INFO: 19502000 (1980 to 2000)
+     [java] 11/2/26, 9:53 PM INFO: 20012050 (2001 to 2020)
+     [java] 11/2/26, 9:53 PM INFO: FuelTypeID 1 has 1 formulations
+     [java] 11/2/26, 9:53 PM INFO: Checked sulfur model input table tempNOxA
+     [java] 11/2/26, 9:53 PM INFO: Checked sulfur model output table criteriaRatio
+     [java] 11/2/26, 9:53 PM INFO: Checked sulfur model input table tempNOxA
+     [java] 11/2/26, 9:53 PM INFO: Checked sulfur model output table criteriaRatio
+     [java] 11/2/26, 9:53 PM INFO: doMTBECalculations
+     [java] 11/2/26, 9:53 PM INFO: doEvapBenzeneCalculations
+     [java] 11/2/26, 9:53 PM INFO: Creating criteriaRatio indexes
+     [java] 11/2/26, 9:53 PM INFO: Removed potential overlaps between ATRatioNonGas and ATRatio
+     [java] 11/2/26, 9:53 PM INFO: FuelEffectsGenerator totalTime=2497
+     [java] 11/2/26, 9:53 PM DEBUG: newSBD Generator called for process: Start Exhaust
+     [java] 11/2/26, 9:53 PM DEBUG: Processing pollutant-process: Carbon Monoxide (CO) - Start Exhaust
+     [java] 11/2/26, 9:53 PM DEBUG: Processing pollutant-process: Oxides of Nitrogen (NOx) - Start Exhaust
+     [java] 11/2/26, 9:53 PM DEBUG: Processing pollutant-process: Total Gaseous Hydrocarbons - Start Exhaust
+     [java] 11/2/26, 9:53 PM INFO: newSBDG setupTime=0 bundleTime=45
+     [java] 11/2/26, 9:53 PM INFO: TAG SourceTypeHour2 ms=5
+     [java] 11/2/26, 9:53 PM INFO: TAG AverageSpeed ms=3
+     [java] 11/2/26, 9:53 PM INFO: TAG SHOByAgeRoadwayHour ms=16
+     [java] 11/2/26, 9:53 PM INFO: TAG IdleHoursByAgeHour ms=3
+     [java] 11/2/26, 9:53 PM INFO: TAG StartsPerSampleVehicle ms=11
+     [java] 11/2/26, 9:53 PM INFO: TAG SourceTypesInStartsPerVehicle ms=3
+     [java] 11/2/26, 9:53 PM INFO: TAG StartsPerVehicle ms=9
+     [java] 11/2/26, 9:53 PM INFO: TAG StartsByAgeHour ms=6
+     [java] 11/2/26, 9:53 PM INFO: TAG SHPByAgeHour ms=7
+     [java] 11/2/26, 9:53 PM INFO: TAG setupTime=20 growthTime=82 bundleTime=111 focusTime=0
+     [java] 11/2/26, 9:53 PM DEBUG: BaseRateGenerator.addIndexes: alter table avgSpeedBin add key speed1 (avgSpeedBinID, avgBinSpeed)
+     [java] 11/2/26, 9:53 PM DEBUG: BaseRateGenerator.addIndexes ms=2
+     [java] 11/2/26, 9:53 PM DEBUG: BaseRateGenerator.addIndexes: alter table avgSpeedBin add key speed2 (avgBinSpeed, avgSpeedBinID)
+     [java] 11/2/26, 9:53 PM DEBUG: BaseRateGenerator.addIndexes ms=2
+     [java] 11/2/26, 9:53 PM DEBUG: BaseRateGenerator.addIndexes: analyze table avgSpeedBin
+     [java] 11/2/26, 9:53 PM DEBUG: BaseRateGenerator.addIndexes ms=0
+     [java] 11/2/26, 9:53 PM DEBUG: Base Rate Generator called for process: Start Exhaust
+     [java] 11/2/26, 9:53 PM DEBUG: Normalizing sourcebin-weighted emission rates
+     [java] 11/2/26, 9:53 PM INFO: Running Statement: #CORE: 1 of 6
+     [java] 11/2/26, 9:53 PM INFO: Running Statement: #CORE: 2 of 6
+     [java] 11/2/26, 9:53 PM INFO: Running Statement: #CORE: 3 of 6
+     [java] 11/2/26, 9:53 PM INFO: Running Statement: #CORE: 4 of 6
+     [java] 11/2/26, 9:53 PM INFO: Running Statement: #CORE: 5 of 6
+     [java] 11/2/26, 9:53 PM INFO: Running Statement: #CORE: 6 of 6
+     [java] 11/2/26, 9:53 PM INFO: Running Statement: #CORE: 1 of 2
+     [java] 11/2/26, 9:53 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 1 of 1
+     [java] 11/2/26, 9:53 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 1 of 1
+     [java] 11/2/26, 9:53 PM INFO: Running Statement: #SBWEIGHTEDDISTANCERATE: 1 of 1
+     [java] 11/2/26, 9:53 PM INFO: Running Statement: #CORE: 2 of 2
+     [java] 11/2/26, 9:53 PM INFO: BRG SBW running concurrent statements...
+     [java] 11/2/26, 9:53 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 1 of 3
+     [java] 11/2/26, 9:53 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 1 of 3
+     [java] 11/2/26, 9:53 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 2 of 3
+     [java] 11/2/26, 9:53 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 3 of 3
+     [java] 11/2/26, 9:53 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 2 of 3
+     [java] 11/2/26, 9:53 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 3 of 3
+     [java] 11/2/26, 9:53 PM INFO: BRG SBW done running concurrent statements.
+     [java] 11/2/26, 9:53 PM INFO: Statements done: 17
+     [java] 11/2/26, 9:53 PM INFO: Avg. Concurrent Statements: 1.411764705882353
+     [java] 11/2/26, 9:53 PM INFO: Max. Concurrent Statements: 3
+     [java] 11/2/26, 9:53 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=68
+     [java] 11/2/26, 9:53 PM DEBUG: BaseRateGenerator: processID=2, applyAvgSpeedDistribution=false, useAvgSpeedBin=false, applySourceBinDistribution=true, keepOpModeID=true, avgSpeedFraction="", sumSBD="*sumSBD"
+     [java] 11/2/26, 9:53 PM DEBUG: BaseRateGenerator processID=2, roadTypeID=0, yearID=2020 has 3 iterations
+     [java] 11/2/26, 9:53 PM DEBUG: BaseRateGenerator executing concurrent SQL...
+     [java] 11/2/26, 9:53 PM INFO: Running Statement: #BASERATE: 1 of 6
+     [java] 11/2/26, 9:53 PM INFO: Running Statement: #BASERATEBYAGE: 1 of 3
+     [java] 11/2/26, 9:53 PM DEBUG: BaseRateGenerator executing BaseRateByAgeHelper...
+     [java] 11/2/26, 9:53 PM INFO: Running Statement: #BASERATE: 2 of 6
+     [java] 11/2/26, 9:53 PM INFO: Running Statement: #BASERATE: 3 of 6
+     [java] 11/2/26, 9:53 PM INFO: Running Statement: #BASERATE: 4 of 6
+     [java] 11/2/26, 9:53 PM INFO: Running Statement: #BASERATE: 5 of 6
+     [java] 11/2/26, 9:53 PM INFO: Running Statement: #BASERATE: 6 of 6
+     [java] 11/2/26, 9:53 PM DEBUG: BaseRateGenerator executing BaseRateByAgeHelper Done
+     [java] 11/2/26, 9:53 PM INFO: Running Statement: #BASERATEBYAGE: 2 of 3
+     [java] 11/2/26, 9:53 PM DEBUG: BaseRateGenerator executing BaseRateByAgeHelper...
+     [java] 11/2/26, 9:53 PM DEBUG: BaseRateGenerator executing BaseRateByAgeHelper Done
+     [java] 11/2/26, 9:53 PM INFO: Running Statement: #BASERATEBYAGE: 3 of 3
+     [java] 11/2/26, 9:53 PM DEBUG: BaseRateGenerator executing BaseRateByAgeHelper...
+     [java] 11/2/26, 9:53 PM DEBUG: BaseRateGenerator executing BaseRateByAgeHelper Done
+     [java] 11/2/26, 9:53 PM DEBUG: BaseRateGenerator concurrent SQL done.
+     [java] 11/2/26, 9:53 PM INFO: Statements done: 9
+     [java] 11/2/26, 9:53 PM INFO: Avg. Concurrent Statements: 1.6666666666666667
+     [java] 11/2/26, 9:53 PM INFO: Max. Concurrent Statements: 2
+     [java] 11/2/26, 9:53 PM DEBUG: Done with BaseRateGenerator processID=2, roadTypeID=0, yearID=2020
+     [java] 11/2/26, 9:53 PM DEBUG: BaseRateGenerator.generateBaseRates ms=115
+     [java] 11/2/26, 9:53 PM INFO: BRG setupTime=5 bundleTime=184
+     [java] 11/2/26, 9:53 PM INFO: Saved bundle file 4454931386605935533_1_TODO
+     [java] 11/2/26, 9:53 PM INFO: Created bundle 1 for workers to process
+     [java] 11/2/26, 9:53 PM INFO: Saved bundle file 4454931386605935533_2_TODO
+     [java] 11/2/26, 9:53 PM INFO: Created bundle 2 for workers to process
+     [java] 11/2/26, 9:53 PM INFO: newSBDG setupTime=0 bundleTime=0
+     [java] 11/2/26, 9:53 PM INFO: TAG setupTime=20 growthTime=82 bundleTime=111 focusTime=0
+     [java] 11/2/26, 9:53 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/2/26, 9:53 PM INFO: BRG setupTime=5 bundleTime=184
+     [java] 11/2/26, 9:53 PM INFO: Saved bundle file 4454931386605935533_3_TODO
+     [java] 11/2/26, 9:53 PM INFO: Created bundle 3 for workers to process
+     [java] 11/2/26, 9:53 PM INFO: newSBDG setupTime=0 bundleTime=0
+     [java] 11/2/26, 9:53 PM INFO: TAG setupTime=20 growthTime=82 bundleTime=111 focusTime=0
+     [java] 11/2/26, 9:53 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/2/26, 9:53 PM INFO: BRG setupTime=5 bundleTime=185
+     [java] 11/2/26, 9:53 PM INFO: Saved bundle file 4454931386605935533_4_TODO
+     [java] 11/2/26, 9:53 PM INFO: Created bundle 4 for workers to process
+     [java] 11/2/26, 9:53 PM INFO: newSBDG setupTime=0 bundleTime=0
+     [java] 11/2/26, 9:53 PM INFO: TAG setupTime=20 growthTime=82 bundleTime=111 focusTime=0
+     [java] 11/2/26, 9:53 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/2/26, 9:53 PM INFO: BRG setupTime=5 bundleTime=185
+     [java] 11/2/26, 9:53 PM INFO: Saved bundle file 4454931386605935533_5_TODO
+     [java] 11/2/26, 9:53 PM INFO: Created bundle 5 for workers to process
+     [java] 11/2/26, 9:53 PM INFO: newSBDG setupTime=0 bundleTime=0
+     [java] 11/2/26, 9:53 PM INFO: TAG setupTime=20 growthTime=82 bundleTime=111 focusTime=0
+     [java] 11/2/26, 9:53 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/2/26, 9:53 PM INFO: BRG setupTime=5 bundleTime=185
+     [java] 11/2/26, 9:53 PM INFO: Saved bundle file 4454931386605935533_6_TODO
+     [java] 11/2/26, 9:53 PM INFO: Created bundle 6 for workers to process
+     [java] 11/2/26, 9:53 PM INFO: newSBDG setupTime=0 bundleTime=0
+     [java] 11/2/26, 9:53 PM INFO: TAG setupTime=20 growthTime=82 bundleTime=111 focusTime=0
+     [java] 11/2/26, 9:53 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/2/26, 9:53 PM INFO: BRG setupTime=5 bundleTime=186
+     [java] 11/2/26, 9:53 PM INFO: Saved bundle file 4454931386605935533_7_TODO
+     [java] 11/2/26, 9:53 PM INFO: Created bundle 7 for workers to process
+     [java] 11/2/26, 9:53 PM INFO: newSBDG setupTime=0 bundleTime=0
+     [java] 11/2/26, 9:53 PM INFO: TAG setupTime=20 growthTime=82 bundleTime=111 focusTime=0
+     [java] 11/2/26, 9:53 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/2/26, 9:53 PM INFO: BRG setupTime=5 bundleTime=186
+     [java] 11/2/26, 9:53 PM INFO: Saved bundle file 4454931386605935533_8_TODO
+     [java] 11/2/26, 9:53 PM INFO: Created bundle 8 for workers to process
+     [java] 11/2/26, 9:53 PM INFO: newSBDG setupTime=0 bundleTime=0
+     [java] 11/2/26, 9:53 PM INFO: TAG setupTime=20 growthTime=82 bundleTime=111 focusTime=0
+     [java] 11/2/26, 9:53 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/2/26, 9:53 PM INFO: BRG setupTime=5 bundleTime=186
+     [java] 11/2/26, 9:53 PM INFO: Saved bundle file 4454931386605935533_9_TODO
+     [java] 11/2/26, 9:53 PM INFO: Created bundle 9 for workers to process
+     [java] 11/2/26, 9:53 PM INFO: newSBDG setupTime=0 bundleTime=0
+     [java] 11/2/26, 9:53 PM INFO: TAG setupTime=20 growthTime=82 bundleTime=111 focusTime=0
+     [java] 11/2/26, 9:53 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/2/26, 9:53 PM INFO: BRG setupTime=5 bundleTime=186
+     [java] 11/2/26, 9:53 PM INFO: Saved bundle file 4454931386605935533_10_TODO
+     [java] 11/2/26, 9:53 PM INFO: Created bundle 10 for workers to process
+     [java] 11/2/26, 9:53 PM INFO: newSBDG setupTime=0 bundleTime=0
+     [java] 11/2/26, 9:53 PM INFO: TAG setupTime=20 growthTime=82 bundleTime=111 focusTime=0
+     [java] 11/2/26, 9:53 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/2/26, 9:53 PM INFO: BRG setupTime=5 bundleTime=186
+     [java] 11/2/26, 9:53 PM INFO: Saved bundle file 4454931386605935533_11_TODO
+     [java] 11/2/26, 9:53 PM INFO: Created bundle 11 for workers to process
+     [java] 11/2/26, 9:53 PM INFO: newSBDG setupTime=0 bundleTime=0
+     [java] 11/2/26, 9:53 PM INFO: TAG setupTime=20 growthTime=82 bundleTime=111 focusTime=0
+     [java] 11/2/26, 9:53 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/2/26, 9:53 PM INFO: BRG setupTime=5 bundleTime=186
+     [java] 11/2/26, 9:53 PM INFO: Saved bundle file 4454931386605935533_12_TODO
+     [java] 11/2/26, 9:53 PM INFO: Created bundle 12 for workers to process
+     [java] 11/2/26, 9:53 PM INFO: newSBDG setupTime=0 bundleTime=0
+     [java] 11/2/26, 9:53 PM INFO: TAG setupTime=20 growthTime=82 bundleTime=111 focusTime=0
+     [java] 11/2/26, 9:53 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/2/26, 9:53 PM INFO: BRG setupTime=5 bundleTime=186
+     [java] 11/2/26, 9:53 PM INFO: Saved bundle file 4454931386605935533_13_TODO
+     [java] 11/2/26, 9:53 PM INFO: Created bundle 13 for workers to process
+     [java] 11/2/26, 9:53 PM INFO: newSBDG setupTime=0 bundleTime=0
+     [java] 11/2/26, 9:53 PM INFO: TAG setupTime=20 growthTime=82 bundleTime=111 focusTime=0
+     [java] 11/2/26, 9:53 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/2/26, 9:53 PM INFO: BRG setupTime=5 bundleTime=186
+     [java] 11/2/26, 9:53 PM INFO: Saved bundle file 4454931386605935533_14_TODO
+     [java] 11/2/26, 9:53 PM INFO: Created bundle 14 for workers to process
+     [java] 11/2/26, 9:53 PM INFO: newSBDG setupTime=0 bundleTime=0
+     [java] 11/2/26, 9:53 PM INFO: TAG setupTime=20 growthTime=82 bundleTime=111 focusTime=0
+     [java] 11/2/26, 9:53 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/2/26, 9:53 PM INFO: BRG setupTime=5 bundleTime=186
+     [java] 11/2/26, 9:53 PM INFO: Saved bundle file 4454931386605935533_15_TODO
+     [java] 11/2/26, 9:53 PM INFO: Created bundle 15 for workers to process
+     [java] 11/2/26, 9:53 PM INFO: newSBDG setupTime=0 bundleTime=0
+     [java] 11/2/26, 9:53 PM INFO: TAG setupTime=20 growthTime=82 bundleTime=111 focusTime=0
+     [java] 11/2/26, 9:53 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/2/26, 9:53 PM INFO: BRG setupTime=5 bundleTime=186
+     [java] 11/2/26, 9:53 PM INFO: Saved bundle file 4454931386605935533_16_TODO
+     [java] 11/2/26, 9:53 PM INFO: Created bundle 16 for workers to process
+     [java] 11/2/26, 9:53 PM INFO: newSBDG setupTime=0 bundleTime=0
+     [java] 11/2/26, 9:53 PM INFO: TAG setupTime=20 growthTime=82 bundleTime=111 focusTime=0
+     [java] 11/2/26, 9:53 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/2/26, 9:53 PM INFO: BRG setupTime=5 bundleTime=187
+     [java] 11/2/26, 9:53 PM INFO: Saved bundle file 4454931386605935533_17_TODO
+     [java] 11/2/26, 9:53 PM INFO: Created bundle 17 for workers to process
+     [java] 11/2/26, 9:53 PM INFO: newSBDG setupTime=0 bundleTime=0
+     [java] 11/2/26, 9:53 PM INFO: TAG setupTime=20 growthTime=82 bundleTime=111 focusTime=0
+     [java] 11/2/26, 9:53 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/2/26, 9:53 PM INFO: BRG setupTime=5 bundleTime=188
+     [java] 11/2/26, 9:53 PM INFO: Saved bundle file 4454931386605935533_18_TODO
+     [java] 11/2/26, 9:53 PM INFO: Created bundle 18 for workers to process
+     [java] 11/2/26, 9:53 PM INFO: Thread shutdown starting for class gov.epa.otaq.moves.master.framework.MasterLoop.
+     [java] 11/2/26, 9:53 PM INFO: Thread shutdown starting for class gov.epa.otaq.moves.master.framework.MasterLoopableThread.
+     [java] 11/2/26, 9:53 PM INFO: Thread shutdown complete for class gov.epa.otaq.moves.master.framework.MasterLoopableThread.
+     [java] 11/2/26, 9:53 PM INFO: Thread shutdown complete for class gov.epa.otaq.moves.master.framework.MasterLoop.
+     [java] 11/2/26, 9:53 PM DEBUG: Worker found 18 TODO files.
+     [java] 11/2/26, 9:53 PM INFO: Found work file: 4454931386605935533_1_TODO
+     [java] 11/2/26, 9:53 PM INFO: Worker Processing 4454931386605935533_1_InProgress_4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/2/26, 9:53 PM INFO: WorkerComputerID=ccc0232.campuscluster.illinois.edu
+     [java] 11/2/26, 9:53 PM INFO: WorkerID=4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from MOVESWorkerOutput
+     [java] 11/2/26, 9:53 PM INFO: Extracted 250 rows from MOVESWorkerActivityOutput
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/2/26, 9:53 PM INFO: Worker finished processing: 4454931386605935533_1_InProgress_4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: Worker is idle
+     [java] 11/2/26, 9:53 PM INFO: Found work file: 4454931386605935533_2_TODO
+     [java] 11/2/26, 9:53 PM INFO: Worker Processing 4454931386605935533_2_InProgress_4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/2/26, 9:53 PM INFO: WorkerComputerID=ccc0232.campuscluster.illinois.edu
+     [java] 11/2/26, 9:53 PM INFO: WorkerID=4621779352432077299
+     [java] 11/2/26, 9:53 PM DEBUG: Run /opt/moves/calc/externalcalculatorgo64.exe in /opt/moves/MOVESTemporary/manyworkers/workerfolder/WorkerTemp1
+     [java] 11/2/26, 9:53 PM DEBUG: Command line = 
+     [java] 11/2/26, 9:53 PM DEBUG: -isproject=0
+     [java] 11/2/26, 9:53 PM DEBUG: 
+     [java] 11/2/26, 9:53 PM INFO: Time spent on running the external calculator (sec): 0.08299999684095383
+     [java] 11/2/26, 9:53 PM INFO: Time spent on absorbing external calculator results (sec): 0.004999999888241291
+     [java] 11/2/26, 9:53 PM INFO: Extracted 684 rows from MOVESWorkerOutput
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/2/26, 9:53 PM INFO: Extracted 684 rows from BaseRateOutput
+     [java] 11/2/26, 9:53 PM INFO: Worker finished processing: 4454931386605935533_2_InProgress_4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: Worker is idle
+     [java] 11/2/26, 9:53 PM INFO: Found work file: 4454931386605935533_3_TODO
+     [java] 11/2/26, 9:53 PM INFO: Worker Processing 4454931386605935533_3_InProgress_4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/2/26, 9:53 PM INFO: WorkerComputerID=ccc0232.campuscluster.illinois.edu
+     [java] 11/2/26, 9:53 PM INFO: WorkerID=4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from MOVESWorkerOutput
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/2/26, 9:53 PM INFO: Worker finished processing: 4454931386605935533_3_InProgress_4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: Worker is idle
+     [java] 11/2/26, 9:53 PM INFO: Found work file: 4454931386605935533_4_TODO
+     [java] 11/2/26, 9:53 PM INFO: Worker Processing 4454931386605935533_4_InProgress_4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/2/26, 9:53 PM INFO: WorkerComputerID=ccc0232.campuscluster.illinois.edu
+     [java] 11/2/26, 9:53 PM INFO: WorkerID=4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from MOVESWorkerOutput
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/2/26, 9:53 PM INFO: Worker finished processing: 4454931386605935533_4_InProgress_4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: Worker is idle
+     [java] 11/2/26, 9:53 PM INFO: Found work file: 4454931386605935533_5_TODO
+     [java] 11/2/26, 9:53 PM INFO: Worker Processing 4454931386605935533_5_InProgress_4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/2/26, 9:53 PM INFO: WorkerComputerID=ccc0232.campuscluster.illinois.edu
+     [java] 11/2/26, 9:53 PM INFO: WorkerID=4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from MOVESWorkerOutput
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/2/26, 9:53 PM INFO: Worker finished processing: 4454931386605935533_5_InProgress_4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: Worker is idle
+     [java] 11/2/26, 9:53 PM INFO: Found work file: 4454931386605935533_6_TODO
+     [java] 11/2/26, 9:53 PM INFO: Worker Processing 4454931386605935533_6_InProgress_4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/2/26, 9:53 PM INFO: WorkerComputerID=ccc0232.campuscluster.illinois.edu
+     [java] 11/2/26, 9:53 PM INFO: WorkerID=4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from MOVESWorkerOutput
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/2/26, 9:53 PM INFO: Worker finished processing: 4454931386605935533_6_InProgress_4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: Worker is idle
+     [java] 11/2/26, 9:53 PM INFO: Found work file: 4454931386605935533_7_TODO
+     [java] 11/2/26, 9:53 PM INFO: Worker Processing 4454931386605935533_7_InProgress_4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/2/26, 9:53 PM INFO: WorkerComputerID=ccc0232.campuscluster.illinois.edu
+     [java] 11/2/26, 9:53 PM INFO: WorkerID=4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from MOVESWorkerOutput
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/2/26, 9:53 PM INFO: Worker finished processing: 4454931386605935533_7_InProgress_4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: Worker is idle
+     [java] 11/2/26, 9:53 PM INFO: Found work file: 4454931386605935533_8_TODO
+     [java] 11/2/26, 9:53 PM INFO: Worker Processing 4454931386605935533_8_InProgress_4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/2/26, 9:53 PM INFO: WorkerComputerID=ccc0232.campuscluster.illinois.edu
+     [java] 11/2/26, 9:53 PM INFO: WorkerID=4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from MOVESWorkerOutput
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/2/26, 9:53 PM INFO: Worker finished processing: 4454931386605935533_8_InProgress_4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: Worker is idle
+     [java] 11/2/26, 9:53 PM INFO: Found work file: 4454931386605935533_9_TODO
+     [java] 11/2/26, 9:53 PM INFO: Worker Processing 4454931386605935533_9_InProgress_4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/2/26, 9:53 PM INFO: WorkerComputerID=ccc0232.campuscluster.illinois.edu
+     [java] 11/2/26, 9:53 PM INFO: WorkerID=4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from MOVESWorkerOutput
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/2/26, 9:53 PM INFO: Worker finished processing: 4454931386605935533_9_InProgress_4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: Worker is idle
+     [java] 11/2/26, 9:53 PM INFO: Found work file: 4454931386605935533_10_TODO
+     [java] 11/2/26, 9:53 PM INFO: Worker Processing 4454931386605935533_10_InProgress_4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/2/26, 9:53 PM INFO: WorkerComputerID=ccc0232.campuscluster.illinois.edu
+     [java] 11/2/26, 9:53 PM INFO: WorkerID=4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from MOVESWorkerOutput
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/2/26, 9:53 PM INFO: Worker finished processing: 4454931386605935533_10_InProgress_4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: Worker is idle
+     [java] 11/2/26, 9:53 PM INFO: Found work file: 4454931386605935533_11_TODO
+     [java] 11/2/26, 9:53 PM INFO: Worker Processing 4454931386605935533_11_InProgress_4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/2/26, 9:53 PM INFO: WorkerComputerID=ccc0232.campuscluster.illinois.edu
+     [java] 11/2/26, 9:53 PM INFO: WorkerID=4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from MOVESWorkerOutput
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/2/26, 9:53 PM INFO: Worker finished processing: 4454931386605935533_11_InProgress_4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: Worker is idle
+     [java] 11/2/26, 9:53 PM INFO: Found work file: 4454931386605935533_12_TODO
+     [java] 11/2/26, 9:53 PM INFO: Worker Processing 4454931386605935533_12_InProgress_4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/2/26, 9:53 PM INFO: WorkerComputerID=ccc0232.campuscluster.illinois.edu
+     [java] 11/2/26, 9:53 PM INFO: WorkerID=4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from MOVESWorkerOutput
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/2/26, 9:53 PM INFO: Worker finished processing: 4454931386605935533_12_InProgress_4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: Worker is idle
+     [java] 11/2/26, 9:53 PM INFO: Found work file: 4454931386605935533_13_TODO
+     [java] 11/2/26, 9:53 PM INFO: Worker Processing 4454931386605935533_13_InProgress_4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/2/26, 9:53 PM INFO: WorkerComputerID=ccc0232.campuscluster.illinois.edu
+     [java] 11/2/26, 9:53 PM INFO: WorkerID=4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from MOVESWorkerOutput
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/2/26, 9:53 PM INFO: Worker finished processing: 4454931386605935533_13_InProgress_4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: Worker is idle
+     [java] 11/2/26, 9:53 PM INFO: Found work file: 4454931386605935533_14_TODO
+     [java] 11/2/26, 9:53 PM INFO: Worker Processing 4454931386605935533_14_InProgress_4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/2/26, 9:53 PM INFO: WorkerComputerID=ccc0232.campuscluster.illinois.edu
+     [java] 11/2/26, 9:53 PM INFO: WorkerID=4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from MOVESWorkerOutput
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/2/26, 9:53 PM INFO: Worker finished processing: 4454931386605935533_14_InProgress_4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: Worker is idle
+     [java] 11/2/26, 9:53 PM INFO: Found work file: 4454931386605935533_15_TODO
+     [java] 11/2/26, 9:53 PM INFO: Worker Processing 4454931386605935533_15_InProgress_4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/2/26, 9:53 PM INFO: WorkerComputerID=ccc0232.campuscluster.illinois.edu
+     [java] 11/2/26, 9:53 PM INFO: WorkerID=4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from MOVESWorkerOutput
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/2/26, 9:53 PM INFO: Worker finished processing: 4454931386605935533_15_InProgress_4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: Worker is idle
+     [java] 11/2/26, 9:53 PM INFO: Found work file: 4454931386605935533_16_TODO
+     [java] 11/2/26, 9:53 PM INFO: Worker Processing 4454931386605935533_16_InProgress_4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/2/26, 9:53 PM INFO: WorkerComputerID=ccc0232.campuscluster.illinois.edu
+     [java] 11/2/26, 9:53 PM INFO: WorkerID=4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from MOVESWorkerOutput
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/2/26, 9:53 PM INFO: Worker finished processing: 4454931386605935533_16_InProgress_4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: Worker is idle
+     [java] 11/2/26, 9:53 PM INFO: Found work file: 4454931386605935533_17_TODO
+     [java] 11/2/26, 9:53 PM INFO: Worker Processing 4454931386605935533_17_InProgress_4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/2/26, 9:53 PM INFO: WorkerComputerID=ccc0232.campuscluster.illinois.edu
+     [java] 11/2/26, 9:53 PM INFO: WorkerID=4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from MOVESWorkerOutput
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/2/26, 9:53 PM INFO: Worker finished processing: 4454931386605935533_17_InProgress_4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: Worker is idle
+     [java] 11/2/26, 9:53 PM INFO: Found work file: 4454931386605935533_18_TODO
+     [java] 11/2/26, 9:53 PM INFO: Worker Processing 4454931386605935533_18_InProgress_4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/2/26, 9:53 PM INFO: WorkerComputerID=ccc0232.campuscluster.illinois.edu
+     [java] 11/2/26, 9:53 PM INFO: WorkerID=4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from MOVESWorkerOutput
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/2/26, 9:53 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/2/26, 9:53 PM INFO: Worker finished processing: 4454931386605935533_18_InProgress_4621779352432077299
+     [java] 11/2/26, 9:53 PM INFO: Worker is idle
+     [java] 11/2/26, 9:53 PM INFO: Received bundle from worker
+     [java] 11/2/26, 9:53 PM INFO: Bundle 10 is from worker: 'ccc0232.campuscluster.illinois.edu'/'MOVES5.0.1'/'4621779352432077299'
+     [java] 11/2/26, 9:53 PM INFO: Received bundle from worker
+     [java] 11/2/26, 9:53 PM INFO: Bundle 11 is from worker: 'ccc0232.campuscluster.illinois.edu'/'MOVES5.0.1'/'4621779352432077299'
+     [java] 11/2/26, 9:53 PM INFO: Received bundle from worker
+     [java] 11/2/26, 9:53 PM INFO: Bundle 12 is from worker: 'ccc0232.campuscluster.illinois.edu'/'MOVES5.0.1'/'4621779352432077299'
+     [java] 11/2/26, 9:53 PM INFO: Received bundle from worker
+     [java] 11/2/26, 9:53 PM INFO: Bundle 13 is from worker: 'ccc0232.campuscluster.illinois.edu'/'MOVES5.0.1'/'4621779352432077299'
+     [java] 11/2/26, 9:53 PM INFO: Received bundle from worker
+     [java] 11/2/26, 9:53 PM INFO: Bundle 14 is from worker: 'ccc0232.campuscluster.illinois.edu'/'MOVES5.0.1'/'4621779352432077299'
+     [java] 11/2/26, 9:53 PM INFO: Received bundle from worker
+     [java] 11/2/26, 9:53 PM INFO: Bundle 15 is from worker: 'ccc0232.campuscluster.illinois.edu'/'MOVES5.0.1'/'4621779352432077299'
+     [java] 11/2/26, 9:53 PM INFO: Received bundle from worker
+     [java] 11/2/26, 9:53 PM INFO: Bundle 16 is from worker: 'ccc0232.campuscluster.illinois.edu'/'MOVES5.0.1'/'4621779352432077299'
+     [java] 11/2/26, 9:53 PM INFO: Received bundle from worker
+     [java] 11/2/26, 9:53 PM INFO: Bundle 17 is from worker: 'ccc0232.campuscluster.illinois.edu'/'MOVES5.0.1'/'4621779352432077299'
+     [java] 11/2/26, 9:53 PM INFO: Received bundle from worker
+     [java] 11/2/26, 9:53 PM INFO: Bundle 18 is from worker: 'ccc0232.campuscluster.illinois.edu'/'MOVES5.0.1'/'4621779352432077299'
+     [java] 11/2/26, 9:53 PM INFO: Received bundle from worker
+     [java] 11/2/26, 9:53 PM INFO: Bundle 1 is from worker: 'ccc0232.campuscluster.illinois.edu'/'MOVES5.0.1'/'4621779352432077299'
+     [java] 11/2/26, 9:53 PM INFO: Received bundle from worker
+     [java] 11/2/26, 9:53 PM INFO: Bundle 2 is from worker: 'ccc0232.campuscluster.illinois.edu'/'MOVES5.0.1'/'4621779352432077299'
+     [java] 11/2/26, 9:53 PM INFO: Received bundle from worker
+     [java] 11/2/26, 9:53 PM INFO: Bundle 3 is from worker: 'ccc0232.campuscluster.illinois.edu'/'MOVES5.0.1'/'4621779352432077299'
+     [java] 11/2/26, 9:53 PM INFO: Received bundle from worker
+     [java] 11/2/26, 9:53 PM INFO: Bundle 4 is from worker: 'ccc0232.campuscluster.illinois.edu'/'MOVES5.0.1'/'4621779352432077299'
+     [java] 11/2/26, 9:53 PM INFO: Received bundle from worker
+     [java] 11/2/26, 9:53 PM INFO: Bundle 5 is from worker: 'ccc0232.campuscluster.illinois.edu'/'MOVES5.0.1'/'4621779352432077299'
+     [java] 11/2/26, 9:53 PM INFO: Received bundle from worker
+     [java] 11/2/26, 9:53 PM INFO: Bundle 6 is from worker: 'ccc0232.campuscluster.illinois.edu'/'MOVES5.0.1'/'4621779352432077299'
+     [java] 11/2/26, 9:53 PM INFO: Received bundle from worker
+     [java] 11/2/26, 9:53 PM INFO: Bundle 7 is from worker: 'ccc0232.campuscluster.illinois.edu'/'MOVES5.0.1'/'4621779352432077299'
+     [java] 11/2/26, 9:53 PM INFO: Received bundle from worker
+     [java] 11/2/26, 9:53 PM INFO: Bundle 8 is from worker: 'ccc0232.campuscluster.illinois.edu'/'MOVES5.0.1'/'4621779352432077299'
+     [java] 11/2/26, 9:53 PM INFO: Received bundle from worker
+     [java] 11/2/26, 9:53 PM INFO: Bundle 9 is from worker: 'ccc0232.campuscluster.illinois.edu'/'MOVES5.0.1'/'4621779352432077299'
+     [java] 11/2/26, 9:53 PM INFO: Final aggregation is being done by default.
+     [java] 11/2/26, 9:53 PM INFO: Final Aggregation starting...
+     [java] 11/2/26, 9:53 PM INFO: Final Aggregation complete.
+     [java] 11/2/26, 9:53 PM INFO: Unit conversions starting...
+     [java] 11/2/26, 9:53 PM INFO: Time Measurement System = Seconds
+     [java] 11/2/26, 9:53 PM INFO: Output Time Step = Hour
+     [java] 11/2/26, 9:53 PM INFO: Output Time Step average hours = 1.0
+     [java] 11/2/26, 9:53 PM INFO: Unit conversions done.
+     [java] 11/2/26, 9:53 PM INFO: Final Post processing starting...
+     [java] 11/2/26, 9:53 PM INFO: Analyzing mesoscale output tables
+     [java] 11/2/26, 9:53 PM INFO: Zeroing null values in rate output tables
+     [java] 11/2/26, 9:53 PM INFO: Done building rate output tables
+     [java] 11/2/26, 9:53 PM INFO: Final Post processing done.
+     [java] 11/2/26, 9:53 PM INFO: Removing data from MOVESOutput per Advanced Performance Features setting...
+     [java] 11/2/26, 9:53 PM INFO: Truncating empty MOVESOutput per Advanced Performance Features setting.
+     [java] 11/2/26, 9:53 PM INFO: Removed data from MOVESOutput per Advanced Performance Features setting.
+     [java] 11/2/26, 9:53 PM INFO: Removing data from MOVESActivityOutput per Advanced Performance Features setting...
+     [java] 11/2/26, 9:53 PM INFO: Truncating empty MOVESActivityOutput per Advanced Performance Features setting.
+     [java] 11/2/26, 9:53 PM INFO: Removed data from MOVESActivityOutput per Advanced Performance Features setting.
+     [java] 11/2/26, 9:53 PM INFO: Removing data from BaseRateOutput per Advanced Performance Features setting...
+     [java] 11/2/26, 9:53 PM INFO: Truncating empty BaseRateOutput per Advanced Performance Features setting.
+     [java] 11/2/26, 9:53 PM INFO: Removed data from BaseRateOutput per Advanced Performance Features setting.
+     [java] 11/2/26, 9:53 PM INFO: Removing data from BaseRateUnits per Advanced Performance Features setting...
+     [java] 11/2/26, 9:53 PM INFO: Truncating empty BaseRateUnits per Advanced Performance Features setting.
+     [java] 11/2/26, 9:53 PM INFO: Removed data from BaseRateUnits per Advanced Performance Features setting.
+     [java] 11/2/26, 9:53 PM INFO: Unbundler has detected completion conditions. Exiting.
+     [java] 11/2/26, 9:53 PM INFO: Generated bundles = 18 Retrieved bundles = 18
+     [java] 11/2/26, 9:53 PM INFO: Thread shutdown starting for class gov.epa.otaq.moves.master.framework.EmissionCalculatorInboundUnbundler.
+     [java] 11/2/26, 9:53 PM INFO: Thread shutdown complete for class gov.epa.otaq.moves.master.framework.EmissionCalculatorInboundUnbundler.
+     [java] 11/2/26, 9:53 PM INFO: Thread shutdown starting for class gov.epa.otaq.moves.master.framework.HeartbeatDetectionThread.
+     [java] 11/2/26, 9:53 PM INFO: Thread shutdown complete for class gov.epa.otaq.moves.master.framework.HeartbeatDetectionThread.
      [java] MOVESCommandLine after runApplication
-     [java] 11/1/26, 3:51 PM INFO: Thread shutdown starting for class gov.epa.otaq.moves.worker.framework.WorkerHeartbeatThread.
-     [java] 11/1/26, 3:51 PM INFO: Thread shutdown complete for class gov.epa.otaq.moves.worker.framework.WorkerHeartbeatThread.
+     [java] 11/2/26, 9:53 PM INFO: Thread shutdown starting for class gov.epa.otaq.moves.worker.framework.WorkerHeartbeatThread.
+     [java] 11/2/26, 9:53 PM INFO: Thread shutdown complete for class gov.epa.otaq.moves.worker.framework.WorkerHeartbeatThread.
      [echo] MOVES and 1 worker finished.
      [echo] MOVES has been shutdown, but not MySQL since it was already running.
 
 BUILD SUCCESSFUL
-Total time: 33 seconds
+Total time: 39 seconds

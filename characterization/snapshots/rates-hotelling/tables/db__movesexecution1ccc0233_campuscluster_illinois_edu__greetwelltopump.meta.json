@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__greetwelltopump",
   "schema": [
     {
@@ -29,6 +29,9 @@
     "fuelSubtypeID"
   ],
   "row_count": 620,
-  "float_decimals": 12,
-  "content_sha256": "db22d208de6eff68a918880af431024b82730530df0402abe2b9e54ebc64201a"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "76b378f7562c11c357f4d633f16f13f372c65e2a8fa7df5b53dc54eea64153ee"
 }

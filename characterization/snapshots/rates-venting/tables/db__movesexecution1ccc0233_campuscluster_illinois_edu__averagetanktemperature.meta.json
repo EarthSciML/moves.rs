@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__averagetanktemperature",
   "schema": [
     {
@@ -43,6 +43,9 @@
     "opModeID"
   ],
   "row_count": 288,
-  "float_decimals": 12,
-  "content_sha256": "93f28082e6b2baaaef1c36277425854c8d0f3c9c5f68d7d895c957c915c464ab"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "79dfe4747f1bf0f12b1e5e64dc8980b0480a9c83de6641a5a4b804d5cf56318a"
 }

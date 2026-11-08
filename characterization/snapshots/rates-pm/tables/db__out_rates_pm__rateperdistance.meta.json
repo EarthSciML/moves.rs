@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_rates_pm__rateperdistance",
   "schema": [
     {
@@ -81,6 +81,9 @@
   ],
   "natural_key": [],
   "row_count": 47320,
-  "float_decimals": 12,
-  "content_sha256": "41dc5246182bc33d88578d410c93a134b63e585d22ff3eb35974ac7093b6f82d"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "cbe39336ce38b4d1d41d4eff71ec71fba96aa1d97205cfb4d4d170ce2a9c3215"
 }

@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_rates_venting__rateperprofile",
   "schema": [
     {
@@ -69,6 +69,9 @@
   ],
   "natural_key": [],
   "row_count": 3072,
-  "float_decimals": 12,
-  "content_sha256": "b116a8300288d44d9c47776645fc4470cf19314b71e5cc9b04035eccf89e02be"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "33c1cd8b62fdc77c05fdfc48b8377422bed95d36054777b7d98bcb6f0e4e190e"
 }

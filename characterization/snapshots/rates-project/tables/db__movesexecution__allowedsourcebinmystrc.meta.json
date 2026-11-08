@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution__allowedsourcebinmystrc",
   "schema": [
     {
@@ -26,6 +26,9 @@
     "regClassID"
   ],
   "row_count": 125,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "b19f19be908a5979d9c0b181439640808b818d2a4ecd2e931cce26fb8a3bc461"
 }

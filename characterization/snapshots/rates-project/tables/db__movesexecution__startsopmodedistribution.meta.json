@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution__startsopmodedistribution",
   "schema": [
     {
@@ -39,6 +39,9 @@
     "opModeID"
   ],
   "row_count": 328,
-  "float_decimals": 12,
-  "content_sha256": "8ef69cfb6d8d8adfff10638341d296a7100224eb58c3a5eb48fe733cb69ce7f2"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "14ae1dbf0d4b40e8433ec171750e76300d98f05b874c8c10d796efd5a00808eb"
 }

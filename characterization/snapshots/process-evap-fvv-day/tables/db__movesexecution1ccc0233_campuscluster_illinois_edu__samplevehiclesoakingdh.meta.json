@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__samplevehiclesoakingdh",
   "schema": [
     {
@@ -25,6 +25,9 @@
     "hourID"
   ],
   "row_count": 44,
-  "float_decimals": 12,
-  "content_sha256": "466c147c0012bcd216776a725154fd21b451de072491a790b4322db48088ac1f"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "1d0eef16698615360d628d091f7e165c6a952b3139767aab7d6ef1e1ba4d336f"
 }

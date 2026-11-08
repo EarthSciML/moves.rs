@@ -5,7 +5,7 @@
   "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
   "runspec_path": "/scratch/ctessum/moves-county-fixture/rates-project/rates-project.xml",
   "runspec_sha256": "7521a2b4244337f6db66469175f306c142bfd5fd473cef370d83bec90028173f",
-  "snapshot_aggregate_sha256": "5e804ff33f236045a662e3eec15ff4015f90a03af4cd7c5a14c516b5def45ac0",
+  "snapshot_aggregate_sha256": "06057601ad55feed34dcc4628bbf38999ce56816716aa26ce6b0543989dc7c8b",
   "output_database": "out_rates_project",
   "scale_input_database": "washtenaw_cdb"
 }

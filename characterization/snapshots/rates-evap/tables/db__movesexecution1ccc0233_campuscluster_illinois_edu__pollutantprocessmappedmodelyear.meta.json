@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__pollutantprocessmappedmodelyear",
   "schema": [
     {
@@ -28,6 +28,9 @@
     "modelYearID"
   ],
   "row_count": 1776,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "f694d725a59d9aca0ba83a0d66c7e949c2bea87f0a2925de66042457bbab7ca3"
 }

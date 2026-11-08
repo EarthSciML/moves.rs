@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution__link",
   "schema": [
     {
@@ -43,6 +43,9 @@
     "linkID"
   ],
   "row_count": 1,
-  "float_decimals": 12,
-  "content_sha256": "4b0e99ce6daf4e1eb771d966778ec312faa7638ed22ad4232fb60719f6e1fabb"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "ea3a29bdcf8b7c128637d3a6ec075052000ca94553346f0c3f867bd4ef371e2e"
 }

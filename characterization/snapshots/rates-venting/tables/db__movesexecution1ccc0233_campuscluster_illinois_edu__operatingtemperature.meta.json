@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__operatingtemperature",
   "schema": [
     {
@@ -63,6 +63,9 @@
     "hourDayID"
   ],
   "row_count": 14462,
-  "float_decimals": 12,
-  "content_sha256": "22424eb84d7237994ae3c051b26ff36edc3db76c3dd600d56286ea4dc4c39d22"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "d8faaadc0d3d394c657e996e6471cbc617fc579ee1afc56dc34e7ece2945ee11"
 }

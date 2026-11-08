@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution__baserate_1_2020",
   "schema": [
     {
@@ -99,6 +99,9 @@
     "opModeID"
   ],
   "row_count": 125,
-  "float_decimals": 12,
-  "content_sha256": "731bc7e8cd72bde186f5166b7d355e1e0c297dac1a46a197ce160fc86c682171"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "4e442567f9019cd359d1c803cbd8c1424b11bca8bb493be072ed01457b336445"
 }

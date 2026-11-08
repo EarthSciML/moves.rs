@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_rates_hotelling__ratepervehicle",
   "schema": [
     {
@@ -73,6 +73,9 @@
   ],
   "natural_key": [],
   "row_count": 491,
-  "float_decimals": 12,
-  "content_sha256": "f9e3653a1e6c02fc05e5768343349f4a9a86bd1b45d314b29942269d8be35d3b"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "64e7299dc7b6befe03bc9785c55d464f8a7dde12436cb333a93b21eca0a7d53c"
 }

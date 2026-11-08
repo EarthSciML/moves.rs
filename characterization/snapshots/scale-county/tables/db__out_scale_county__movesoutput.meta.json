@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_scale_county__movesoutput",
   "schema": [
     {
@@ -105,6 +105,9 @@
   ],
   "natural_key": [],
   "row_count": 729,
-  "float_decimals": 12,
-  "content_sha256": "95fa57197069f3baee7601d17f51dd328c59bc8e507d91e61f4cd894bc1dd59b"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "105afa94e840b4f23333faf3cdfac7fade99ab6a6b764fb0791b12d918b0804d"
 }

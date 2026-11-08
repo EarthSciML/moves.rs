@@ -5,7 +5,7 @@
   "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
   "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/rates-nonhaptog.xml",
   "runspec_sha256": "e91509d3224177e41e972a2a63c696d34e410e448198348c263f2d8a72b86a79",
-  "snapshot_aggregate_sha256": "74c10857ad0b58adacc238a64d16871f084c1cd7ff1be6c03bc207a105d500d4",
+  "snapshot_aggregate_sha256": "c02ce2e7c477088e75f9a89eb5f2c6770410c77553084eac1a028131de2ae84e",
   "output_database": "out_rates_nonhaptog",
   "scale_input_database": null
 }

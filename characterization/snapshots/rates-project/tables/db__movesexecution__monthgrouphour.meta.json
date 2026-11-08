@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution__monthgrouphour",
   "schema": [
     {
@@ -40,6 +40,9 @@
     "hourID"
   ],
   "row_count": 1,
-  "float_decimals": 12,
-  "content_sha256": "aa84409274d44c015706a49f73a4fb1d8011e69e9decb33492ee59c422858909"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "688443b4526dc4b40ccab47b1778b663fa0455a318cba743344f0e482d7df431"
 }

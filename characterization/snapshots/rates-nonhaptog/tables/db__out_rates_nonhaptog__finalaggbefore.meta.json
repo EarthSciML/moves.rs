@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_rates_nonhaptog__finalaggbefore",
   "schema": [
     {
@@ -105,6 +105,9 @@
   ],
   "natural_key": [],
   "row_count": 35100,
-  "float_decimals": 12,
-  "content_sha256": "0d82aceeaeb153568cb14b2d1e3be661a93a23450fbcfc0bd16d4496cb63137a"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "a31e0ac32c3ca4158dcbb2bc7206ab77a3725f91e3d8f22db82e277e9e00a6f8"
 }

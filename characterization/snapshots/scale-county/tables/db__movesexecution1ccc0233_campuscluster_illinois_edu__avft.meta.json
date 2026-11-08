@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__avft",
   "schema": [
     {
@@ -30,6 +30,9 @@
     "engTechID"
   ],
   "row_count": 444,
-  "float_decimals": 12,
-  "content_sha256": "52124aee904e0cac2d3091b419f9b8387a69c0fd581ba76d34a1358128a1ed06"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "1af7cb08cea242f0b12a2b3e7354ffaf3dfe58b4c5df0e8bc5aa3be18d480380"
 }

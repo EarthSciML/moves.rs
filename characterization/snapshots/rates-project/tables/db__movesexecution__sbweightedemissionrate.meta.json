@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution__sbweightedemissionrate",
   "schema": [
     {
@@ -60,6 +60,9 @@
     "regClassID"
   ],
   "row_count": 832,
-  "float_decimals": 12,
-  "content_sha256": "cd67617c75880e3e896ee8f85e47dda0c00341911cff1c4c1f5a77a8f7edabcc"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "d07e6d743c17619b581f2cec1a5a82979d8471dd59de644be288051d118484a9"
 }

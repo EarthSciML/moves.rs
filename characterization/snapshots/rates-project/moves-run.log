@@ -1,7 +1,7 @@
 INFO:    User not listed in /etc/subuid, trying root-mapped namespace
 INFO:    Using fakeroot command combined with root-mapped namespace
 [init-mariadb] /var/lib/mysql already populated; skipping seed.
-[start-mariadb-bg] mariadbd ready (PID 3768324).
+[start-mariadb-bg] mariadbd ready (PID 658708).
 Picked up JAVA_TOOL_OPTIONS: -Xlog:class+load=info:file=/opt/moves/MOVESTemporary/instrumentation/class-load-%p.log
 Buildfile: /opt/moves/build.xml
 
@@ -11,190 +11,190 @@ main1worker:
      [echo] MySQL is already running and will not be automatically shutdown by this instance.
      [echo] Launching MOVES, which will launch a worker...
      [java] Picked up JAVA_TOOL_OPTIONS: -Xlog:class+load=info:file=/opt/moves/MOVESTemporary/instrumentation/class-load-%p.log
-     [java] 11/1/26, 6:51 PM INFO: Loading system configuration...
-     [java] 11/1/26, 6:51 PM INFO: System configuration setting up the instance counter...
-     [java] 11/1/26, 6:51 PM INFO: System configuration clearing prior IDs...
-     [java] 11/1/26, 6:51 PM INFO: System configuration reading computer ID...
-     [java] 11/1/26, 6:51 PM INFO: Using alternate master configuration file: maketodo.txt
-     [java] 11/1/26, 6:51 PM INFO: Using master configuration file: maketodo.txt
-     [java] 11/1/26, 6:51 PM INFO: System configuration loading configuration files...
-     [java] 11/1/26, 6:51 PM INFO: System configuration setting up temporary files...
-     [java] 11/1/26, 6:51 PM INFO: Folder for temporary files: /opt/moves/MOVESTemporary
-     [java] 11/1/26, 6:51 PM INFO: System configuration acquiring distributed master ID...
-     [java] 11/1/26, 6:51 PM INFO: Done loading system configuration.
-     [java] 11/1/26, 6:51 PM INFO: Using alternate worker configuration file: manyworkers.txt
-     [java] 11/1/26, 6:51 PM INFO: Initializing default database connections...
-     [java] 11/1/26, 6:51 PM INFO: Reading default database table definitions...
-     [java] 11/1/26, 6:51 PM INFO: Done initializing database connections.
-     [java] 11/1/26, 6:51 PM WARNING: Added missing vehicle selection: Passenger Car - Diesel Fuel
-     [java] 11/1/26, 6:51 PM WARNING: Added missing vehicle selection: Passenger Car - Ethanol (E-85)
-     [java] 11/1/26, 6:51 PM WARNING: Added missing vehicle selection: Passenger Car - Electricity
-     [java] 11/1/26, 6:51 PM WARNING: Invalid PollutantProcessAssociation
-     [java] 11/1/26, 6:51 PM WARNING: Invalid PollutantProcessAssociation
-     [java] 11/1/26, 6:51 PM INFO: Performing compatibility checks between RunSpec and domain database...
-     [java] 11/1/26, 6:51 PM INFO: Done performing compatibility checks between RunSpec and domain database.
-     [java] 11/1/26, 6:51 PM WARNING: Skipping domain database validation.
-     [java] 11/1/26, 6:51 PM INFO: ***Starting MOVES run***
-     [java] 11/1/26, 6:51 PM INFO: Master Release: MOVES5.0.1
-     [java] 11/1/26, 6:51 PM INFO: Master Computer ID: ccc0233.campuscluster.illinois.edu
-     [java] 11/1/26, 6:51 PM INFO: Master ID: 13880092289699820592
-     [java] 11/1/26, 6:51 PM INFO: RunSpec: /scratch/ctessum/moves-county-fixture/rates-project/rates-project.xml
-     [java] 11/1/26, 6:51 PM INFO: Initializing output database connections...
-     [java] 11/1/26, 6:51 PM INFO: Done initializing database connections.
-     [java] 11/1/26, 6:51 PM INFO: Thread starting for class gov.epa.otaq.moves.master.framework.HeartbeatDetectionThread.
-     [java] 11/1/26, 6:51 PM INFO: HeartbeatDetectionThread !hasWorkerOnThisComputer
-     [java] 11/1/26, 6:51 PM INFO: Initializing default database connections...
-     [java] 11/1/26, 6:51 PM INFO: Database connections already established.
-     [java] 11/1/26, 6:51 PM INFO: Initializing MOVESExecution connections...
-     [java] 11/1/26, 6:51 PM INFO: Creating the execution database...
-     [java] 11/1/26, 6:51 PM INFO: Removing tables from the execution database...
-     [java] 11/1/26, 6:51 PM INFO: Creating empty tables in the execution database...
-     [java] 11/1/26, 6:51 PM INFO: Finalizing the execution database...
-     [java] 11/1/26, 6:51 PM INFO: Reading execution database table definitions...
-     [java] 11/1/26, 6:51 PM INFO: Done initializing database connections.
-     [java] 11/1/26, 6:51 PM INFO: Initializing output database connections...
-     [java] 11/1/26, 6:51 PM INFO: Database connections already established.
-     [java] 11/1/26, 6:51 PM INFO: Thread starting for class gov.epa.otaq.moves.master.framework.EmissionCalculatorInboundUnbundler.
-     [java] 11/1/26, 6:51 PM INFO: Thread starting for class gov.epa.otaq.moves.master.framework.MasterLoop.
-     [java] 11/1/26, 6:51 PM DEBUG: Starting WorkerCommandLine...
-     [java] 11/1/26, 6:51 PM INFO: testConnection = com.mysql.jdbc.JDBC4Connection@33e7d79a
-     [java] 11/1/26, 6:51 PM INFO: WorkerConfiguration loaded. distributedWorkerId = 9900942463944749198
-     [java] 11/1/26, 6:51 PM INFO: Worker Release: MOVES5.0.1
-     [java] 11/1/26, 6:51 PM INFO: Worker Computer ID: ccc0233.campuscluster.illinois.edu
-     [java] 11/1/26, 6:51 PM INFO: Worker ID: 9900942463944749198
-     [java] 11/1/26, 6:51 PM INFO: Thread starting for class gov.epa.otaq.moves.worker.framework.WorkerHeartbeatThread.
-     [java] 11/1/26, 6:51 PM INFO: Thread starting for class gov.epa.otaq.moves.worker.framework.RemoteEmissionsCalculator.
-     [java] 11/1/26, 6:51 PM INFO: Setting worker flag for 9900942463944749198 on port 13132
-     [java] 11/1/26, 6:51 PM INFO: InputDataManager transferred all default tables.
-     [java] 11/1/26, 6:51 PM INFO: InputDataManager transferred all default tables.
-     [java] 11/1/26, 6:51 PM INFO: InputDataManager transferred all default tables.
-     [java] 11/1/26, 6:51 PM INFO: InputDataManager transferred all NonRoad tables.
-     [java] 11/1/26, 6:51 PM INFO: InputDataManager transferred all default tables.
-     [java] 11/1/26, 6:51 PM INFO: InputDataManager transferred all NonRoad tables.
-     [java] 11/1/26, 6:51 PM INFO: Class gov.epa.otaq.moves.master.implementation.general.MeteorologyGenerator has been instantiated.
-     [java] 11/1/26, 6:51 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.ActivityCalculator has been instantiated.
-     [java] 11/1/26, 6:51 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.BaseRateCalculator has been instantiated.
-     [java] 11/1/26, 6:51 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator has been instantiated.
-     [java] 11/1/26, 6:51 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator has been instantiated.
-     [java] 11/1/26, 6:51 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.LinkOperatingModeDistributionGenerator has been instantiated.
-     [java] 11/1/26, 6:51 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.ProjectTAG has been instantiated.
-     [java] 11/1/26, 6:51 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.RatesOperatingModeDistributionGenerator has been instantiated.
-     [java] 11/1/26, 6:51 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator has been instantiated.
-     [java] 11/1/26, 6:51 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.StartOperatingModeDistributionGenerator has been instantiated.
-     [java] 11/1/26, 6:51 PM DEBUG: gov.epa.otaq.moves.master.implementation.general.MeteorologyGenerator subscribed to Running Exhaust at PROCESS/100
-     [java] 11/1/26, 6:51 PM DEBUG: gov.epa.otaq.moves.master.implementation.general.MeteorologyGenerator subscribed to Extended Idle Exhaust at PROCESS/100
-     [java] 11/1/26, 6:51 PM DEBUG: gov.epa.otaq.moves.master.implementation.general.MeteorologyGenerator subscribed to Start Exhaust at PROCESS/100
-     [java] 11/1/26, 6:51 PM DEBUG: gov.epa.otaq.moves.master.implementation.general.MeteorologyGenerator subscribed to Auxiliary Power Exhaust at PROCESS/100
-     [java] 11/1/26, 6:51 PM DEBUG: gov.epa.otaq.moves.master.implementation.general.MeteorologyGenerator subscribed to Tirewear at PROCESS/100
-     [java] 11/1/26, 6:51 PM DEBUG: gov.epa.otaq.moves.master.implementation.general.MeteorologyGenerator subscribed to Brakewear at PROCESS/100
-     [java] 11/1/26, 6:51 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.ActivityCalculator subscribed to Running Exhaust at YEAR/10
-     [java] 11/1/26, 6:51 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.ActivityCalculator subscribed to Start Exhaust at YEAR/10
-     [java] 11/1/26, 6:51 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateCalculator subscribed to Running Exhaust at MONTH/10
-     [java] 11/1/26, 6:51 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateCalculator subscribed to Start Exhaust at MONTH/10
-     [java] 11/1/26, 6:51 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator subscribed to Running Exhaust at YEAR/98
-     [java] 11/1/26, 6:51 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator subscribed to Start Exhaust at YEAR/98
-     [java] 11/1/26, 6:51 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator subscribed to Extended Idle Exhaust at YEAR/98
-     [java] 11/1/26, 6:51 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator subscribed to Auxiliary Power Exhaust at YEAR/98
-     [java] 11/1/26, 6:51 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator subscribed to Brakewear at YEAR/98
-     [java] 11/1/26, 6:51 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator subscribed to Tirewear at YEAR/98
-     [java] 11/1/26, 6:51 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator subscribed to Running Exhaust at PROCESS/99
-     [java] 11/1/26, 6:51 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator subscribed to Start Exhaust at PROCESS/99
-     [java] 11/1/26, 6:51 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.LinkOperatingModeDistributionGenerator subscribed to Running Exhaust at LINK/101
-     [java] 11/1/26, 6:51 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.LinkOperatingModeDistributionGenerator subscribed to Brakewear at LINK/101
-     [java] 11/1/26, 6:51 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.ProjectTAG subscribed to Running Exhaust at YEAR/100
-     [java] 11/1/26, 6:51 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.ProjectTAG subscribed to Start Exhaust at YEAR/100
-     [java] 11/1/26, 6:51 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.RatesOperatingModeDistributionGenerator subscribed to Extended Idle Exhaust at YEAR/100
-     [java] 11/1/26, 6:51 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.RatesOperatingModeDistributionGenerator subscribed to Auxiliary Power Exhaust at YEAR/100
-     [java] 11/1/26, 6:51 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Running Exhaust at YEAR/101
-     [java] 11/1/26, 6:51 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Start Exhaust at YEAR/101
-     [java] 11/1/26, 6:51 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Extended Idle Exhaust at YEAR/101
-     [java] 11/1/26, 6:51 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Auxiliary Power Exhaust at YEAR/101
-     [java] 11/1/26, 6:51 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Evap Permeation at YEAR/101
-     [java] 11/1/26, 6:51 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Evap Fuel Vapor Venting at YEAR/101
-     [java] 11/1/26, 6:51 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Evap Fuel Leaks at YEAR/101
-     [java] 11/1/26, 6:51 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Brakewear at YEAR/101
-     [java] 11/1/26, 6:51 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Tirewear at YEAR/101
-     [java] 11/1/26, 6:51 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.StartOperatingModeDistributionGenerator subscribed to Start Exhaust at PROCESS/100
-     [java] 11/1/26, 6:51 PM INFO: Calculate AVFT Control Strategy
-     [java] 11/1/26, 6:51 PM INFO: AVFT Calculations Complete
-     [java] 11/1/26, 6:51 PM INFO: 3 bundles will be used.
-     [java] 11/1/26, 6:51 PM INFO: Thread starting for class gov.epa.otaq.moves.master.framework.MasterLoopableThread.
-     [java] 11/1/26, 6:51 PM INFO: MetGen setupTime=214 bundleTime=0
-     [java] 11/1/26, 6:51 PM INFO: doGeneralFuelRatio
-     [java] 11/1/26, 6:51 PM INFO: doAirToxicsCalculations
-     [java] 11/1/26, 6:51 PM INFO: 19502000 (1980 to 2000)
-     [java] 11/1/26, 6:51 PM INFO: 20012050 (2001 to 2020)
-     [java] 11/1/26, 6:51 PM INFO: doCOCalculations
-     [java] 11/1/26, 6:51 PM INFO: 19502000 (1980 to 2000)
-     [java] 11/1/26, 6:51 PM INFO: 20012050 (2001 to 2020)
-     [java] 11/1/26, 6:51 PM INFO: doPredictiveCalculations: predictHC, 101,102 / 1000101,1000102
-     [java] 11/1/26, 6:51 PM INFO: 0 (1980 to 2020)
-     [java] 11/1/26, 6:51 PM INFO: doPredictiveCalculations: predictNOx, 301,302 / 
-     [java] 11/1/26, 6:51 PM INFO: 0 (1980 to 2020)
-     [java] 11/1/26, 6:51 PM INFO: doMTBECalculations
-     [java] 11/1/26, 6:51 PM INFO: doEvapBenzeneCalculations
-     [java] 11/1/26, 6:51 PM INFO: Removed potential overlaps between ATRatioNonGas and ATRatio
-     [java] 11/1/26, 6:51 PM INFO: FuelEffectsGenerator totalTime=353
-     [java] 11/1/26, 6:51 PM DEBUG: LinkOperatingModeDistributionGenerator.calculateOpModeFractions ms=580
-     [java] 11/1/26, 6:51 PM DEBUG: LinkOperatingModeDistributionGenerator.populateRatesOpModeDistribution ms=1
-     [java] 11/1/26, 6:51 PM INFO: LOMDG setupTime=59 bundleTime=582
-     [java] 11/1/26, 6:51 PM DEBUG: newSBD Generator called for process: Running Exhaust
-     [java] 11/1/26, 6:51 PM DEBUG: Processing pollutant-process: Total Energy Consumption - Running Exhaust
-     [java] 11/1/26, 6:51 PM DEBUG: SourceTypePhysics.updateEmissionRateTables starting for process 1
-     [java] 11/1/26, 6:51 PM DEBUG: SourceTypePhysics.updateEmissionRateTables done
-     [java] 11/1/26, 6:51 PM INFO: newSBDG setupTime=0 bundleTime=451
-     [java] 11/1/26, 6:51 PM INFO: ProjectTAG totalTime=18
-     [java] 11/1/26, 6:51 PM DEBUG: BaseRateGenerator.addIndexes: alter table avgSpeedBin add key speed1 (avgSpeedBinID, avgBinSpeed)
-     [java] 11/1/26, 6:51 PM DEBUG: BaseRateGenerator.addIndexes ms=19
-     [java] 11/1/26, 6:51 PM DEBUG: BaseRateGenerator.addIndexes: alter table avgSpeedBin add key speed2 (avgBinSpeed, avgSpeedBinID)
-     [java] 11/1/26, 6:51 PM DEBUG: BaseRateGenerator.addIndexes ms=21
-     [java] 11/1/26, 6:51 PM DEBUG: BaseRateGenerator.addIndexes: analyze table avgSpeedBin
-     [java] 11/1/26, 6:51 PM DEBUG: BaseRateGenerator.addIndexes ms=2
-     [java] 11/1/26, 6:51 PM DEBUG: Base Rate Generator called for process: Running Exhaust
-     [java] 11/1/26, 6:51 PM DEBUG: Base Rate Generator called for link: 1
-     [java] 11/1/26, 6:51 PM DEBUG: Normalizing sourcebin-weighted emission rates
-     [java] 11/1/26, 6:51 PM DEBUG: Normalizing sourcebin-weighted distance rates
-     [java] 11/1/26, 6:51 PM INFO: Running Statement: #CORE: 1 of 6
-     [java] 11/1/26, 6:51 PM INFO: Running Statement: #CORE: 2 of 6
-     [java] 11/1/26, 6:51 PM INFO: Running Statement: #CORE: 3 of 6
-     [java] 11/1/26, 6:51 PM INFO: Running Statement: #CORE: 4 of 6
-     [java] 11/1/26, 6:51 PM INFO: Running Statement: #CORE: 5 of 6
-     [java] 11/1/26, 6:51 PM INFO: Running Statement: #CORE: 6 of 6
-     [java] 11/1/26, 6:51 PM INFO: Running Statement: #CORE: 1 of 2
-     [java] 11/1/26, 6:51 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 1 of 1
-     [java] 11/1/26, 6:51 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 1 of 1
-     [java] 11/1/26, 6:51 PM INFO: Running Statement: #SBWEIGHTEDDISTANCERATE: 1 of 1
-     [java] 11/1/26, 6:51 PM INFO: Running Statement: #CORE: 2 of 2
-     [java] 11/1/26, 6:51 PM INFO: BRG SBW running concurrent statements...
-     [java] 11/1/26, 6:51 PM INFO: Running Statement: #SBWEIGHTEDDISTANCERATE: 1 of 1
-     [java] 11/1/26, 6:51 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 1 of 3
-     [java] 11/1/26, 6:51 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 1 of 3
-     [java] 11/1/26, 6:51 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 2 of 3
-     [java] 11/1/26, 6:51 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 2 of 3
-     [java] 11/1/26, 6:51 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 3 of 3
-     [java] 11/1/26, 6:51 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 3 of 3
-     [java] 11/1/26, 6:51 PM INFO: BRG SBW done running concurrent statements.
-     [java] 11/1/26, 6:51 PM INFO: Statements done: 18
-     [java] 11/1/26, 6:51 PM INFO: Avg. Concurrent Statements: 1.6111111111111112
-     [java] 11/1/26, 6:51 PM INFO: Max. Concurrent Statements: 4
-     [java] 11/1/26, 6:51 PM DEBUG: BaseRateGenerator: processID=1, applyAvgSpeedDistribution=false, useAvgSpeedBin=false, applySourceBinDistribution=false, keepOpModeID=false, avgSpeedFraction="", sumSBD=""
-     [java] 11/1/26, 6:51 PM DEBUG: Run /opt/moves/generators/externalgenerator64.exe in /opt/moves/MOVESTemporary/GeneratorTemp2
-     [java] 11/1/26, 6:51 PM DEBUG: Command line = 
-     [java] 11/1/26, 6:51 PM DEBUG: -class=BaseRateGenerator.generateBaseRates
-     [java] 11/1/26, 6:51 PM DEBUG: , 
-     [java] 11/1/26, 6:51 PM DEBUG: -db=MOVESExecution
-     [java] 11/1/26, 6:51 PM DEBUG: , 
-     [java] 11/1/26, 6:51 PM DEBUG: -dbuser=moves
-     [java] 11/1/26, 6:51 PM DEBUG: , 
-     [java] 11/1/26, 6:51 PM DEBUG: -dbpwd=moves
-     [java] 11/1/26, 6:51 PM DEBUG: , 
-     [java] 11/1/26, 6:51 PM DEBUG: -params=nOp,nASB,nASF,nSBD,nRaw,1,2020,4
-     [java] 11/1/26, 6:51 PM DEBUG: , 
-     [java] 11/1/26, 6:51 PM DEBUG: -isproject=1
-     [java] 11/1/26, 6:51 PM DEBUG: , 
-     [java] 11/1/26, 6:51 PM DEBUG: -saveromd=0
-     [java] 11/1/26, 6:51 PM DEBUG: 
-     [java] 11/1/26, 6:51 PM INFO: Time spent on running the external generator (sec): 0.2939999997615814 for Process: 1 Running Exhaust
+     [java] 11/2/26, 9:46 PM INFO: Loading system configuration...
+     [java] 11/2/26, 9:46 PM INFO: System configuration setting up the instance counter...
+     [java] 11/2/26, 9:46 PM INFO: System configuration clearing prior IDs...
+     [java] 11/2/26, 9:46 PM INFO: System configuration reading computer ID...
+     [java] 11/2/26, 9:46 PM INFO: Using alternate master configuration file: maketodo.txt
+     [java] 11/2/26, 9:46 PM INFO: Using master configuration file: maketodo.txt
+     [java] 11/2/26, 9:46 PM INFO: System configuration loading configuration files...
+     [java] 11/2/26, 9:46 PM INFO: System configuration setting up temporary files...
+     [java] 11/2/26, 9:46 PM INFO: Folder for temporary files: /opt/moves/MOVESTemporary
+     [java] 11/2/26, 9:46 PM INFO: System configuration acquiring distributed master ID...
+     [java] 11/2/26, 9:46 PM INFO: Done loading system configuration.
+     [java] 11/2/26, 9:46 PM INFO: Using alternate worker configuration file: manyworkers.txt
+     [java] 11/2/26, 9:46 PM INFO: Initializing default database connections...
+     [java] 11/2/26, 9:46 PM INFO: Reading default database table definitions...
+     [java] 11/2/26, 9:46 PM INFO: Done initializing database connections.
+     [java] 11/2/26, 9:46 PM WARNING: Added missing vehicle selection: Passenger Car - Diesel Fuel
+     [java] 11/2/26, 9:46 PM WARNING: Added missing vehicle selection: Passenger Car - Ethanol (E-85)
+     [java] 11/2/26, 9:46 PM WARNING: Added missing vehicle selection: Passenger Car - Electricity
+     [java] 11/2/26, 9:46 PM WARNING: Invalid PollutantProcessAssociation
+     [java] 11/2/26, 9:46 PM WARNING: Invalid PollutantProcessAssociation
+     [java] 11/2/26, 9:46 PM INFO: Performing compatibility checks between RunSpec and domain database...
+     [java] 11/2/26, 9:46 PM INFO: Done performing compatibility checks between RunSpec and domain database.
+     [java] 11/2/26, 9:46 PM WARNING: Skipping domain database validation.
+     [java] 11/2/26, 9:46 PM INFO: ***Starting MOVES run***
+     [java] 11/2/26, 9:46 PM INFO: Master Release: MOVES5.0.1
+     [java] 11/2/26, 9:46 PM INFO: Master Computer ID: ccc0232.campuscluster.illinois.edu
+     [java] 11/2/26, 9:46 PM INFO: Master ID: 16101449711698594219
+     [java] 11/2/26, 9:46 PM INFO: RunSpec: /scratch/ctessum/moves-county-fixture/rates-project/rates-project.xml
+     [java] 11/2/26, 9:46 PM INFO: Initializing output database connections...
+     [java] 11/2/26, 9:46 PM INFO: Done initializing database connections.
+     [java] 11/2/26, 9:46 PM INFO: Thread starting for class gov.epa.otaq.moves.master.framework.HeartbeatDetectionThread.
+     [java] 11/2/26, 9:46 PM INFO: HeartbeatDetectionThread !hasWorkerOnThisComputer
+     [java] 11/2/26, 9:46 PM INFO: Initializing default database connections...
+     [java] 11/2/26, 9:46 PM INFO: Database connections already established.
+     [java] 11/2/26, 9:46 PM INFO: Initializing MOVESExecution connections...
+     [java] 11/2/26, 9:46 PM INFO: Creating the execution database...
+     [java] 11/2/26, 9:46 PM INFO: Removing tables from the execution database...
+     [java] 11/2/26, 9:46 PM INFO: Creating empty tables in the execution database...
+     [java] 11/2/26, 9:46 PM INFO: Finalizing the execution database...
+     [java] 11/2/26, 9:47 PM INFO: Reading execution database table definitions...
+     [java] 11/2/26, 9:47 PM INFO: Done initializing database connections.
+     [java] 11/2/26, 9:47 PM INFO: Initializing output database connections...
+     [java] 11/2/26, 9:47 PM INFO: Database connections already established.
+     [java] 11/2/26, 9:47 PM INFO: Thread starting for class gov.epa.otaq.moves.master.framework.EmissionCalculatorInboundUnbundler.
+     [java] 11/2/26, 9:47 PM INFO: Thread starting for class gov.epa.otaq.moves.master.framework.MasterLoop.
+     [java] 11/2/26, 9:47 PM INFO: InputDataManager transferred all default tables.
+     [java] 11/2/26, 9:47 PM INFO: InputDataManager transferred all default tables.
+     [java] 11/2/26, 9:47 PM DEBUG: Starting WorkerCommandLine...
+     [java] 11/2/26, 9:47 PM INFO: InputDataManager transferred all default tables.
+     [java] 11/2/26, 9:47 PM INFO: InputDataManager transferred all NonRoad tables.
+     [java] 11/2/26, 9:47 PM INFO: testConnection = com.mysql.jdbc.JDBC4Connection@77cc0235
+     [java] 11/2/26, 9:47 PM INFO: WorkerConfiguration loaded. distributedWorkerId = 17112701374408338256
+     [java] 11/2/26, 9:47 PM INFO: Worker Release: MOVES5.0.1
+     [java] 11/2/26, 9:47 PM INFO: Worker Computer ID: ccc0232.campuscluster.illinois.edu
+     [java] 11/2/26, 9:47 PM INFO: Worker ID: 17112701374408338256
+     [java] 11/2/26, 9:47 PM INFO: Thread starting for class gov.epa.otaq.moves.worker.framework.WorkerHeartbeatThread.
+     [java] 11/2/26, 9:47 PM INFO: Setting worker flag for 17112701374408338256 on port 13132
+     [java] 11/2/26, 9:47 PM INFO: Thread starting for class gov.epa.otaq.moves.worker.framework.RemoteEmissionsCalculator.
+     [java] 11/2/26, 9:47 PM INFO: InputDataManager transferred all default tables.
+     [java] 11/2/26, 9:47 PM INFO: InputDataManager transferred all NonRoad tables.
+     [java] 11/2/26, 9:47 PM INFO: Class gov.epa.otaq.moves.master.implementation.general.MeteorologyGenerator has been instantiated.
+     [java] 11/2/26, 9:47 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.ActivityCalculator has been instantiated.
+     [java] 11/2/26, 9:47 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.BaseRateCalculator has been instantiated.
+     [java] 11/2/26, 9:47 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator has been instantiated.
+     [java] 11/2/26, 9:47 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator has been instantiated.
+     [java] 11/2/26, 9:47 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.LinkOperatingModeDistributionGenerator has been instantiated.
+     [java] 11/2/26, 9:47 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.ProjectTAG has been instantiated.
+     [java] 11/2/26, 9:47 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.RatesOperatingModeDistributionGenerator has been instantiated.
+     [java] 11/2/26, 9:47 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator has been instantiated.
+     [java] 11/2/26, 9:47 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.StartOperatingModeDistributionGenerator has been instantiated.
+     [java] 11/2/26, 9:47 PM DEBUG: gov.epa.otaq.moves.master.implementation.general.MeteorologyGenerator subscribed to Running Exhaust at PROCESS/100
+     [java] 11/2/26, 9:47 PM DEBUG: gov.epa.otaq.moves.master.implementation.general.MeteorologyGenerator subscribed to Extended Idle Exhaust at PROCESS/100
+     [java] 11/2/26, 9:47 PM DEBUG: gov.epa.otaq.moves.master.implementation.general.MeteorologyGenerator subscribed to Start Exhaust at PROCESS/100
+     [java] 11/2/26, 9:47 PM DEBUG: gov.epa.otaq.moves.master.implementation.general.MeteorologyGenerator subscribed to Auxiliary Power Exhaust at PROCESS/100
+     [java] 11/2/26, 9:47 PM DEBUG: gov.epa.otaq.moves.master.implementation.general.MeteorologyGenerator subscribed to Tirewear at PROCESS/100
+     [java] 11/2/26, 9:47 PM DEBUG: gov.epa.otaq.moves.master.implementation.general.MeteorologyGenerator subscribed to Brakewear at PROCESS/100
+     [java] 11/2/26, 9:47 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.ActivityCalculator subscribed to Running Exhaust at YEAR/10
+     [java] 11/2/26, 9:47 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.ActivityCalculator subscribed to Start Exhaust at YEAR/10
+     [java] 11/2/26, 9:47 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateCalculator subscribed to Running Exhaust at MONTH/10
+     [java] 11/2/26, 9:47 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateCalculator subscribed to Start Exhaust at MONTH/10
+     [java] 11/2/26, 9:47 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator subscribed to Running Exhaust at YEAR/98
+     [java] 11/2/26, 9:47 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator subscribed to Start Exhaust at YEAR/98
+     [java] 11/2/26, 9:47 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator subscribed to Extended Idle Exhaust at YEAR/98
+     [java] 11/2/26, 9:47 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator subscribed to Auxiliary Power Exhaust at YEAR/98
+     [java] 11/2/26, 9:47 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator subscribed to Brakewear at YEAR/98
+     [java] 11/2/26, 9:47 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator subscribed to Tirewear at YEAR/98
+     [java] 11/2/26, 9:47 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator subscribed to Running Exhaust at PROCESS/99
+     [java] 11/2/26, 9:47 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator subscribed to Start Exhaust at PROCESS/99
+     [java] 11/2/26, 9:47 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.LinkOperatingModeDistributionGenerator subscribed to Running Exhaust at LINK/101
+     [java] 11/2/26, 9:47 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.LinkOperatingModeDistributionGenerator subscribed to Brakewear at LINK/101
+     [java] 11/2/26, 9:47 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.ProjectTAG subscribed to Running Exhaust at YEAR/100
+     [java] 11/2/26, 9:47 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.ProjectTAG subscribed to Start Exhaust at YEAR/100
+     [java] 11/2/26, 9:47 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.RatesOperatingModeDistributionGenerator subscribed to Extended Idle Exhaust at YEAR/100
+     [java] 11/2/26, 9:47 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.RatesOperatingModeDistributionGenerator subscribed to Auxiliary Power Exhaust at YEAR/100
+     [java] 11/2/26, 9:47 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Running Exhaust at YEAR/101
+     [java] 11/2/26, 9:47 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Start Exhaust at YEAR/101
+     [java] 11/2/26, 9:47 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Extended Idle Exhaust at YEAR/101
+     [java] 11/2/26, 9:47 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Auxiliary Power Exhaust at YEAR/101
+     [java] 11/2/26, 9:47 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Evap Permeation at YEAR/101
+     [java] 11/2/26, 9:47 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Evap Fuel Vapor Venting at YEAR/101
+     [java] 11/2/26, 9:47 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Evap Fuel Leaks at YEAR/101
+     [java] 11/2/26, 9:47 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Brakewear at YEAR/101
+     [java] 11/2/26, 9:47 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Tirewear at YEAR/101
+     [java] 11/2/26, 9:47 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.StartOperatingModeDistributionGenerator subscribed to Start Exhaust at PROCESS/100
+     [java] 11/2/26, 9:47 PM INFO: Calculate AVFT Control Strategy
+     [java] 11/2/26, 9:47 PM INFO: AVFT Calculations Complete
+     [java] 11/2/26, 9:47 PM INFO: 3 bundles will be used.
+     [java] 11/2/26, 9:47 PM INFO: Thread starting for class gov.epa.otaq.moves.master.framework.MasterLoopableThread.
+     [java] 11/2/26, 9:47 PM INFO: MetGen setupTime=165 bundleTime=0
+     [java] 11/2/26, 9:47 PM INFO: doGeneralFuelRatio
+     [java] 11/2/26, 9:47 PM INFO: doAirToxicsCalculations
+     [java] 11/2/26, 9:47 PM INFO: 19502000 (1980 to 2000)
+     [java] 11/2/26, 9:47 PM INFO: 20012050 (2001 to 2020)
+     [java] 11/2/26, 9:47 PM INFO: doCOCalculations
+     [java] 11/2/26, 9:47 PM INFO: 19502000 (1980 to 2000)
+     [java] 11/2/26, 9:47 PM INFO: 20012050 (2001 to 2020)
+     [java] 11/2/26, 9:47 PM INFO: doPredictiveCalculations: predictHC, 101,102 / 1000101,1000102
+     [java] 11/2/26, 9:47 PM INFO: 0 (1980 to 2020)
+     [java] 11/2/26, 9:47 PM INFO: doPredictiveCalculations: predictNOx, 301,302 / 
+     [java] 11/2/26, 9:47 PM INFO: 0 (1980 to 2020)
+     [java] 11/2/26, 9:47 PM INFO: doMTBECalculations
+     [java] 11/2/26, 9:47 PM INFO: doEvapBenzeneCalculations
+     [java] 11/2/26, 9:47 PM INFO: Removed potential overlaps between ATRatioNonGas and ATRatio
+     [java] 11/2/26, 9:47 PM INFO: FuelEffectsGenerator totalTime=329
+     [java] 11/2/26, 9:47 PM DEBUG: LinkOperatingModeDistributionGenerator.calculateOpModeFractions ms=511
+     [java] 11/2/26, 9:47 PM DEBUG: LinkOperatingModeDistributionGenerator.populateRatesOpModeDistribution ms=1
+     [java] 11/2/26, 9:47 PM INFO: LOMDG setupTime=54 bundleTime=514
+     [java] 11/2/26, 9:47 PM DEBUG: newSBD Generator called for process: Running Exhaust
+     [java] 11/2/26, 9:47 PM DEBUG: Processing pollutant-process: Total Energy Consumption - Running Exhaust
+     [java] 11/2/26, 9:47 PM DEBUG: SourceTypePhysics.updateEmissionRateTables starting for process 1
+     [java] 11/2/26, 9:47 PM DEBUG: SourceTypePhysics.updateEmissionRateTables done
+     [java] 11/2/26, 9:47 PM INFO: newSBDG setupTime=0 bundleTime=453
+     [java] 11/2/26, 9:47 PM INFO: ProjectTAG totalTime=23
+     [java] 11/2/26, 9:47 PM DEBUG: BaseRateGenerator.addIndexes: alter table avgSpeedBin add key speed1 (avgSpeedBinID, avgBinSpeed)
+     [java] 11/2/26, 9:47 PM DEBUG: BaseRateGenerator.addIndexes ms=20
+     [java] 11/2/26, 9:47 PM DEBUG: BaseRateGenerator.addIndexes: alter table avgSpeedBin add key speed2 (avgBinSpeed, avgSpeedBinID)
+     [java] 11/2/26, 9:47 PM DEBUG: BaseRateGenerator.addIndexes ms=24
+     [java] 11/2/26, 9:47 PM DEBUG: BaseRateGenerator.addIndexes: analyze table avgSpeedBin
+     [java] 11/2/26, 9:47 PM DEBUG: BaseRateGenerator.addIndexes ms=2
+     [java] 11/2/26, 9:47 PM DEBUG: Base Rate Generator called for process: Running Exhaust
+     [java] 11/2/26, 9:47 PM DEBUG: Base Rate Generator called for link: 1
+     [java] 11/2/26, 9:47 PM DEBUG: Normalizing sourcebin-weighted emission rates
+     [java] 11/2/26, 9:47 PM DEBUG: Normalizing sourcebin-weighted distance rates
+     [java] 11/2/26, 9:47 PM INFO: Running Statement: #CORE: 1 of 6
+     [java] 11/2/26, 9:47 PM INFO: Running Statement: #CORE: 2 of 6
+     [java] 11/2/26, 9:47 PM INFO: Running Statement: #CORE: 3 of 6
+     [java] 11/2/26, 9:47 PM INFO: Running Statement: #CORE: 4 of 6
+     [java] 11/2/26, 9:47 PM INFO: Running Statement: #CORE: 5 of 6
+     [java] 11/2/26, 9:47 PM INFO: Running Statement: #CORE: 6 of 6
+     [java] 11/2/26, 9:47 PM INFO: Running Statement: #CORE: 1 of 2
+     [java] 11/2/26, 9:47 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 1 of 1
+     [java] 11/2/26, 9:47 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 1 of 1
+     [java] 11/2/26, 9:47 PM INFO: Running Statement: #SBWEIGHTEDDISTANCERATE: 1 of 1
+     [java] 11/2/26, 9:47 PM INFO: Running Statement: #CORE: 2 of 2
+     [java] 11/2/26, 9:47 PM INFO: BRG SBW running concurrent statements...
+     [java] 11/2/26, 9:47 PM INFO: Running Statement: #SBWEIGHTEDDISTANCERATE: 1 of 1
+     [java] 11/2/26, 9:47 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 1 of 3
+     [java] 11/2/26, 9:47 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 1 of 3
+     [java] 11/2/26, 9:47 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 2 of 3
+     [java] 11/2/26, 9:47 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 3 of 3
+     [java] 11/2/26, 9:47 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 2 of 3
+     [java] 11/2/26, 9:47 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 3 of 3
+     [java] 11/2/26, 9:47 PM INFO: BRG SBW done running concurrent statements.
+     [java] 11/2/26, 9:47 PM INFO: Statements done: 18
+     [java] 11/2/26, 9:47 PM INFO: Avg. Concurrent Statements: 1.6111111111111112
+     [java] 11/2/26, 9:47 PM INFO: Max. Concurrent Statements: 4
+     [java] 11/2/26, 9:47 PM DEBUG: BaseRateGenerator: processID=1, applyAvgSpeedDistribution=false, useAvgSpeedBin=false, applySourceBinDistribution=false, keepOpModeID=false, avgSpeedFraction="", sumSBD=""
+     [java] 11/2/26, 9:47 PM DEBUG: Run /opt/moves/generators/externalgenerator64.exe in /opt/moves/MOVESTemporary/GeneratorTemp3
+     [java] 11/2/26, 9:47 PM DEBUG: Command line = 
+     [java] 11/2/26, 9:47 PM DEBUG: -class=BaseRateGenerator.generateBaseRates
+     [java] 11/2/26, 9:47 PM DEBUG: , 
+     [java] 11/2/26, 9:47 PM DEBUG: -db=MOVESExecution
+     [java] 11/2/26, 9:47 PM DEBUG: , 
+     [java] 11/2/26, 9:47 PM DEBUG: -dbuser=moves
+     [java] 11/2/26, 9:47 PM DEBUG: , 
+     [java] 11/2/26, 9:47 PM DEBUG: -dbpwd=moves
+     [java] 11/2/26, 9:47 PM DEBUG: , 
+     [java] 11/2/26, 9:47 PM DEBUG: -params=nOp,nASB,nASF,nSBD,nRaw,1,2020,4
+     [java] 11/2/26, 9:47 PM DEBUG: , 
+     [java] 11/2/26, 9:47 PM DEBUG: -isproject=1
+     [java] 11/2/26, 9:47 PM DEBUG: , 
+     [java] 11/2/26, 9:47 PM DEBUG: -saveromd=0
+     [java] 11/2/26, 9:47 PM DEBUG: 
+     [java] 11/2/26, 9:47 PM INFO: Time spent on running the external generator (sec): 0.0860000029206276 for Process: 1 Running Exhaust
      [java] State: 26
      [java] County: 26161
      [java] Zone: 261610
@@ -210,132 +210,132 @@ main1worker:
      [java] Module: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator
      [java] Iteration: 1
      [java] MovesRunID: 1
-     [java] 11/1/26, 6:51 PM DEBUG: Success running the external generator in BaseRateGenerator.generateBaseRates
-     [java] 11/1/26, 6:51 PM INFO: Statements done: 0
-     [java] 11/1/26, 6:51 PM INFO: Max. Concurrent Statements: 0
-     [java] 11/1/26, 6:51 PM DEBUG: Done with BaseRateGenerator processID=1, roadTypeID=4, yearID=2020
-     [java] 11/1/26, 6:51 PM INFO: BRG setupTime=43 bundleTime=491
-     [java] 11/1/26, 6:51 PM INFO: Saved bundle file 13880092289699820592_1_TODO
-     [java] 11/1/26, 6:51 PM INFO: Created bundle 1 for workers to process
-     [java] 11/1/26, 6:51 PM INFO: Saved bundle file 13880092289699820592_2_TODO
-     [java] 11/1/26, 6:51 PM INFO: Created bundle 2 for workers to process
-     [java] 11/1/26, 6:51 PM INFO: MetGen setupTime=214 bundleTime=0
-     [java] 11/1/26, 6:51 PM INFO: StartOperatingModeDistributionGenerator setupTime=1 totalTime=5
-     [java] 11/1/26, 6:51 PM DEBUG: newSBD Generator called for process: Start Exhaust
-     [java] 11/1/26, 6:51 PM DEBUG: Processing pollutant-process: Total Energy Consumption - Start Exhaust
-     [java] 11/1/26, 6:51 PM INFO: newSBDG setupTime=0 bundleTime=134
-     [java] 11/1/26, 6:51 PM INFO: ProjectTAG totalTime=21
-     [java] 11/1/26, 6:51 PM DEBUG: Base Rate Generator called for process: Start Exhaust
-     [java] 11/1/26, 6:51 PM DEBUG: Base Rate Generator called for link: 1
-     [java] 11/1/26, 6:51 PM DEBUG: Normalizing sourcebin-weighted emission rates
-     [java] 11/1/26, 6:51 PM INFO: Running Statement: #CORE: 1 of 6
-     [java] 11/1/26, 6:51 PM INFO: Running Statement: #CORE: 2 of 6
-     [java] 11/1/26, 6:51 PM INFO: Running Statement: #CORE: 3 of 6
-     [java] 11/1/26, 6:51 PM INFO: Running Statement: #CORE: 4 of 6
-     [java] 11/1/26, 6:51 PM INFO: Running Statement: #CORE: 5 of 6
-     [java] 11/1/26, 6:51 PM INFO: Running Statement: #CORE: 6 of 6
-     [java] 11/1/26, 6:51 PM INFO: Running Statement: #CORE: 1 of 2
-     [java] 11/1/26, 6:51 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 1 of 1
-     [java] 11/1/26, 6:51 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 1 of 1
-     [java] 11/1/26, 6:51 PM INFO: Running Statement: #SBWEIGHTEDDISTANCERATE: 1 of 1
-     [java] 11/1/26, 6:51 PM INFO: Running Statement: #CORE: 2 of 2
-     [java] 11/1/26, 6:51 PM INFO: BRG SBW running concurrent statements...
-     [java] 11/1/26, 6:51 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 1 of 3
-     [java] 11/1/26, 6:51 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 1 of 3
-     [java] 11/1/26, 6:51 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 2 of 3
-     [java] 11/1/26, 6:51 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 3 of 3
-     [java] 11/1/26, 6:51 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 2 of 3
-     [java] 11/1/26, 6:51 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 3 of 3
-     [java] 11/1/26, 6:51 PM INFO: BRG SBW done running concurrent statements.
-     [java] 11/1/26, 6:51 PM INFO: Statements done: 17
-     [java] 11/1/26, 6:51 PM INFO: Avg. Concurrent Statements: 1.5294117647058822
-     [java] 11/1/26, 6:51 PM INFO: Max. Concurrent Statements: 4
-     [java] 11/1/26, 6:51 PM INFO: BRG setupTime=43 bundleTime=582
-     [java] 11/1/26, 6:51 PM INFO: Saved bundle file 13880092289699820592_3_TODO
-     [java] 11/1/26, 6:51 PM INFO: Created bundle 3 for workers to process
-     [java] 11/1/26, 6:51 PM INFO: Thread shutdown starting for class gov.epa.otaq.moves.master.framework.MasterLoop.
-     [java] 11/1/26, 6:51 PM INFO: Thread shutdown starting for class gov.epa.otaq.moves.master.framework.MasterLoopableThread.
-     [java] 11/1/26, 6:51 PM INFO: Thread shutdown complete for class gov.epa.otaq.moves.master.framework.MasterLoopableThread.
-     [java] 11/1/26, 6:51 PM INFO: Thread shutdown complete for class gov.epa.otaq.moves.master.framework.MasterLoop.
-     [java] 11/1/26, 6:51 PM DEBUG: Worker found 3 TODO files.
-     [java] 11/1/26, 6:51 PM INFO: Found work file: 13880092289699820592_1_TODO
-     [java] 11/1/26, 6:51 PM INFO: Worker Processing 13880092289699820592_1_InProgress_9900942463944749198
-     [java] 11/1/26, 6:51 PM INFO: WorkerVersion=MOVES5.0.1
-     [java] 11/1/26, 6:51 PM INFO: WorkerComputerID=ccc0233.campuscluster.illinois.edu
-     [java] 11/1/26, 6:51 PM INFO: WorkerID=9900942463944749198
-     [java] 11/1/26, 6:51 PM INFO: Extracted 0 rows from MOVESWorkerOutput
-     [java] 11/1/26, 6:51 PM INFO: Extracted 125 rows from MOVESWorkerActivityOutput
-     [java] 11/1/26, 6:51 PM INFO: Extracted 0 rows from BaseRateOutput
-     [java] 11/1/26, 6:51 PM INFO: Worker finished processing: 13880092289699820592_1_InProgress_9900942463944749198
-     [java] 11/1/26, 6:51 PM INFO: Worker is idle
-     [java] 11/1/26, 6:51 PM INFO: Found work file: 13880092289699820592_2_TODO
-     [java] 11/1/26, 6:51 PM INFO: Worker Processing 13880092289699820592_2_InProgress_9900942463944749198
-     [java] 11/1/26, 6:51 PM INFO: WorkerVersion=MOVES5.0.1
-     [java] 11/1/26, 6:51 PM INFO: WorkerComputerID=ccc0233.campuscluster.illinois.edu
-     [java] 11/1/26, 6:51 PM INFO: WorkerID=9900942463944749198
-     [java] 11/1/26, 6:51 PM DEBUG: Run /opt/moves/calc/externalcalculatorgo64.exe in /opt/moves/MOVESTemporary/manyworkers/workerfolder/WorkerTemp4
-     [java] 11/1/26, 6:51 PM DEBUG: Command line = 
-     [java] 11/1/26, 6:51 PM DEBUG: -isproject=1
-     [java] 11/1/26, 6:51 PM DEBUG: 
-     [java] 11/1/26, 6:51 PM INFO: Time spent on running the external calculator (sec): 0.1720000058412552
-     [java] 11/1/26, 6:51 PM INFO: Received bundle from worker
-     [java] 11/1/26, 6:51 PM INFO: Bundle 1 is from worker: 'ccc0233.campuscluster.illinois.edu'/'MOVES5.0.1'/'9900942463944749198'
-     [java] 11/1/26, 6:51 PM INFO: Time spent on absorbing external calculator results (sec): 0.03099999949336052
-     [java] 11/1/26, 6:51 PM INFO: Extracted 125 rows from MOVESWorkerOutput
-     [java] 11/1/26, 6:51 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
-     [java] 11/1/26, 6:51 PM INFO: Extracted 125 rows from BaseRateOutput
-     [java] 11/1/26, 6:51 PM INFO: Worker finished processing: 13880092289699820592_2_InProgress_9900942463944749198
-     [java] 11/1/26, 6:51 PM INFO: Worker is idle
-     [java] 11/1/26, 6:51 PM INFO: Found work file: 13880092289699820592_3_TODO
-     [java] 11/1/26, 6:51 PM INFO: Worker Processing 13880092289699820592_3_InProgress_9900942463944749198
-     [java] 11/1/26, 6:51 PM INFO: WorkerVersion=MOVES5.0.1
-     [java] 11/1/26, 6:51 PM INFO: WorkerComputerID=ccc0233.campuscluster.illinois.edu
-     [java] 11/1/26, 6:51 PM INFO: WorkerID=9900942463944749198
-     [java] 11/1/26, 6:51 PM INFO: Extracted 0 rows from MOVESWorkerOutput
-     [java] 11/1/26, 6:51 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
-     [java] 11/1/26, 6:51 PM INFO: Extracted 0 rows from BaseRateOutput
-     [java] 11/1/26, 6:51 PM INFO: Worker finished processing: 13880092289699820592_3_InProgress_9900942463944749198
-     [java] 11/1/26, 6:51 PM INFO: Worker is idle
-     [java] 11/1/26, 6:51 PM INFO: Received bundle from worker
-     [java] 11/1/26, 6:51 PM INFO: Bundle 2 is from worker: 'ccc0233.campuscluster.illinois.edu'/'MOVES5.0.1'/'9900942463944749198'
-     [java] 11/1/26, 6:51 PM INFO: Received bundle from worker
-     [java] 11/1/26, 6:51 PM INFO: Bundle 3 is from worker: 'ccc0233.campuscluster.illinois.edu'/'MOVES5.0.1'/'9900942463944749198'
-     [java] 11/1/26, 6:51 PM INFO: Final aggregation is being done by default.
-     [java] 11/1/26, 6:51 PM INFO: Final Aggregation starting...
-     [java] 11/1/26, 6:51 PM INFO: Final Aggregation complete.
-     [java] 11/1/26, 6:51 PM INFO: Unit conversions starting...
-     [java] 11/1/26, 6:51 PM INFO: Time Measurement System = Seconds
-     [java] 11/1/26, 6:51 PM INFO: Output Time Step = Hour
-     [java] 11/1/26, 6:51 PM INFO: Output Time Step average hours = 1.0
-     [java] 11/1/26, 6:51 PM INFO: Unit conversions done.
-     [java] 11/1/26, 6:51 PM INFO: Final Post processing starting...
-     [java] 11/1/26, 6:51 PM INFO: Analyzing mesoscale output tables
-     [java] 11/1/26, 6:51 PM INFO: Zeroing null values in rate output tables
-     [java] 11/1/26, 6:51 PM INFO: Done building rate output tables
-     [java] 11/1/26, 6:51 PM INFO: Final Post processing done.
-     [java] 11/1/26, 6:51 PM INFO: Removing data from MOVESOutput per Advanced Performance Features setting...
-     [java] 11/1/26, 6:51 PM INFO: Truncating empty MOVESOutput per Advanced Performance Features setting.
-     [java] 11/1/26, 6:51 PM INFO: Removed data from MOVESOutput per Advanced Performance Features setting.
-     [java] 11/1/26, 6:51 PM INFO: Removing data from MOVESActivityOutput per Advanced Performance Features setting...
-     [java] 11/1/26, 6:51 PM INFO: Truncating empty MOVESActivityOutput per Advanced Performance Features setting.
-     [java] 11/1/26, 6:51 PM INFO: Removed data from MOVESActivityOutput per Advanced Performance Features setting.
-     [java] 11/1/26, 6:51 PM INFO: Removing data from BaseRateOutput per Advanced Performance Features setting...
-     [java] 11/1/26, 6:51 PM INFO: Truncating empty BaseRateOutput per Advanced Performance Features setting.
-     [java] 11/1/26, 6:51 PM INFO: Removed data from BaseRateOutput per Advanced Performance Features setting.
-     [java] 11/1/26, 6:51 PM INFO: Removing data from BaseRateUnits per Advanced Performance Features setting...
-     [java] 11/1/26, 6:51 PM INFO: Truncating empty BaseRateUnits per Advanced Performance Features setting.
-     [java] 11/1/26, 6:51 PM INFO: Removed data from BaseRateUnits per Advanced Performance Features setting.
-     [java] 11/1/26, 6:51 PM INFO: Unbundler has detected completion conditions. Exiting.
-     [java] 11/1/26, 6:51 PM INFO: Generated bundles = 3 Retrieved bundles = 3
-     [java] 11/1/26, 6:51 PM INFO: Thread shutdown starting for class gov.epa.otaq.moves.master.framework.EmissionCalculatorInboundUnbundler.
-     [java] 11/1/26, 6:51 PM INFO: Thread shutdown complete for class gov.epa.otaq.moves.master.framework.EmissionCalculatorInboundUnbundler.
-     [java] 11/1/26, 6:51 PM INFO: Thread shutdown starting for class gov.epa.otaq.moves.master.framework.HeartbeatDetectionThread.
-     [java] 11/1/26, 6:51 PM INFO: Thread shutdown complete for class gov.epa.otaq.moves.master.framework.HeartbeatDetectionThread.
+     [java] 11/2/26, 9:47 PM DEBUG: Success running the external generator in BaseRateGenerator.generateBaseRates
+     [java] 11/2/26, 9:47 PM INFO: Statements done: 0
+     [java] 11/2/26, 9:47 PM INFO: Max. Concurrent Statements: 0
+     [java] 11/2/26, 9:47 PM DEBUG: Done with BaseRateGenerator processID=1, roadTypeID=4, yearID=2020
+     [java] 11/2/26, 9:47 PM INFO: BRG setupTime=48 bundleTime=299
+     [java] 11/2/26, 9:47 PM INFO: Saved bundle file 16101449711698594219_1_TODO
+     [java] 11/2/26, 9:47 PM INFO: Created bundle 1 for workers to process
+     [java] 11/2/26, 9:47 PM INFO: Saved bundle file 16101449711698594219_2_TODO
+     [java] 11/2/26, 9:47 PM INFO: Created bundle 2 for workers to process
+     [java] 11/2/26, 9:47 PM INFO: StartOperatingModeDistributionGenerator setupTime=1 totalTime=4
+     [java] 11/2/26, 9:47 PM INFO: MetGen setupTime=165 bundleTime=0
+     [java] 11/2/26, 9:47 PM DEBUG: newSBD Generator called for process: Start Exhaust
+     [java] 11/2/26, 9:47 PM DEBUG: Processing pollutant-process: Total Energy Consumption - Start Exhaust
+     [java] 11/2/26, 9:47 PM INFO: newSBDG setupTime=0 bundleTime=131
+     [java] 11/2/26, 9:47 PM INFO: ProjectTAG totalTime=27
+     [java] 11/2/26, 9:47 PM DEBUG: Base Rate Generator called for process: Start Exhaust
+     [java] 11/2/26, 9:47 PM DEBUG: Base Rate Generator called for link: 1
+     [java] 11/2/26, 9:47 PM DEBUG: Normalizing sourcebin-weighted emission rates
+     [java] 11/2/26, 9:47 PM INFO: Running Statement: #CORE: 1 of 6
+     [java] 11/2/26, 9:47 PM INFO: Running Statement: #CORE: 2 of 6
+     [java] 11/2/26, 9:47 PM INFO: Running Statement: #CORE: 3 of 6
+     [java] 11/2/26, 9:47 PM INFO: Running Statement: #CORE: 4 of 6
+     [java] 11/2/26, 9:47 PM INFO: Running Statement: #CORE: 5 of 6
+     [java] 11/2/26, 9:47 PM INFO: Running Statement: #CORE: 6 of 6
+     [java] 11/2/26, 9:47 PM INFO: Running Statement: #CORE: 1 of 2
+     [java] 11/2/26, 9:47 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 1 of 1
+     [java] 11/2/26, 9:47 PM INFO: Running Statement: #SBWEIGHTEDDISTANCERATE: 1 of 1
+     [java] 11/2/26, 9:47 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 1 of 1
+     [java] 11/2/26, 9:47 PM INFO: Running Statement: #CORE: 2 of 2
+     [java] 11/2/26, 9:47 PM INFO: BRG SBW running concurrent statements...
+     [java] 11/2/26, 9:47 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 1 of 3
+     [java] 11/2/26, 9:47 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 1 of 3
+     [java] 11/2/26, 9:47 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 2 of 3
+     [java] 11/2/26, 9:47 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 3 of 3
+     [java] 11/2/26, 9:47 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 2 of 3
+     [java] 11/2/26, 9:47 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 3 of 3
+     [java] 11/2/26, 9:47 PM INFO: BRG SBW done running concurrent statements.
+     [java] 11/2/26, 9:47 PM INFO: Statements done: 17
+     [java] 11/2/26, 9:47 PM INFO: Avg. Concurrent Statements: 1.5294117647058822
+     [java] 11/2/26, 9:47 PM INFO: Max. Concurrent Statements: 4
+     [java] 11/2/26, 9:47 PM INFO: BRG setupTime=48 bundleTime=417
+     [java] 11/2/26, 9:47 PM INFO: Saved bundle file 16101449711698594219_3_TODO
+     [java] 11/2/26, 9:47 PM INFO: Created bundle 3 for workers to process
+     [java] 11/2/26, 9:47 PM INFO: Thread shutdown starting for class gov.epa.otaq.moves.master.framework.MasterLoop.
+     [java] 11/2/26, 9:47 PM INFO: Thread shutdown starting for class gov.epa.otaq.moves.master.framework.MasterLoopableThread.
+     [java] 11/2/26, 9:47 PM INFO: Thread shutdown complete for class gov.epa.otaq.moves.master.framework.MasterLoopableThread.
+     [java] 11/2/26, 9:47 PM INFO: Thread shutdown complete for class gov.epa.otaq.moves.master.framework.MasterLoop.
+     [java] 11/2/26, 9:47 PM DEBUG: Worker found 3 TODO files.
+     [java] 11/2/26, 9:47 PM INFO: Found work file: 16101449711698594219_1_TODO
+     [java] 11/2/26, 9:47 PM INFO: Worker Processing 16101449711698594219_1_InProgress_17112701374408338256
+     [java] 11/2/26, 9:47 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/2/26, 9:47 PM INFO: WorkerComputerID=ccc0232.campuscluster.illinois.edu
+     [java] 11/2/26, 9:47 PM INFO: WorkerID=17112701374408338256
+     [java] 11/2/26, 9:47 PM INFO: Extracted 0 rows from MOVESWorkerOutput
+     [java] 11/2/26, 9:47 PM INFO: Extracted 125 rows from MOVESWorkerActivityOutput
+     [java] 11/2/26, 9:47 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/2/26, 9:47 PM INFO: Worker finished processing: 16101449711698594219_1_InProgress_17112701374408338256
+     [java] 11/2/26, 9:47 PM INFO: Worker is idle
+     [java] 11/2/26, 9:47 PM INFO: Found work file: 16101449711698594219_2_TODO
+     [java] 11/2/26, 9:47 PM INFO: Worker Processing 16101449711698594219_2_InProgress_17112701374408338256
+     [java] 11/2/26, 9:47 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/2/26, 9:47 PM INFO: WorkerComputerID=ccc0232.campuscluster.illinois.edu
+     [java] 11/2/26, 9:47 PM INFO: WorkerID=17112701374408338256
+     [java] 11/2/26, 9:47 PM DEBUG: Run /opt/moves/calc/externalcalculatorgo64.exe in /opt/moves/MOVESTemporary/manyworkers/workerfolder/WorkerTemp7
+     [java] 11/2/26, 9:47 PM DEBUG: Command line = 
+     [java] 11/2/26, 9:47 PM DEBUG: -isproject=1
+     [java] 11/2/26, 9:47 PM DEBUG: 
+     [java] 11/2/26, 9:47 PM INFO: Time spent on running the external calculator (sec): 0.06300000101327896
+     [java] 11/2/26, 9:47 PM INFO: Time spent on absorbing external calculator results (sec): 0.03200000151991844
+     [java] 11/2/26, 9:47 PM INFO: Extracted 125 rows from MOVESWorkerOutput
+     [java] 11/2/26, 9:47 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/2/26, 9:47 PM INFO: Extracted 125 rows from BaseRateOutput
+     [java] 11/2/26, 9:47 PM INFO: Worker finished processing: 16101449711698594219_2_InProgress_17112701374408338256
+     [java] 11/2/26, 9:47 PM INFO: Worker is idle
+     [java] 11/2/26, 9:47 PM INFO: Found work file: 16101449711698594219_3_TODO
+     [java] 11/2/26, 9:47 PM INFO: Worker Processing 16101449711698594219_3_InProgress_17112701374408338256
+     [java] 11/2/26, 9:47 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/2/26, 9:47 PM INFO: WorkerComputerID=ccc0232.campuscluster.illinois.edu
+     [java] 11/2/26, 9:47 PM INFO: WorkerID=17112701374408338256
+     [java] 11/2/26, 9:47 PM INFO: Extracted 0 rows from MOVESWorkerOutput
+     [java] 11/2/26, 9:47 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/2/26, 9:47 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/2/26, 9:47 PM INFO: Worker finished processing: 16101449711698594219_3_InProgress_17112701374408338256
+     [java] 11/2/26, 9:47 PM INFO: Worker is idle
+     [java] 11/2/26, 9:47 PM INFO: Received bundle from worker
+     [java] 11/2/26, 9:47 PM INFO: Bundle 1 is from worker: 'ccc0232.campuscluster.illinois.edu'/'MOVES5.0.1'/'17112701374408338256'
+     [java] 11/2/26, 9:47 PM INFO: Received bundle from worker
+     [java] 11/2/26, 9:47 PM INFO: Bundle 2 is from worker: 'ccc0232.campuscluster.illinois.edu'/'MOVES5.0.1'/'17112701374408338256'
+     [java] 11/2/26, 9:47 PM INFO: Received bundle from worker
+     [java] 11/2/26, 9:47 PM INFO: Bundle 3 is from worker: 'ccc0232.campuscluster.illinois.edu'/'MOVES5.0.1'/'17112701374408338256'
+     [java] 11/2/26, 9:47 PM INFO: Final aggregation is being done by default.
+     [java] 11/2/26, 9:47 PM INFO: Final Aggregation starting...
+     [java] 11/2/26, 9:47 PM INFO: Final Aggregation complete.
+     [java] 11/2/26, 9:47 PM INFO: Unit conversions starting...
+     [java] 11/2/26, 9:47 PM INFO: Time Measurement System = Seconds
+     [java] 11/2/26, 9:47 PM INFO: Output Time Step = Hour
+     [java] 11/2/26, 9:47 PM INFO: Output Time Step average hours = 1.0
+     [java] 11/2/26, 9:47 PM INFO: Unit conversions done.
+     [java] 11/2/26, 9:47 PM INFO: Final Post processing starting...
+     [java] 11/2/26, 9:47 PM INFO: Analyzing mesoscale output tables
+     [java] 11/2/26, 9:47 PM INFO: Zeroing null values in rate output tables
+     [java] 11/2/26, 9:47 PM INFO: Done building rate output tables
+     [java] 11/2/26, 9:47 PM INFO: Final Post processing done.
+     [java] 11/2/26, 9:47 PM INFO: Removing data from MOVESOutput per Advanced Performance Features setting...
+     [java] 11/2/26, 9:47 PM INFO: Truncating empty MOVESOutput per Advanced Performance Features setting.
+     [java] 11/2/26, 9:47 PM INFO: Removed data from MOVESOutput per Advanced Performance Features setting.
+     [java] 11/2/26, 9:47 PM INFO: Removing data from MOVESActivityOutput per Advanced Performance Features setting...
+     [java] 11/2/26, 9:47 PM INFO: Truncating empty MOVESActivityOutput per Advanced Performance Features setting.
+     [java] 11/2/26, 9:47 PM INFO: Removed data from MOVESActivityOutput per Advanced Performance Features setting.
+     [java] 11/2/26, 9:47 PM INFO: Removing data from BaseRateOutput per Advanced Performance Features setting...
+     [java] 11/2/26, 9:47 PM INFO: Truncating empty BaseRateOutput per Advanced Performance Features setting.
+     [java] 11/2/26, 9:47 PM INFO: Removed data from BaseRateOutput per Advanced Performance Features setting.
+     [java] 11/2/26, 9:47 PM INFO: Removing data from BaseRateUnits per Advanced Performance Features setting...
+     [java] 11/2/26, 9:47 PM INFO: Truncating empty BaseRateUnits per Advanced Performance Features setting.
+     [java] 11/2/26, 9:47 PM INFO: Removed data from BaseRateUnits per Advanced Performance Features setting.
+     [java] 11/2/26, 9:47 PM INFO: Unbundler has detected completion conditions. Exiting.
+     [java] 11/2/26, 9:47 PM INFO: Generated bundles = 3 Retrieved bundles = 3
+     [java] 11/2/26, 9:47 PM INFO: Thread shutdown starting for class gov.epa.otaq.moves.master.framework.EmissionCalculatorInboundUnbundler.
+     [java] 11/2/26, 9:47 PM INFO: Thread shutdown complete for class gov.epa.otaq.moves.master.framework.EmissionCalculatorInboundUnbundler.
+     [java] 11/2/26, 9:47 PM INFO: Thread shutdown starting for class gov.epa.otaq.moves.master.framework.HeartbeatDetectionThread.
+     [java] 11/2/26, 9:47 PM INFO: Thread shutdown complete for class gov.epa.otaq.moves.master.framework.HeartbeatDetectionThread.
      [java] MOVESCommandLine after runApplication
-     [java] 11/1/26, 6:51 PM INFO: Thread shutdown starting for class gov.epa.otaq.moves.worker.framework.WorkerHeartbeatThread.
-     [java] 11/1/26, 6:51 PM INFO: Thread shutdown complete for class gov.epa.otaq.moves.worker.framework.WorkerHeartbeatThread.
+     [java] 11/2/26, 9:47 PM INFO: Thread shutdown starting for class gov.epa.otaq.moves.worker.framework.WorkerHeartbeatThread.
+     [java] 11/2/26, 9:47 PM INFO: Thread shutdown complete for class gov.epa.otaq.moves.worker.framework.WorkerHeartbeatThread.
      [echo] MOVES and 1 worker finished.
      [echo] MOVES has been shutdown, but not MySQL since it was already running.
 
 BUILD SUCCESSFUL
-Total time: 34 seconds
+Total time: 39 seconds

@@ -5,7 +5,7 @@
   "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
   "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/expand-multiyear.xml",
   "runspec_sha256": "61bdb3b28616c377f740388f52e58aa8ed3a39a2b5a1c1cbaac1a812cf0a2951",
-  "snapshot_aggregate_sha256": "40b6a230b2daef11a42e400f8bb7aa53af56a31d8a3104bb524bc98f4d83493e",
+  "snapshot_aggregate_sha256": "099e7af328146c2abe89eb185181515ede2c24fa2e25c59ea33257a594a33c78",
   "output_database": "out_expand_multiyear",
   "scale_input_database": null
 }

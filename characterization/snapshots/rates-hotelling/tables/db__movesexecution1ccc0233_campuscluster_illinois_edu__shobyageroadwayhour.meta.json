@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__shobyageroadwayhour",
   "schema": [
     {
@@ -53,6 +53,9 @@
     "hourID"
   ],
   "row_count": 3936,
-  "float_decimals": 12,
-  "content_sha256": "f0854b4c401e97bbb70553525f20d6c6ca6e0d4d536d24012360fb8f0644d6ce"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "55087465665a05949d7c28ed3035129ddfdd12ca92a07fec6a531bf8d6db2f10"
 }

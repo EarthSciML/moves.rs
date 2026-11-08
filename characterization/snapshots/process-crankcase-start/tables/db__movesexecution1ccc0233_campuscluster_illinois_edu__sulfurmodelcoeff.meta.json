@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__sulfurmodelcoeff",
   "schema": [
     {
@@ -44,6 +44,9 @@
     "sulfurFunctionID"
   ],
   "row_count": 1170,
-  "float_decimals": 12,
-  "content_sha256": "bcad8d49057ba07eb89b9b0edfe18d8e85aed58192bb875df56bb62a96e77498"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "e9aabfb8d5a8ba5be539dd9f2844501704b8fe9c49ce71f22e73464aabeacd39"
 }

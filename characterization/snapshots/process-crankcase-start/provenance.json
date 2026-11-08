@@ -5,7 +5,7 @@
   "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
   "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/process-crankcase-start.xml",
   "runspec_sha256": "f3b7c80dd8237bd69e4a58d6207b94e2d04a65826ad6d1c5643070a7aea6d808",
-  "snapshot_aggregate_sha256": "7af3db6ad8dc2aa7a73f3812869eb8f38e58ebd5ca051049843cab279e61e1b2",
+  "snapshot_aggregate_sha256": "93fa17634e60523729ea52641e368d67fa5eb827afdd8756952c7aeeb46b14c4",
   "output_database": "out_process_crankcase_start",
   "scale_input_database": null
 }

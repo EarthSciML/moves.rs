@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution__hourvmtfraction",
   "schema": [
     {
@@ -30,6 +30,9 @@
     "hourID"
   ],
   "row_count": 96,
-  "float_decimals": 12,
-  "content_sha256": "af6c9657d5761c86c313b1a78fd163b5c52e7d8b690baeb85d846adb278beb36"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "9dc99267ca2d6304fc61734f646e34108a973d060a1f4136b77c70d3429a7687"
 }

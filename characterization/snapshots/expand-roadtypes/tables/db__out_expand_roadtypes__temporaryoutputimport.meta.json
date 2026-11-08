@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_expand_roadtypes__temporaryoutputimport",
   "schema": [
     {
@@ -105,6 +105,9 @@
   ],
   "natural_key": [],
   "row_count": 104,
-  "float_decimals": 12,
-  "content_sha256": "5c706be4ccb5f9d6e7d69f5d6c51fe390159aa7514dc4cc6fb709b712a75380a"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "bc42f2f00d229b227b48078b2838ca7ee797845f1260765367568c5919cb7a16"
 }

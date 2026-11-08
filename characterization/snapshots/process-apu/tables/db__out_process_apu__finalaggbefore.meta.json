@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_process_apu__finalaggbefore",
   "schema": [
     {
@@ -105,6 +105,9 @@
   ],
   "natural_key": [],
   "row_count": 91,
-  "float_decimals": 12,
-  "content_sha256": "988317431f52d12a76d33fd76eb2cdcd7486b3ff074c70d552fc69c12a536ed2"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "db90c9c3ddc43dfec43f76c1f1f430bcac786e53c6c81d8b75af8e1292f2ba3b"
 }

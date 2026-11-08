@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__soakactivityfraction",
   "schema": [
     {
@@ -43,6 +43,9 @@
     "opModeID"
   ],
   "row_count": 2,
-  "float_decimals": 12,
-  "content_sha256": "2c14220a9302d6e21364ea54ed4cf6a5ab31bd0dc89868d69722829896d7d5e3"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "3dfa3ba782340072e040b7437358cd0fdd852f3ec2af7139747a660dd11bae98"
 }

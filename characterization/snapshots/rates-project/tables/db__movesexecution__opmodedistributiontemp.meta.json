@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution__opmodedistributiontemp",
   "schema": [
     {
@@ -37,6 +37,9 @@
   ],
   "natural_key": [],
   "row_count": 40,
-  "float_decimals": 12,
-  "content_sha256": "a9caa959cacbc68ff89b3ba8442de01a4b3d685a95b0d6afe0d2813da680948f"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "24884ae469ca93cda036b155249ef4efa9d4a83499e9e8b467e6d89e45a2c8c3"
 }

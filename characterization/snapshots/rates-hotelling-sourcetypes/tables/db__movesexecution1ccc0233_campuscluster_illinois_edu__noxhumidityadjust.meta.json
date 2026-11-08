@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__noxhumidityadjust",
   "schema": [
     {
@@ -35,6 +35,9 @@
     "fuelTypeID"
   ],
   "row_count": 3,
-  "float_decimals": 12,
-  "content_sha256": "500c827024cd24ec573e7ac3e9ec569f0aedf742eaef8ebb3b14db8c19aafe72"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "3c6191a59b16e5e6bad8b1003fbd45ff2acb686c7e821e7e68f0c8f85ca6ed8f"
 }

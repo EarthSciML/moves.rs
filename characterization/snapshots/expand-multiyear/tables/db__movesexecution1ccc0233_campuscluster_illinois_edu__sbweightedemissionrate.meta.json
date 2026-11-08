@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__sbweightedemissionrate",
   "schema": [
     {
@@ -60,6 +60,9 @@
     "regClassID"
   ],
   "row_count": 912,
-  "float_decimals": 12,
-  "content_sha256": "71eb1ac3b9d85194fba386ee22fab3293f6ac79e999f90c4239cbaee6826942b"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "ae993232487de41d2a408e449756fda9f574f4cc4fb02b3490abc5cec2420163"
 }

@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution__samplevehicletrip",
   "schema": [
     {
@@ -37,6 +37,9 @@
     "tripID"
   ],
   "row_count": 26958,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "63e7460ea83e3629ecdc25ffe7147d1d17869beb49e973a038d2695d170bcde7"
 }

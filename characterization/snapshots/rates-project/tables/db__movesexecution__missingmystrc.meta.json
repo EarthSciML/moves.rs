@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution__missingmystrc",
   "schema": [
     {
@@ -21,6 +21,9 @@
     "regClassID"
   ],
   "row_count": 0,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "3573087ceeff5cddb49736ada2568ba7175958647e88ddaca0f50fbda911aa63"
 }

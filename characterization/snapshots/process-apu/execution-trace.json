@@ -289,6 +289,10 @@
       "kind": "framework"
     },
     {
+      "name": "gov.epa.otaq.moves.master.framework.HeartbeatDetectionThread$ObservedFileStamp",
+      "kind": "framework"
+    },
+    {
       "name": "gov.epa.otaq.moves.master.framework.InputDataManager",
       "kind": "framework"
     },

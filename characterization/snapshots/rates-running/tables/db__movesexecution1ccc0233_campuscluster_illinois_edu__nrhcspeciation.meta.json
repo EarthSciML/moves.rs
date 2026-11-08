@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__nrhcspeciation",
   "schema": [
     {
@@ -43,6 +43,9 @@
     "nrHPCategory"
   ],
   "row_count": 2112,
-  "float_decimals": 12,
-  "content_sha256": "b55771bb23628c82c549601264655fbe3fa60c5ba5460f5233d2530fb3568add"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "c3239564a12e82f92557edb5305d521becae8e77ff7e98010df2479ea70a6459"
 }

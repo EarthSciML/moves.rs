@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_rates_venting__finalaggbefore",
   "schema": [
     {
@@ -105,6 +105,9 @@
   ],
   "natural_key": [],
   "row_count": 52224,
-  "float_decimals": 12,
-  "content_sha256": "82d1a341e9b33a4231f8ed6de0b24f987a85a44b231544421a51f8e9d1563a91"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "2bdcc2eb16484bd92639caaeacfca0d828f4c6446c0e41df4935504b66609e14"
 }
