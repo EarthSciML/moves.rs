@@ -1,0 +1,80 @@
+<runspec version="MOVES5.0.1">
+	<description><![CDATA[Project-domain run (model_domain=PROJECT) on three links in Washtenaw County: link 1 on road type 4 (1 mile, 1000 veh/h, 30 mph), link 2 on road type 5 (0.5 mile, 600 veh/h, 25 mph) and off-network link 3 on road type 1, for two source types (21, 32) and four processes (running, start, brake wear, tire wear). ProjectTAG's SHO on two links and its Starts from offNetworkLink; LinkOperatingModeDistributionGenerator on two speeds. Snapshot capture supplies the project DB from county-inputs/washtenaw-project-links/setup-project-links.sql.]]></description>
+	<models>
+		<model value="ONROAD"/>
+	</models>
+	<modelscale value="Inv"/>
+	<modeldomain value="PROJECT"/>
+	<geographicselections>
+		<geographicselection type="COUNTY" key="26161" description="MICHIGAN - Washtenaw County"/>
+	</geographicselections>
+	<timespan>
+		<year key="2020"/>
+		<month key="7"/>
+		<day id="5"/>
+		<beginhour key="8"/>
+		<endhour key="8"/>
+	</timespan>
+	<onroadvehicleselections>
+		<onroadvehicleselection fueltypeid="1" fueltypedesc="Gasoline" sourcetypeid="21" sourcetypename="Passenger Car"/>
+		<onroadvehicleselection fueltypeid="1" fueltypedesc="Gasoline" sourcetypeid="32" sourcetypename="Light Commercial Truck"/>
+	</onroadvehicleselections>
+	<offroadvehicleselections>
+	</offroadvehicleselections>
+	<offroadvehiclesccs>
+	</offroadvehiclesccs>
+	<roadtypes>
+		<roadtype roadtypeid="1" roadtypename="Off-Network" modelCombination="M1"/>
+		<roadtype roadtypeid="4" roadtypename="Urban Restricted Access" modelCombination="M1"/>
+		<roadtype roadtypeid="5" roadtypename="Urban Unrestricted Access" modelCombination="M1"/>
+	</roadtypes>
+	<pollutantprocessassociations>
+		<pollutantprocessassociation pollutantkey="2" pollutantname="Carbon Monoxide (CO)" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="91" pollutantname="Total Energy Consumption" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="2" pollutantname="Carbon Monoxide (CO)" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="91" pollutantname="Total Energy Consumption" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="106" pollutantname="Primary PM10 - Brakewear Particulate" processkey="9" processname="Brakewear"/>
+		<pollutantprocessassociation pollutantkey="116" pollutantname="Primary PM2.5 - Brakewear Particulate" processkey="9" processname="Brakewear"/>
+		<pollutantprocessassociation pollutantkey="107" pollutantname="Primary PM10 - Tirewear Particulate" processkey="10" processname="Tirewear"/>
+		<pollutantprocessassociation pollutantkey="117" pollutantname="Primary PM2.5 - Tirewear Particulate" processkey="10" processname="Tirewear"/>
+	</pollutantprocessassociations>
+	<databaseselections>
+	</databaseselections>
+	<internalcontrolstrategies>
+	</internalcontrolstrategies>
+	<inputdatabase servername="" databasename="" description=""/>
+	<uncertaintyparameters uncertaintymodeenabled="false" numberofrunspersimulation="0" numberofsimulations="0"/>
+	<geographicoutputdetail description="LINK"/>
+	<outputemissionsbreakdownselection>
+	    <modelyear selected="true"/>
+	    <fueltype selected="true"/>
+	    <emissionprocess selected="true"/>
+	    <distinguishparticulates selected="true"/>
+	    <onroadoffroad selected="true"/>
+	    <roadtype selected="true"/>
+	    <sourceusetype selected="false"/>
+	    <movesvehicletype selected="false"/>
+	    <onroadscc selected="true"/>
+	    <offroadscc selected="false"/>
+	    <estimateuncertainty selected="false"/>
+	    <segment selected="false"/>
+	    <hpclass selected="false"/>
+	</outputemissionsbreakdownselection>
+	<outputdatabase servername="" databasename="out_project_links" description=""/>
+	<outputtimestep value="Hour"/>
+	<outputvmtdata value="false"/>
+	<outputsho value="false"/>
+	<outputsh value="false"/>
+	<outputshp value="false"/>
+	<outputshidling value="false"/>
+	<outputstarts value="false"/>
+	<outputpopulation value="false"/>
+	<scaleinputdatabase servername="" databasename="" description=""/>
+	<pmsize value="0"/>
+	<outputfactors>
+		<timefactors selected="true" units="Seconds"/>
+		<distancefactors selected="true" units="Miles"/>
+		<massfactors selected="true" units="Grams" energyunits="Million BTU"/>
+	</outputfactors>
+	<skipdomaindatabasevalidation selected="true"/>
+</runspec>

@@ -1,0 +1,36 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0236_campuscluster_illinois_edu__sourcebinmodelyearrange",
+  "schema": [
+    {
+      "name": "sourceBinID",
+      "kind": "int64"
+    },
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "minModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "maxModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "howManyModelYears",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "sourceBinID",
+    "polProcessID"
+  ],
+  "row_count": 219,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "ca3d8252a4118ea12ed6a3eb6f2c5459636707ca6e09993cf9871c73e349a86f"
+}

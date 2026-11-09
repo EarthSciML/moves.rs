@@ -1,0 +1,11 @@
+{
+  "provenance_version": "moves-fixture-capture/v1",
+  "fixture_name": "project-links",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
+  "sif_path": "/scratch.local/ctessum/gaps/moves.rs/characterization/fixture-image.lock",
+  "runspec_path": "/scratch/ctessum/moves-county-fixture/project-links/project-links.xml",
+  "runspec_sha256": "00b3c9c521038873ba1960290f38a13be43bcebea6aa54919d52ef6da3b81e72",
+  "snapshot_aggregate_sha256": "6173954ca2126bd7abc3cb29940b0db0ce1741ca453771740be33bdf0828d9b0",
+  "output_database": "out_project_links",
+  "scale_input_database": "washtenaw_cdb"
+}

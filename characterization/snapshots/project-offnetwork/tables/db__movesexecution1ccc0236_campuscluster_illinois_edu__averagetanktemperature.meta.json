@@ -1,0 +1,51 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0236_campuscluster_illinois_edu__averagetanktemperature",
+  "schema": [
+    {
+      "name": "tankTemperatureGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "zoneID",
+      "kind": "int64"
+    },
+    {
+      "name": "monthID",
+      "kind": "int64"
+    },
+    {
+      "name": "hourDayID",
+      "kind": "int64"
+    },
+    {
+      "name": "opModeID",
+      "kind": "int64"
+    },
+    {
+      "name": "averageTankTemperature",
+      "kind": "float64"
+    },
+    {
+      "name": "averageTankTemperatureCV",
+      "kind": "float64"
+    },
+    {
+      "name": "isUserInput",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "tankTemperatureGroupID",
+    "zoneID",
+    "monthID",
+    "hourDayID",
+    "opModeID"
+  ],
+  "row_count": 216,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "9f63e0e51c4e2ed59920a8b7d4bc7530bd41facdcf83c4ba3dfc124f86ea7212"
+}

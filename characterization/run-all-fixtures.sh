@@ -84,6 +84,12 @@ declare -a SKIP_BY_DEFAULT=(
     # database named MOVESExecution, and its tables are `db__movesexecution__*`.
     # Skipped by default, as scale-project is, for the project-database seed.
     "rates-project"
+    # project-links, project-offnetwork: multi-link PROJECT-domain runs, each
+    # with its own project database (COUNTY_SQL_FOR below). Skipped by default
+    # for the same seed pass.
+    "project-links"
+    "project-offnetwork"
+    "project-hotelling"
     # error-*: deliberately invalid RunSpecs that are expected to fail parsing.
     # They are tested by the Rust regression suite's error_fixtures_return_expected_errors
     # test, not by canonical-MOVES runs.
@@ -227,6 +233,10 @@ county_sql_for() {
             echo "${HERE}/county-inputs/washtenaw-county/setup-county.sql" ;;
         scale-project|rates-project)
             echo "${HERE}/county-inputs/washtenaw-project/setup-project.sql" ;;
+        project-links)
+            echo "${HERE}/county-inputs/washtenaw-project-links/setup-project-links.sql" ;;
+        project-offnetwork|project-hotelling)
+            echo "${HERE}/county-inputs/washtenaw-project-offnetwork/setup-project-offnetwork.sql" ;;
         *)
             echo "" ;;
     esac

@@ -1,0 +1,11 @@
+{
+  "provenance_version": "moves-fixture-capture/v1",
+  "fixture_name": "project-offnetwork",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
+  "sif_path": "/scratch.local/ctessum/gaps/moves.rs/characterization/fixture-image.lock",
+  "runspec_path": "/scratch/ctessum/moves-county-fixture/project-offnetwork/project-offnetwork.xml",
+  "runspec_sha256": "a2039109c69162173785281ad543ea5c8239efc46fb70249ec8fd26af1260e53",
+  "snapshot_aggregate_sha256": "30e8e7658a3508cb5344aad704525398340bac0daf5e56471cd28f77f8c73e0d",
+  "output_database": "out_project_offnetwork",
+  "scale_input_database": "washtenaw_cdb"
+}

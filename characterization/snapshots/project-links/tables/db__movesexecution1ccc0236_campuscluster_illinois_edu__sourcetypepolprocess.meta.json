@@ -1,0 +1,36 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0236_campuscluster_illinois_edu__sourcetypepolprocess",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "isSizeWeightReqd",
+      "kind": "utf8"
+    },
+    {
+      "name": "isRegClassReqd",
+      "kind": "utf8"
+    },
+    {
+      "name": "isMYGroupReqd",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "sourceTypeID",
+    "polProcessID"
+  ],
+  "row_count": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "d3a203b363414c958e167e6532ba9ea3f4e151d05650a95d1a0c77d199180ce8"
+}

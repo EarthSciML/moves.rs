@@ -1,0 +1,52 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0236_campuscluster_illinois_edu__emissionrateadjustment",
+  "schema": [
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "regClassID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "beginModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "endModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "emissionRateAdjustment",
+      "kind": "float64"
+    },
+    {
+      "name": "dataSourceID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "polProcessID",
+    "sourceTypeID",
+    "regClassID",
+    "fuelTypeID",
+    "beginModelYearID",
+    "endModelYearID"
+  ],
+  "row_count": 60,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "af7724436beab5f37bd7ae3d6ea19bd3172b335919fb08d9ce87f00274022c9b"
+}
