@@ -1,0 +1,41 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__out_scale_county_idle_adjust__baserateunits",
+  "schema": [
+    {
+      "name": "MOVESRunID",
+      "kind": "int64"
+    },
+    {
+      "name": "pollutantID",
+      "kind": "int64"
+    },
+    {
+      "name": "processID",
+      "kind": "int64"
+    },
+    {
+      "name": "meanBaseRateUnitsNumerator",
+      "kind": "utf8"
+    },
+    {
+      "name": "meanBaseRateUnitsDenominator",
+      "kind": "utf8"
+    },
+    {
+      "name": "emissionBaseRateUnitsNumerator",
+      "kind": "utf8"
+    },
+    {
+      "name": "emissionBaseRateUnitsDenominator",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [],
+  "row_count": 3,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "074218220f61b2557faa05e9b3c0ed0091ed8527493d46071f1d17e96d6f4914"
+}

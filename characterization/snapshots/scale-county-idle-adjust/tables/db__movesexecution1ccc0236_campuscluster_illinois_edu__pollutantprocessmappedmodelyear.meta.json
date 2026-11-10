@@ -1,0 +1,36 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0236_campuscluster_illinois_edu__pollutantprocessmappedmodelyear",
+  "schema": [
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelMYGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "IMModelYearGroupID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "polProcessID",
+    "modelYearID"
+  ],
+  "row_count": 333,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "bf1e41967097e9a51c3054df31668dbf67bcb2ffa60722ea51cc3c3dba452c10"
+}

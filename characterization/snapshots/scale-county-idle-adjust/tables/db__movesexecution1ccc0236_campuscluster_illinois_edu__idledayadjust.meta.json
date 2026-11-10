@@ -1,0 +1,28 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0236_campuscluster_illinois_edu__idledayadjust",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "dayID",
+      "kind": "int64"
+    },
+    {
+      "name": "idleDayAdjust",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "sourceTypeID",
+    "dayID"
+  ],
+  "row_count": 3,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "b41c0618dccddbda521c6ab33d65ad9a161158174fcff1c0147bb1e9ef85582b"
+}

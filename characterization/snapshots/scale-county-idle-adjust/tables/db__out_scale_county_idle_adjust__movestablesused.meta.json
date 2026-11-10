@@ -1,0 +1,41 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__out_scale_county_idle_adjust__movestablesused",
+  "schema": [
+    {
+      "name": "MOVESRunID",
+      "kind": "int64"
+    },
+    {
+      "name": "databaseServer",
+      "kind": "utf8"
+    },
+    {
+      "name": "databaseName",
+      "kind": "utf8"
+    },
+    {
+      "name": "tableName",
+      "kind": "utf8"
+    },
+    {
+      "name": "dataFileSize",
+      "kind": "int64"
+    },
+    {
+      "name": "dataFileModificationDate",
+      "kind": "utf8"
+    },
+    {
+      "name": "tableUseSequence",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [],
+  "row_count": 156,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "26d80c22fa5a9ddfac4f58b4f04fb8ca3f3531ebd02026b20c6548d93c6bc615"
+}
