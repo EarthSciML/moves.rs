@@ -1,0 +1,11 @@
+{
+  "provenance_version": "moves-fixture-capture/v1",
+  "fixture_name": "project-refueling",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-projx/characterization/fixture-image.lock",
+  "runspec_path": "/scratch/ctessum/moves-county-fixture/project-refueling/project-refueling.xml",
+  "runspec_sha256": "b4724d944dd82bb6303aa2928842f3463555b4f0ed00dd4428bb00c8c07863b7",
+  "snapshot_aggregate_sha256": "a29c6380239af491018f178b2f0030afbc3e161ed812e9f18dff3b3220f785f0",
+  "output_database": "out_project_refueling",
+  "scale_input_database": "washtenaw_cdb"
+}
