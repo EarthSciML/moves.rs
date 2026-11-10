@@ -1,0 +1,11 @@
+{
+  "provenance_version": "moves-fixture-capture/v1",
+  "fixture_name": "rates-project-evap",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-projx/characterization/fixture-image.lock",
+  "runspec_path": "/scratch/ctessum/moves-county-fixture/rates-project-evap/rates-project-evap.xml",
+  "runspec_sha256": "a6687c51f6f624088952518f50a00e6b3ae91b230b961f691ce150b9bd2bd43f",
+  "snapshot_aggregate_sha256": "24ef52edfb8fc6dcfa02722f86d64004243eb60cd9a1b438248f61b0dc94f8c1",
+  "output_database": "out_rates_project_evap",
+  "scale_input_database": "washtenaw_cdb"
+}
