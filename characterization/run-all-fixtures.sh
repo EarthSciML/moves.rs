@@ -96,6 +96,8 @@ declare -a SKIP_BY_DEFAULT=(
     "project-crankcase"
     "project-refueling"
     "rates-project-evap"
+    # project-useromd: a user-stated link operating-mode distribution.
+    "project-useromd"
     # error-*: deliberately invalid RunSpecs that are expected to fail parsing.
     # They are tested by the Rust regression suite's error_fixtures_return_expected_errors
     # test, not by canonical-MOVES runs.
@@ -245,6 +247,8 @@ county_sql_for() {
             echo "${HERE}/county-inputs/washtenaw-project-offnetwork/setup-project-offnetwork.sql" ;;
         project-crankcase|project-refueling)
             echo "${HERE}/county-inputs/washtenaw-project-crankcase/setup-project-crankcase.sql" ;;
+        project-useromd)
+            echo "${HERE}/county-inputs/washtenaw-project-useromd/setup-project-useromd.sql" ;;
         *)
             echo "" ;;
     esac
