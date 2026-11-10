@@ -90,6 +90,10 @@ declare -a SKIP_BY_DEFAULT=(
     "project-links"
     "project-offnetwork"
     "project-hotelling"
+    # scale-county-idle-adjust: scale-county's database with the six idle and
+    # hotelling adjustment tables populated (COUNTY_SQL_FOR below). Skipped by
+    # default for the seed pass, as scale-county is.
+    "scale-county-idle-adjust"
     # error-*: deliberately invalid RunSpecs that are expected to fail parsing.
     # They are tested by the Rust regression suite's error_fixtures_return_expected_errors
     # test, not by canonical-MOVES runs.
@@ -231,6 +235,8 @@ county_sql_for() {
             echo "${HERE}/county-inputs/washtenaw-county/setup-starts.sql" ;;
         scale-county)
             echo "${HERE}/county-inputs/washtenaw-county/setup-county.sql" ;;
+        scale-county-idle-adjust)
+            echo "${HERE}/county-inputs/washtenaw-county-idle-adjust/setup-idle-adjust.sql" ;;
         scale-project|rates-project)
             echo "${HERE}/county-inputs/washtenaw-project/setup-project.sql" ;;
         project-links)
