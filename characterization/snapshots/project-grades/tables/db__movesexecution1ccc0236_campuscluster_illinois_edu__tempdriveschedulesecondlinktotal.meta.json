@@ -1,0 +1,25 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0236_campuscluster_illinois_edu__tempdriveschedulesecondlinktotal",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "linkID",
+      "kind": "int64"
+    },
+    {
+      "name": "secondTotal",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [],
+  "row_count": 11,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "9632ccf62c1b191475d365dee658366989a617446a0d7b8bbd26cb0f55eb3869"
+}

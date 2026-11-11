@@ -1,0 +1,41 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__out_project_multilink__movestablesused",
+  "schema": [
+    {
+      "name": "MOVESRunID",
+      "kind": "int64"
+    },
+    {
+      "name": "databaseServer",
+      "kind": "utf8"
+    },
+    {
+      "name": "databaseName",
+      "kind": "utf8"
+    },
+    {
+      "name": "tableName",
+      "kind": "utf8"
+    },
+    {
+      "name": "dataFileSize",
+      "kind": "int64"
+    },
+    {
+      "name": "dataFileModificationDate",
+      "kind": "utf8"
+    },
+    {
+      "name": "tableUseSequence",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [],
+  "row_count": 160,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "24414787a0fc0c11c4b0e1e1408fc9961628bd37381f1aad30d58fb2c740a53e"
+}

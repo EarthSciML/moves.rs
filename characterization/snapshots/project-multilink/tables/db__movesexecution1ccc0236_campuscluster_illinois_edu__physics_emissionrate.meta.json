@@ -1,0 +1,49 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0236_campuscluster_illinois_edu__physics_emissionrate",
+  "schema": [
+    {
+      "name": "sourceBinID",
+      "kind": "int64"
+    },
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "opModeID",
+      "kind": "int64"
+    },
+    {
+      "name": "meanBaseRate",
+      "kind": "float64"
+    },
+    {
+      "name": "meanBaseRateCV",
+      "kind": "float64"
+    },
+    {
+      "name": "meanBaseRateIM",
+      "kind": "float64"
+    },
+    {
+      "name": "meanBaseRateIMCV",
+      "kind": "float64"
+    },
+    {
+      "name": "dataSourceId",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "sourceBinID",
+    "polProcessID",
+    "opModeID"
+  ],
+  "row_count": 20,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "0c401fd10f9f59f086fd90f11e43aef1a058bd76a3605245b5a5cd448b975c8f"
+}

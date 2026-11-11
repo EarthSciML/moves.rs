@@ -115,6 +115,14 @@ declare -a SKIP_BY_DEFAULT=(
     "rates-project-chained"
     "rates-project-evap-links"
     "rates-project-useromd"
+    # project-multilink, project-grades, project-useromd-gaps,
+    # project-startconflict: two links per road type, link grades and
+    # out-of-bounds brackets, user operating modes that leave gaps, and
+    # conflicting user start modes.
+    "project-multilink"
+    "project-grades"
+    "project-useromd-gaps"
+    "project-startconflict"
     # error-*: deliberately invalid RunSpecs that are expected to fail parsing.
     # They are tested by the Rust regression suite's error_fixtures_return_expected_errors
     # test, not by canonical-MOVES runs.
@@ -270,6 +278,8 @@ county_sql_for() {
             echo "${HERE}/county-inputs/washtenaw-project-crankcase/setup-project-crankcase.sql" ;;
         project-useromd|rates-project-useromd)
             echo "${HERE}/county-inputs/washtenaw-project-useromd/setup-project-useromd.sql" ;;
+        project-multilink|project-grades|project-useromd-gaps|project-startconflict)
+            echo "${HERE}/county-inputs/washtenaw-$1/setup-$1.sql" ;;
         *)
             echo "" ;;
     esac

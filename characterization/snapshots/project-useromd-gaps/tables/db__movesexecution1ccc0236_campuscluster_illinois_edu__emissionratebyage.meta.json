@@ -1,0 +1,54 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0236_campuscluster_illinois_edu__emissionratebyage",
+  "schema": [
+    {
+      "name": "sourceBinID",
+      "kind": "int64"
+    },
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "opModeID",
+      "kind": "int64"
+    },
+    {
+      "name": "ageGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "meanBaseRate",
+      "kind": "float64"
+    },
+    {
+      "name": "meanBaseRateCV",
+      "kind": "float64"
+    },
+    {
+      "name": "meanBaseRateIM",
+      "kind": "float64"
+    },
+    {
+      "name": "meanBaseRateIMCV",
+      "kind": "float64"
+    },
+    {
+      "name": "dataSourceId",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "sourceBinID",
+    "polProcessID",
+    "opModeID",
+    "ageGroupID"
+  ],
+  "row_count": 200284,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "fd5c0cceb3fe899bb3cdadad14e34b72e10f1fc9a2c6a5b0a89047259368d5d5"
+}

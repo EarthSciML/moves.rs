@@ -1,0 +1,62 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0236_campuscluster_illinois_edu__sourceusetypephysicsmapping",
+  "schema": [
+    {
+      "name": "realSourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "tempSourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "regClassID",
+      "kind": "int64"
+    },
+    {
+      "name": "beginModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "endModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "opModeIDOffset",
+      "kind": "int64"
+    },
+    {
+      "name": "rollingTermA",
+      "kind": "float64"
+    },
+    {
+      "name": "rotatingTermB",
+      "kind": "float64"
+    },
+    {
+      "name": "dragTermC",
+      "kind": "float64"
+    },
+    {
+      "name": "sourceMass",
+      "kind": "float64"
+    },
+    {
+      "name": "fixedMassFactor",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "realSourceTypeID",
+    "regClassID",
+    "beginModelYearID",
+    "endModelYearID"
+  ],
+  "row_count": 4,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "533195c5f9146f3eb86d2c71a49e7600ace82e3e9137981d0ebdf60be0892493"
+}

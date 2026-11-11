@@ -1,0 +1,29 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0236_campuscluster_illinois_edu__drivescheduleassoc",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "roadTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "driveScheduleID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "sourceTypeID",
+    "roadTypeID",
+    "driveScheduleID"
+  ],
+  "row_count": 40,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "77fa6b93dd10f216bc557befae33fb6138a7163ecce2c47f5555c123be1ab324"
+}
