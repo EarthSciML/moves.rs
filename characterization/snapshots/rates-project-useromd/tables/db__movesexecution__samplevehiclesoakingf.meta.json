@@ -1,0 +1,53 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution__samplevehiclesoakingf",
+  "schema": [
+    {
+      "name": "soakDayID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "dayID",
+      "kind": "int64"
+    },
+    {
+      "name": "F",
+      "kind": "float64"
+    },
+    {
+      "name": "GammaFn1",
+      "kind": "float64"
+    },
+    {
+      "name": "GammaFn",
+      "kind": "float64"
+    },
+    {
+      "name": "NextF",
+      "kind": "float64"
+    },
+    {
+      "name": "P1",
+      "kind": "float64"
+    },
+    {
+      "name": "P24",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "soakDayID",
+    "sourceTypeID",
+    "dayID"
+  ],
+  "row_count": 10,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "ee4a127a6d6e2c13037cc4c277bd92fd5e401f1589f974a840952f99d184b743"
+}

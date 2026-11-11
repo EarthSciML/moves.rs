@@ -1,0 +1,47 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution__emissionprocess",
+  "schema": [
+    {
+      "name": "processID",
+      "kind": "int64"
+    },
+    {
+      "name": "processName",
+      "kind": "utf8"
+    },
+    {
+      "name": "SCCProcID",
+      "kind": "utf8"
+    },
+    {
+      "name": "occursOnRealRoads",
+      "kind": "utf8"
+    },
+    {
+      "name": "shortName",
+      "kind": "utf8"
+    },
+    {
+      "name": "processDisplayGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "isAffectedByOnroad",
+      "kind": "int64"
+    },
+    {
+      "name": "isAffectedByNonroad",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "processID"
+  ],
+  "row_count": 8,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "8e8fa44455ab4f6a6be669fc59acf2dd8371b2a4bd8a8bee9d24822812c93696"
+}

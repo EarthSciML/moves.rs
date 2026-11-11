@@ -1,0 +1,77 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution__stmytvvequations2020",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "regClassID",
+      "kind": "int64"
+    },
+    {
+      "name": "backPurgeFactor",
+      "kind": "float64"
+    },
+    {
+      "name": "averageCanisterCapacity",
+      "kind": "float64"
+    },
+    {
+      "name": "regClassFractionOfSourceTypeModelYearFuel",
+      "kind": "float64"
+    },
+    {
+      "name": "tvvEquation",
+      "kind": "utf8"
+    },
+    {
+      "name": "leakEquation",
+      "kind": "utf8"
+    },
+    {
+      "name": "leakFraction",
+      "kind": "float64"
+    },
+    {
+      "name": "leakFractionIM",
+      "kind": "float64"
+    },
+    {
+      "name": "tankSize",
+      "kind": "float64"
+    },
+    {
+      "name": "tankFillFraction",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "sourceTypeID",
+    "modelYearID",
+    "fuelTypeID",
+    "polProcessID",
+    "regClassID",
+    "tvvEquation",
+    "leakEquation"
+  ],
+  "row_count": 219,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "4aa03ba65ff2740c5d8e1c515f9668fccecd0cd530526b580d4b9da3d922609c"
+}

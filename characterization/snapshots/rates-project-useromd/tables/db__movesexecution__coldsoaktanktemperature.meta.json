@@ -1,0 +1,33 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution__coldsoaktanktemperature",
+  "schema": [
+    {
+      "name": "zoneID",
+      "kind": "int64"
+    },
+    {
+      "name": "monthID",
+      "kind": "int64"
+    },
+    {
+      "name": "hourID",
+      "kind": "int64"
+    },
+    {
+      "name": "coldSoakTankTemperature",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "zoneID",
+    "monthID",
+    "hourID"
+  ],
+  "row_count": 24,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "98c9e83903480cba697c42729a803dd3cba1fe5e6963aef50f2eae3de27c1488"
+}

@@ -1,0 +1,54 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution__sourceusetypephysics",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "regClassID",
+      "kind": "int64"
+    },
+    {
+      "name": "beginModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "endModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "rollingTermA",
+      "kind": "float64"
+    },
+    {
+      "name": "rotatingTermB",
+      "kind": "float64"
+    },
+    {
+      "name": "dragTermC",
+      "kind": "float64"
+    },
+    {
+      "name": "sourceMass",
+      "kind": "float64"
+    },
+    {
+      "name": "fixedMassFactor",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "sourceTypeID",
+    "regClassID",
+    "beginModelYearID",
+    "endModelYearID"
+  ],
+  "row_count": 21,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "b6f9ae91f011990a2f906745124ba62b0ae9f54f5d7d7e8f652fc09b24b80643"
+}

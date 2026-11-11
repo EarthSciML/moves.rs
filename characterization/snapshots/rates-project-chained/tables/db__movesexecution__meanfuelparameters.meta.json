@@ -1,0 +1,50 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution__meanfuelparameters",
+  "schema": [
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelParameterID",
+      "kind": "int64"
+    },
+    {
+      "name": "baseValue",
+      "kind": "float64"
+    },
+    {
+      "name": "centeringValue",
+      "kind": "float64"
+    },
+    {
+      "name": "stdDevValue",
+      "kind": "float64"
+    },
+    {
+      "name": "dataSourceID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "polProcessID",
+    "fuelTypeID",
+    "modelYearGroupID",
+    "fuelParameterID"
+  ],
+  "row_count": 108,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "476b664672b7cfd5d2b290f4a5d286172088f00d1d1234fdad0fcbf819255aca"
+}

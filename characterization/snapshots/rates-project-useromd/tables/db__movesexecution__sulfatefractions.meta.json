@@ -1,0 +1,59 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution__sulfatefractions",
+  "schema": [
+    {
+      "name": "processID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "minModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "maxModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "SulfatenonECPMFraction",
+      "kind": "float64"
+    },
+    {
+      "name": "H2OnonECPMFraction",
+      "kind": "float64"
+    },
+    {
+      "name": "BaseFuelSulfurLevel",
+      "kind": "float64"
+    },
+    {
+      "name": "BaseFuelSulfateFraction",
+      "kind": "float64"
+    },
+    {
+      "name": "DataSourceId",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "processID",
+    "fuelTypeID",
+    "sourceTypeID",
+    "minModelYearID",
+    "maxModelYearID"
+  ],
+  "row_count": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "d3142e12cb986dd5c5b6758cc063125ced47a1cedc201e6f0532c35e247e61e7"
+}

@@ -1,0 +1,52 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution__refuelingcontroltechnology",
+  "schema": [
+    {
+      "name": "processID",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "regClassID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "ageID",
+      "kind": "int64"
+    },
+    {
+      "name": "refuelingTechAdjustment",
+      "kind": "float64"
+    },
+    {
+      "name": "controlledRefuelingRate",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "processID",
+    "modelYearID",
+    "regClassID",
+    "sourceTypeID",
+    "fuelTypeID",
+    "ageID"
+  ],
+  "row_count": 24149,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "08eb624e75e98b379d388d9c0b01efe18b985e4ecca0af99a506340f267cf7bf"
+}

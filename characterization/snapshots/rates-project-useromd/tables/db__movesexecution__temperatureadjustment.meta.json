@@ -1,0 +1,51 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution__temperatureadjustment",
+  "schema": [
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "regClassID",
+      "kind": "int64"
+    },
+    {
+      "name": "minModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "maxModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "tempAdjustTermA",
+      "kind": "float64"
+    },
+    {
+      "name": "tempAdjustTermB",
+      "kind": "float64"
+    },
+    {
+      "name": "tempAdjustTermC",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "polProcessID",
+    "fuelTypeID",
+    "regClassID",
+    "minModelYearID",
+    "maxModelYearID"
+  ],
+  "row_count": 3,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "31633e48c0dc33d356b26bb2ce08b17ee4b5f10bdc128a3ede7bfe92041e921f"
+}

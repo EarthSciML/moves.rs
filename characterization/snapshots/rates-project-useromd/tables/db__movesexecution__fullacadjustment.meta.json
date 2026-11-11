@@ -1,0 +1,37 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution__fullacadjustment",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "opModeID",
+      "kind": "int64"
+    },
+    {
+      "name": "fullACAdjustment",
+      "kind": "float64"
+    },
+    {
+      "name": "fullACAdjustmentCV",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "sourceTypeID",
+    "polProcessID",
+    "opModeID"
+  ],
+  "row_count": 920,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "d12b9d484ca3b218473467824c9870bc1ae4879beeab5ebd9c1a00d586733ee6"
+}

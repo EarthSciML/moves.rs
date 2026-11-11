@@ -2,7 +2,8 @@
 -- Washtenaw County (FIPS 26161, zone 261610, AUGUST 2020, hour 8, day 5) whose
 -- user states a link's operating-mode distribution.
 --
--- Serves fixture: characterization/fixtures/project-useromd.xml
+-- Serves fixtures: characterization/fixtures/project-useromd.xml and
+-- rates-project-useromd.xml
 -- Loaded into database `washtenaw_cdb` by
 --   apptainer/capture-county-snapshot.sh --fixture project-useromd \
 --       --county-sql characterization/county-inputs/washtenaw-project-useromd/setup-project-useromd.sql
