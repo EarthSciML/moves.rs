@@ -2,8 +2,9 @@
 -- Washtenaw County (FIPS 26161, zone 261610, AUGUST 2020, hour 8, day 5) with
 -- two on-network links and an off-network link.
 --
--- Serves fixtures: characterization/fixtures/project-crankcase.xml and
--- project-refueling.xml
+-- Serves fixtures: characterization/fixtures/project-crankcase.xml,
+-- project-refueling.xml, rates-project-chained.xml and
+-- rates-project-evap-links.xml
 -- Loaded into database `washtenaw_cdb` by
 --   apptainer/capture-county-snapshot.sh --fixture project-crankcase \
 --       --county-sql characterization/county-inputs/washtenaw-project-crankcase/setup-project-crankcase.sql

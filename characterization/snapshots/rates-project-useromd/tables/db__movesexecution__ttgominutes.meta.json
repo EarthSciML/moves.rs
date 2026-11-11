@@ -1,0 +1,29 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution__ttgominutes",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "monthID",
+      "kind": "int64"
+    },
+    {
+      "name": "hourDayID",
+      "kind": "int64"
+    },
+    {
+      "name": "oMinutes",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [],
+  "row_count": 48,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "e25c863029fc8a45145f773a2fe471f481c81333e7de03d81f8b4707e8f6ac25"
+}

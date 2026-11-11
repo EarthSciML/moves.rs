@@ -1,0 +1,45 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution__m6sulfurcoeff",
+  "schema": [
+    {
+      "name": "pollutantID",
+      "kind": "int64"
+    },
+    {
+      "name": "minModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "maxModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "minSulfur",
+      "kind": "float64"
+    },
+    {
+      "name": "sulfurLongCoeff",
+      "kind": "float64"
+    },
+    {
+      "name": "sulfurIRFactor",
+      "kind": "float64"
+    },
+    {
+      "name": "maxIRFactorSulfur",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "pollutantID",
+    "minModelYearID",
+    "maxModelYearID"
+  ],
+  "row_count": 8,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "6cdb376d6e168cd7497d3c05c9483992305c47d8a9019111ded8029793f66952"
+}

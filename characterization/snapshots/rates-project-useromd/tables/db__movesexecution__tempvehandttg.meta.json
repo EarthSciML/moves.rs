@@ -1,0 +1,21 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution__tempvehandttg",
+  "schema": [
+    {
+      "name": "vehID",
+      "kind": "int64"
+    },
+    {
+      "name": "tankTemperatureGroupID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [],
+  "row_count": 1764,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "e7bc33c5de981e179399ec48dff11537b14b946e97bb6ef05fd937ab5fefc8a0"
+}

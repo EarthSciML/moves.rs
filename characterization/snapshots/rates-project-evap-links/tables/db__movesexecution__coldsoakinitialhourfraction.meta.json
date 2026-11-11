@@ -1,0 +1,47 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution__coldsoakinitialhourfraction",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "zoneID",
+      "kind": "int64"
+    },
+    {
+      "name": "monthID",
+      "kind": "int64"
+    },
+    {
+      "name": "hourDayID",
+      "kind": "int64"
+    },
+    {
+      "name": "initialHourDayID",
+      "kind": "int64"
+    },
+    {
+      "name": "coldSoakInitialHourFraction",
+      "kind": "float64"
+    },
+    {
+      "name": "isUserInput",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "sourceTypeID",
+    "zoneID",
+    "monthID",
+    "hourDayID",
+    "initialHourDayID"
+  ],
+  "row_count": 254,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "5bad419f160c67e311bfdba69ab3cf4a77b458876ebf642ce64841c0df7c19ef"
+}

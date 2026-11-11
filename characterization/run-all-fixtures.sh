@@ -102,6 +102,12 @@ declare -a SKIP_BY_DEFAULT=(
     "rates-project-evap"
     # project-useromd: a user-stated link operating-mode distribution.
     "project-useromd"
+    # rates-project-chained, rates-project-evap-links, rates-project-useromd:
+    # PROJECT domain at Rates scale -- the chained processes, evaporative rows
+    # in RatePerDistance, two links, and the user's link distribution.
+    "rates-project-chained"
+    "rates-project-evap-links"
+    "rates-project-useromd"
     # error-*: deliberately invalid RunSpecs that are expected to fail parsing.
     # They are tested by the Rust regression suite's error_fixtures_return_expected_errors
     # test, not by canonical-MOVES runs.
@@ -251,9 +257,9 @@ county_sql_for() {
             echo "${HERE}/county-inputs/washtenaw-project-links/setup-project-links.sql" ;;
         project-offnetwork|project-hotelling|rates-project-evap)
             echo "${HERE}/county-inputs/washtenaw-project-offnetwork/setup-project-offnetwork.sql" ;;
-        project-crankcase|project-refueling)
+        project-crankcase|project-refueling|rates-project-chained|rates-project-evap-links)
             echo "${HERE}/county-inputs/washtenaw-project-crankcase/setup-project-crankcase.sql" ;;
-        project-useromd)
+        project-useromd|rates-project-useromd)
             echo "${HERE}/county-inputs/washtenaw-project-useromd/setup-project-useromd.sql" ;;
         *)
             echo "" ;;
@@ -295,7 +301,7 @@ for xml in "${FIXTURES[@]}"; do
     # The execution database's name (apptainer/run-moves.sh): `*`, per host,
     # for every fixture but the one whose SQL hardcodes `MOVESExecution`.
     case "${name}" in
-        rates-project|rates-project-evap) export EXECUTION_DB_NAME=MOVESExecution ;;
+        rates-project|rates-project-*) export EXECUTION_DB_NAME=MOVESExecution ;;
         *)             export EXECUTION_DB_NAME='*' ;;
     esac
 

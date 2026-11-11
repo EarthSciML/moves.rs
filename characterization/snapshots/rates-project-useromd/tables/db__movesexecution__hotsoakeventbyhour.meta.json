@@ -1,0 +1,49 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution__hotsoakeventbyhour",
+  "schema": [
+    {
+      "name": "vehID",
+      "kind": "int64"
+    },
+    {
+      "name": "tripID",
+      "kind": "int64"
+    },
+    {
+      "name": "hourDayID",
+      "kind": "int64"
+    },
+    {
+      "name": "endOfHour",
+      "kind": "int64"
+    },
+    {
+      "name": "hotSoakBegin",
+      "kind": "int64"
+    },
+    {
+      "name": "hotSoakEnd",
+      "kind": "int64"
+    },
+    {
+      "name": "startOfHotSoak",
+      "kind": "int64"
+    },
+    {
+      "name": "endOfHotSoak",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "vehID",
+    "tripID",
+    "hourDayID"
+  ],
+  "row_count": 15892,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "edd1762f4891dcb4f13190498fa6f9d3dafdbf9371461ecb3af66172053269f3"
+}
