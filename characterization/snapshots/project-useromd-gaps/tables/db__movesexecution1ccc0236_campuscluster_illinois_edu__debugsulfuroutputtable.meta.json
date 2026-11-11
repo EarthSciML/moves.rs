@@ -1,0 +1,85 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0236_campuscluster_illinois_edu__debugsulfuroutputtable",
+  "schema": [
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelFormulationID",
+      "kind": "int64"
+    },
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "pollutantID",
+      "kind": "int64"
+    },
+    {
+      "name": "processID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "ageID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelAdjustment",
+      "kind": "float64"
+    },
+    {
+      "name": "fuelAdjustmentGPA",
+      "kind": "float64"
+    },
+    {
+      "name": "ratioNoSulfur",
+      "kind": "float64"
+    },
+    {
+      "name": "target_lowSulfurCoeff",
+      "kind": "float64"
+    },
+    {
+      "name": "target_sulfurLevel",
+      "kind": "float64"
+    },
+    {
+      "name": "target_ratioNoSulfur",
+      "kind": "float64"
+    },
+    {
+      "name": "target_sulfAdj3",
+      "kind": "float64"
+    },
+    {
+      "name": "base_sulfAdj3",
+      "kind": "float64"
+    },
+    {
+      "name": "target_minSulfAdjust",
+      "kind": "float64"
+    },
+    {
+      "name": "target_sulfurBasis",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [],
+  "row_count": 80,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "23a9275c1e6bb9fa40dca6f517318be773c696ea9d44f5e533274e3d28080c06"
+}
