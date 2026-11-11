@@ -1,0 +1,45 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0236_campuscluster_illinois_edu__templinkbracket",
+  "schema": [
+    {
+      "name": "linkID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "roadTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "driveScheduleIDLow",
+      "kind": "int64"
+    },
+    {
+      "name": "driveScheduleIDHigh",
+      "kind": "int64"
+    },
+    {
+      "name": "isOutOfBoundsLow",
+      "kind": "int64"
+    },
+    {
+      "name": "isOutOfBoundsHigh",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "linkID",
+    "sourceTypeID",
+    "roadTypeID"
+  ],
+  "row_count": 2,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "5fc487171532fd18ec492b54df9e4b2086086f1a9f05b65ccddca8f5233f49b0"
+}

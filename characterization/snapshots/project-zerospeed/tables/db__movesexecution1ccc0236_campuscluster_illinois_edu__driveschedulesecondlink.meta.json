@@ -1,0 +1,32 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0236_campuscluster_illinois_edu__driveschedulesecondlink",
+  "schema": [
+    {
+      "name": "linkID",
+      "kind": "int64"
+    },
+    {
+      "name": "secondID",
+      "kind": "int64"
+    },
+    {
+      "name": "speed",
+      "kind": "float64"
+    },
+    {
+      "name": "grade",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "linkID",
+    "secondID"
+  ],
+  "row_count": 30,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "f9c2662aca03a89a54867e1458ade5259be89f83c547cc69f949e11785847b4d"
+}

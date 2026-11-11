@@ -1,0 +1,11 @@
+{
+  "provenance_version": "moves-fixture-capture/v1",
+  "fixture_name": "project-driveschedule",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-drivesched/characterization/fixture-image.lock",
+  "runspec_path": "/scratch/ctessum/moves-county-fixture/project-driveschedule/project-driveschedule.xml",
+  "runspec_sha256": "8f720442eaab453958a401b952841b700ff6405a2d23209239a89be567cfbe66",
+  "snapshot_aggregate_sha256": "13f783217dc5d5dd660af942e02974c91559c708429c0e139a21deac335bb2b3",
+  "output_database": "out_project_driveschedule",
+  "scale_input_database": "washtenaw_cdb"
+}
