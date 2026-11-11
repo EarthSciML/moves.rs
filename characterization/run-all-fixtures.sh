@@ -94,6 +94,9 @@ declare -a SKIP_BY_DEFAULT=(
     # hotelling adjustment tables populated (COUNTY_SQL_FOR below). Skipped by
     # default for the seed pass, as scale-county is.
     "scale-county-idle-adjust"
+    # scale-county-hotelling-multiyear: the same adjustment tables at two
+    # calendar years (COUNTY_SQL_FOR below). Skipped by default, as above.
+    "scale-county-hotelling-multiyear"
     # project-crankcase, project-refueling, rates-project-evap: the chained
     # processes and the Rates-scale evaporative processes in PROJECT domain,
     # on their project databases (COUNTY_SQL_FOR below).
@@ -245,6 +248,8 @@ county_sql_for() {
             echo "${HERE}/county-inputs/washtenaw-county/setup-county.sql" ;;
         scale-county-idle-adjust)
             echo "${HERE}/county-inputs/washtenaw-county-idle-adjust/setup-idle-adjust.sql" ;;
+        scale-county-hotelling-multiyear)
+            echo "${HERE}/county-inputs/washtenaw-county-hotelling-multiyear/setup-hotelling-multiyear.sql" ;;
         scale-project|rates-project)
             echo "${HERE}/county-inputs/washtenaw-project/setup-project.sql" ;;
         project-links)
