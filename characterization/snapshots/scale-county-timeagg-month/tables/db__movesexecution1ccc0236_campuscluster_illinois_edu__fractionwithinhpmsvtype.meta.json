@@ -1,0 +1,33 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0236_campuscluster_illinois_edu__fractionwithinhpmsvtype",
+  "schema": [
+    {
+      "name": "yearID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "ageID",
+      "kind": "int64"
+    },
+    {
+      "name": "fraction",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "yearID",
+    "sourceTypeID",
+    "ageID"
+  ],
+  "row_count": 533,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "5d194356c4bb1829ce42ec1f42c6e32e7b8ef5b94fc3a4f0506bc925037fba53"
+}

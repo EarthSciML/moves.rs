@@ -1,0 +1,11 @@
+{
+  "provenance_version": "moves-fixture-capture/v1",
+  "fixture_name": "scale-county-timeagg-day",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-timeagg/characterization/fixture-image.lock",
+  "runspec_path": "/scratch/ctessum/moves-county-fixture/scale-county-timeagg-day/scale-county-timeagg-day.xml",
+  "runspec_sha256": "d3591c463fc6b8a6e0472e1ea3f357f53eddc5f0a84e64b4b518ac1c322a3750",
+  "snapshot_aggregate_sha256": "23037c0046dadd179f7c05d00fea70676272e3599b4dfe532dfc99996bb17221",
+  "output_database": "out_scale_county_timeagg_day",
+  "scale_input_database": "washtenaw_cdb"
+}
