@@ -1,0 +1,1357 @@
+INFO:    User not listed in /etc/subuid, trying root-mapped namespace
+INFO:    Using fakeroot command combined with root-mapped namespace
+[init-mariadb] /var/lib/mysql already populated; skipping seed.
+[start-mariadb-bg] mariadbd ready (PID 2864157).
+Picked up JAVA_TOOL_OPTIONS: -Xlog:class+load=info:file=/opt/moves/MOVESTemporary/instrumentation/class-load-%p.log
+Buildfile: /opt/moves/build.xml
+
+main1worker:
+    [mkdir] Created dir: /opt/moves/manyworkers
+    [mkdir] Created dir: /opt/moves/manyworkers/workerfolder
+     [echo] MySQL is already running and will not be automatically shutdown by this instance.
+     [echo] Launching MOVES, which will launch a worker...
+     [java] Picked up JAVA_TOOL_OPTIONS: -Xlog:class+load=info:file=/opt/moves/MOVESTemporary/instrumentation/class-load-%p.log
+     [java] 11/11/26, 2:48 PM INFO: Loading system configuration...
+     [java] 11/11/26, 2:48 PM INFO: System configuration setting up the instance counter...
+     [java] 11/11/26, 2:48 PM INFO: System configuration clearing prior IDs...
+     [java] 11/11/26, 2:48 PM INFO: System configuration reading computer ID...
+     [java] 11/11/26, 2:48 PM INFO: Using alternate master configuration file: maketodo.txt
+     [java] 11/11/26, 2:48 PM INFO: Using master configuration file: maketodo.txt
+     [java] 11/11/26, 2:48 PM INFO: System configuration loading configuration files...
+     [java] 11/11/26, 2:48 PM INFO: System configuration setting up temporary files...
+     [java] 11/11/26, 2:48 PM INFO: Folder for temporary files: /opt/moves/MOVESTemporary
+     [java] 11/11/26, 2:48 PM INFO: System configuration acquiring distributed master ID...
+     [java] 11/11/26, 2:48 PM INFO: Done loading system configuration.
+     [java] 11/11/26, 2:48 PM INFO: Using alternate worker configuration file: manyworkers.txt
+     [java] 11/11/26, 2:48 PM INFO: Initializing default database connections...
+     [java] 11/11/26, 2:48 PM INFO: Reading default database table definitions...
+     [java] 11/11/26, 2:48 PM INFO: Done initializing database connections.
+     [java] 11/11/26, 2:48 PM WARNING: Added missing vehicle selection: Passenger Car - Diesel Fuel
+     [java] 11/11/26, 2:48 PM WARNING: Added missing vehicle selection: Passenger Car - Ethanol (E-85)
+     [java] 11/11/26, 2:48 PM WARNING: Added missing vehicle selection: Passenger Car - Electricity
+     [java] 11/11/26, 2:48 PM WARNING: Added missing vehicle selection: Combination Long-haul Truck - Compressed Natural Gas (CNG)
+     [java] 11/11/26, 2:48 PM WARNING: Added missing vehicle selection: Combination Long-haul Truck - Electricity
+     [java] 11/11/26, 2:48 PM INFO: ***Starting MOVES run***
+     [java] 11/11/26, 2:48 PM INFO: Master Release: MOVES5.0.1
+     [java] 11/11/26, 2:48 PM INFO: Master Computer ID: ccc0236.campuscluster.illinois.edu
+     [java] 11/11/26, 2:48 PM INFO: Master ID: 326903741123030981
+     [java] 11/11/26, 2:48 PM INFO: RunSpec: /scratch/ctessum/moves-county-fixture/userdb-hotelling-multiyear/userdb-hotelling-multiyear.xml
+     [java] 11/11/26, 2:48 PM INFO: Initializing output database connections...
+     [java] 11/11/26, 2:48 PM INFO: Done initializing database connections.
+     [java] 11/11/26, 2:48 PM INFO: Thread starting for class gov.epa.otaq.moves.master.framework.HeartbeatDetectionThread.
+     [java] 11/11/26, 2:48 PM INFO: HeartbeatDetectionThread !hasWorkerOnThisComputer
+     [java] 11/11/26, 2:48 PM INFO: Initializing default database connections...
+     [java] 11/11/26, 2:48 PM INFO: Database connections already established.
+     [java] 11/11/26, 2:48 PM INFO: Initializing MOVESExecution connections...
+     [java] 11/11/26, 2:48 PM INFO: Creating the execution database...
+     [java] 11/11/26, 2:48 PM INFO: Removing tables from the execution database...
+     [java] 11/11/26, 2:48 PM INFO: Creating empty tables in the execution database...
+     [java] 11/11/26, 2:48 PM INFO: Finalizing the execution database...
+     [java] 11/11/26, 2:48 PM INFO: Reading execution database table definitions...
+     [java] 11/11/26, 2:48 PM INFO: Done initializing database connections.
+     [java] 11/11/26, 2:48 PM INFO: Initializing output database connections...
+     [java] 11/11/26, 2:48 PM INFO: Database connections already established.
+     [java] 11/11/26, 2:48 PM INFO: Thread starting for class gov.epa.otaq.moves.master.framework.MasterLoop.
+     [java] 11/11/26, 2:48 PM INFO: Thread starting for class gov.epa.otaq.moves.master.framework.EmissionCalculatorInboundUnbundler.
+     [java] 11/11/26, 2:48 PM INFO: WARNING: Off-Network Idle requires all roadtypes. Selecting all roadtypes regardless of runspec.
+     [java] 11/11/26, 2:48 PM INFO: InputDataManager transferred all default tables.
+     [java] 11/11/26, 2:48 PM INFO: InputDataManager transferred all default tables.
+     [java] 11/11/26, 2:48 PM INFO: InputDataManager transferred all default tables.
+     [java] 11/11/26, 2:48 PM INFO: InputDataManager transferred all NonRoad tables.
+     [java] 11/11/26, 2:48 PM INFO: WARNING: Off-Network Idle requires all roadtypes. Selecting all roadtypes regardless of runspec.
+     [java] 11/11/26, 2:48 PM DEBUG: Starting WorkerCommandLine...
+     [java] 11/11/26, 2:48 PM INFO: testConnection = com.mysql.jdbc.JDBC4Connection@7a828bf7
+     [java] 11/11/26, 2:48 PM INFO: WorkerConfiguration loaded. distributedWorkerId = 6533668697583852935
+     [java] 11/11/26, 2:48 PM INFO: Worker Release: MOVES5.0.1
+     [java] 11/11/26, 2:48 PM INFO: Worker Computer ID: ccc0236.campuscluster.illinois.edu
+     [java] 11/11/26, 2:48 PM INFO: Worker ID: 6533668697583852935
+     [java] 11/11/26, 2:48 PM INFO: Thread starting for class gov.epa.otaq.moves.worker.framework.RemoteEmissionsCalculator.
+     [java] 11/11/26, 2:48 PM INFO: Thread starting for class gov.epa.otaq.moves.worker.framework.WorkerHeartbeatThread.
+     [java] 11/11/26, 2:48 PM INFO: Setting worker flag for 6533668697583852935 on port 13132
+     [java] 11/11/26, 2:48 PM INFO: WARNING: Off-Network Idle requires all roadtypes. Selecting all roadtypes regardless of runspec.
+     [java] 11/11/26, 2:48 PM INFO: InputDataManager transferred all default tables.
+     [java] 11/11/26, 2:48 PM INFO: InputDataManager transferred all NonRoad tables.
+     [java] 11/11/26, 2:48 PM INFO: WARNING: Off-Network Idle requires all roadtypes. Selecting all roadtypes regardless of runspec.
+     [java] 11/11/26, 2:48 PM INFO: WARNING: Off-Network Idle requires all roadtypes. Selecting all roadtypes regardless of runspec.
+     [java] 11/11/26, 2:48 PM INFO: Class gov.epa.otaq.moves.master.implementation.general.MeteorologyGenerator has been instantiated.
+     [java] 11/11/26, 2:48 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.BaseRateCalculator has been instantiated.
+     [java] 11/11/26, 2:48 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator has been instantiated.
+     [java] 11/11/26, 2:48 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator has been instantiated.
+     [java] 11/11/26, 2:48 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.RatesOperatingModeDistributionGenerator has been instantiated.
+     [java] 11/11/26, 2:48 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator has been instantiated.
+     [java] 11/11/26, 2:48 PM INFO: Class gov.epa.otaq.moves.master.implementation.ghg.TotalActivityGenerator has been instantiated.
+     [java] 11/11/26, 2:48 PM DEBUG: gov.epa.otaq.moves.master.implementation.general.MeteorologyGenerator subscribed to Running Exhaust at PROCESS/100
+     [java] 11/11/26, 2:48 PM DEBUG: gov.epa.otaq.moves.master.implementation.general.MeteorologyGenerator subscribed to Extended Idle Exhaust at PROCESS/100
+     [java] 11/11/26, 2:48 PM DEBUG: gov.epa.otaq.moves.master.implementation.general.MeteorologyGenerator subscribed to Start Exhaust at PROCESS/100
+     [java] 11/11/26, 2:48 PM DEBUG: gov.epa.otaq.moves.master.implementation.general.MeteorologyGenerator subscribed to Auxiliary Power Exhaust at PROCESS/100
+     [java] 11/11/26, 2:48 PM DEBUG: gov.epa.otaq.moves.master.implementation.general.MeteorologyGenerator subscribed to Tirewear at PROCESS/100
+     [java] 11/11/26, 2:48 PM DEBUG: gov.epa.otaq.moves.master.implementation.general.MeteorologyGenerator subscribed to Brakewear at PROCESS/100
+     [java] 11/11/26, 2:48 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateCalculator subscribed to Running Exhaust at MONTH/10
+     [java] 11/11/26, 2:48 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateCalculator subscribed to Extended Idle Exhaust at MONTH/10
+     [java] 11/11/26, 2:48 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateCalculator subscribed to Auxiliary Power Exhaust at MONTH/10
+     [java] 11/11/26, 2:48 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator subscribed to Running Exhaust at YEAR/98
+     [java] 11/11/26, 2:48 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator subscribed to Start Exhaust at YEAR/98
+     [java] 11/11/26, 2:48 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator subscribed to Extended Idle Exhaust at YEAR/98
+     [java] 11/11/26, 2:48 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator subscribed to Auxiliary Power Exhaust at YEAR/98
+     [java] 11/11/26, 2:48 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator subscribed to Brakewear at YEAR/98
+     [java] 11/11/26, 2:48 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator subscribed to Tirewear at YEAR/98
+     [java] 11/11/26, 2:48 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator subscribed to Running Exhaust at PROCESS/99
+     [java] 11/11/26, 2:48 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator subscribed to Extended Idle Exhaust at PROCESS/99
+     [java] 11/11/26, 2:48 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator subscribed to Auxiliary Power Exhaust at PROCESS/99
+     [java] 11/11/26, 2:48 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.RatesOperatingModeDistributionGenerator subscribed to Running Exhaust at YEAR/100
+     [java] 11/11/26, 2:48 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.RatesOperatingModeDistributionGenerator subscribed to Extended Idle Exhaust at YEAR/100
+     [java] 11/11/26, 2:48 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.RatesOperatingModeDistributionGenerator subscribed to Auxiliary Power Exhaust at YEAR/100
+     [java] 11/11/26, 2:48 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Running Exhaust at YEAR/101
+     [java] 11/11/26, 2:48 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Start Exhaust at YEAR/101
+     [java] 11/11/26, 2:48 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Extended Idle Exhaust at YEAR/101
+     [java] 11/11/26, 2:48 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Auxiliary Power Exhaust at YEAR/101
+     [java] 11/11/26, 2:48 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Evap Permeation at YEAR/101
+     [java] 11/11/26, 2:48 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Evap Fuel Vapor Venting at YEAR/101
+     [java] 11/11/26, 2:48 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Evap Fuel Leaks at YEAR/101
+     [java] 11/11/26, 2:48 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Brakewear at YEAR/101
+     [java] 11/11/26, 2:48 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator subscribed to Tirewear at YEAR/101
+     [java] 11/11/26, 2:48 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.TotalActivityGenerator subscribed to Running Exhaust at YEAR/97
+     [java] 11/11/26, 2:48 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.TotalActivityGenerator subscribed to Extended Idle Exhaust at YEAR/100
+     [java] 11/11/26, 2:48 PM DEBUG: gov.epa.otaq.moves.master.implementation.ghg.TotalActivityGenerator subscribed to Auxiliary Power Exhaust at YEAR/100
+     [java] 11/11/26, 2:48 PM INFO: Calculate AVFT Control Strategy
+     [java] 11/11/26, 2:48 PM INFO: AVFT Calculations Complete
+     [java] 11/11/26, 2:48 PM INFO: 28 bundles will be used.
+     [java] 11/11/26, 2:48 PM INFO: Thread starting for class gov.epa.otaq.moves.master.framework.MasterLoopableThread.
+     [java] 11/11/26, 2:48 PM INFO: MetGen setupTime=165 bundleTime=0
+     [java] 11/11/26, 2:48 PM INFO: doGeneralFuelRatio
+     [java] 11/11/26, 2:48 PM INFO: doAirToxicsCalculations
+     [java] 11/11/26, 2:48 PM INFO: 19502000 (1975 to 2000)
+     [java] 11/11/26, 2:48 PM INFO: 20012050 (2001 to 2020)
+     [java] 11/11/26, 2:48 PM INFO: doCOCalculations
+     [java] 11/11/26, 2:48 PM INFO: 19502000 (1975 to 2000)
+     [java] 11/11/26, 2:48 PM INFO: 20012050 (2001 to 2020)
+     [java] 11/11/26, 2:48 PM INFO: doPredictiveCalculations: predictHC, 101,102 / 1000101,1000102
+     [java] 11/11/26, 2:48 PM INFO: 0 (1975 to 2020)
+     [java] 11/11/26, 2:48 PM INFO: doPredictiveCalculations: predictNOx, 301,302 / 
+     [java] 11/11/26, 2:48 PM INFO: 0 (1975 to 2020)
+     [java] 11/11/26, 2:48 PM INFO: doMTBECalculations
+     [java] 11/11/26, 2:48 PM INFO: doEvapBenzeneCalculations
+     [java] 11/11/26, 2:48 PM INFO: Removed potential overlaps between ATRatioNonGas and ATRatio
+     [java] 11/11/26, 2:48 PM INFO: FuelEffectsGenerator totalTime=506
+     [java] 11/11/26, 2:48 PM DEBUG: newSBD Generator called for process: Running Exhaust
+     [java] 11/11/26, 2:48 PM DEBUG: Processing pollutant-process: Total Energy Consumption - Running Exhaust
+     [java] 11/11/26, 2:48 PM INFO: newSBDG setupTime=2 bundleTime=225
+     [java] 11/11/26, 2:48 PM DEBUG: ROMD calculateOpModeFractions processID=1
+     [java] 11/11/26, 2:48 PM DEBUG: RatesOpModeDistributionGenerator.calculateOpModeFractions ms=1
+     [java] 11/11/26, 2:48 PM INFO: ROMDG setupTime=25 bundleTime=1
+     [java] 11/11/26, 2:48 PM DEBUG: BaseRateGenerator.addIndexes: alter table avgSpeedBin add key speed1 (avgSpeedBinID, avgBinSpeed)
+     [java] 11/11/26, 2:48 PM DEBUG: BaseRateGenerator.addIndexes ms=24
+     [java] 11/11/26, 2:48 PM DEBUG: BaseRateGenerator.addIndexes: alter table avgSpeedBin add key speed2 (avgBinSpeed, avgSpeedBinID)
+     [java] 11/11/26, 2:48 PM DEBUG: BaseRateGenerator.addIndexes ms=21
+     [java] 11/11/26, 2:48 PM DEBUG: BaseRateGenerator.addIndexes: analyze table avgSpeedBin
+     [java] 11/11/26, 2:48 PM DEBUG: BaseRateGenerator.addIndexes ms=2
+     [java] 11/11/26, 2:48 PM DEBUG: Base Rate Generator called for process: Running Exhaust
+     [java] 11/11/26, 2:48 PM DEBUG: Not normalizing sourcebin-weighted emission rates
+     [java] 11/11/26, 2:48 PM DEBUG: Not normalizing sourcebin-weighted distance rates
+     [java] 11/11/26, 2:48 PM INFO: Running Statement: #CORE: 1 of 6
+     [java] 11/11/26, 2:48 PM INFO: Running Statement: #CORE: 2 of 6
+     [java] 11/11/26, 2:48 PM INFO: Running Statement: #CORE: 3 of 6
+     [java] 11/11/26, 2:48 PM INFO: Running Statement: #CORE: 4 of 6
+     [java] 11/11/26, 2:48 PM INFO: Running Statement: #CORE: 5 of 6
+     [java] 11/11/26, 2:48 PM INFO: Running Statement: #CORE: 6 of 6
+     [java] 11/11/26, 2:48 PM INFO: Running Statement: #CORE: 1 of 2
+     [java] 11/11/26, 2:48 PM INFO: Running Statement: #SBWEIGHTEDDISTANCERATE: 1 of 1
+     [java] 11/11/26, 2:48 PM INFO: Running Statement: #CORE: 2 of 2
+     [java] 11/11/26, 2:48 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 1 of 1
+     [java] 11/11/26, 2:48 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 1 of 1
+     [java] 11/11/26, 2:48 PM INFO: BRG SBW running concurrent statements...
+     [java] 11/11/26, 2:48 PM INFO: Running Statement: #SBWEIGHTEDDISTANCERATE: 1 of 1
+     [java] 11/11/26, 2:48 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 1 of 3
+     [java] 11/11/26, 2:48 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 2 of 3
+     [java] 11/11/26, 2:48 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 1 of 3
+     [java] 11/11/26, 2:48 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 2 of 3
+     [java] 11/11/26, 2:48 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 3 of 3
+     [java] 11/11/26, 2:48 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 3 of 3
+     [java] 11/11/26, 2:48 PM INFO: BRG SBW done running concurrent statements.
+     [java] 11/11/26, 2:48 PM INFO: Statements done: 18
+     [java] 11/11/26, 2:48 PM INFO: Avg. Concurrent Statements: 1.2777777777777777
+     [java] 11/11/26, 2:48 PM INFO: Max. Concurrent Statements: 2
+     [java] 11/11/26, 2:48 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=344
+     [java] 11/11/26, 2:48 PM DEBUG: BaseRateGenerator: processID=1, applyAvgSpeedDistribution=true, useAvgSpeedBin=false, applySourceBinDistribution=true, keepOpModeID=false, avgSpeedFraction="*coalesce(avgSpeedFraction,0)", sumSBD="*sumSBD"
+     [java] 11/11/26, 2:48 PM DEBUG: Run /opt/moves/generators/externalgenerator64.exe in /opt/moves/MOVESTemporary/GeneratorTemp
+     [java] 11/11/26, 2:48 PM DEBUG: Command line = 
+     [java] 11/11/26, 2:48 PM DEBUG: -class=BaseRateGenerator.generateBaseRates
+     [java] 11/11/26, 2:48 PM DEBUG: , 
+     [java] 11/11/26, 2:48 PM DEBUG: -db=MOVESExecution1ccc0236_campuscluster_illinois_edu
+     [java] 11/11/26, 2:48 PM DEBUG: , 
+     [java] 11/11/26, 2:48 PM DEBUG: -dbuser=moves
+     [java] 11/11/26, 2:48 PM DEBUG: , 
+     [java] 11/11/26, 2:48 PM DEBUG: -dbpwd=moves
+     [java] 11/11/26, 2:48 PM DEBUG: , 
+     [java] 11/11/26, 2:48 PM DEBUG: -params=nOp,nASB,yASF,ySBD,nRaw,1,2015,0
+     [java] 11/11/26, 2:48 PM DEBUG: , 
+     [java] 11/11/26, 2:48 PM DEBUG: -isproject=0
+     [java] 11/11/26, 2:48 PM DEBUG: , 
+     [java] 11/11/26, 2:48 PM DEBUG: -saveromd=0
+     [java] 11/11/26, 2:48 PM DEBUG: 
+     [java] 11/11/26, 2:48 PM INFO: Time spent on running the external generator (sec): 1.1030000448226929 for Process: 1 Running Exhaust
+     [java] State: 26
+     [java] County: 26161
+     [java] Zone: 261610
+     [java] Link: 2616101
+     [java] Road Type: 1
+     [java] Year: 2015
+     [java] Month: -1
+     [java] Day: -1
+     [java] Hour: -1
+     [java] Granularity: YEAR
+     [java] Priority: 98
+     [java] Phase: exec
+     [java] Module: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator
+     [java] Iteration: 1
+     [java] MovesRunID: 1
+     [java] 11/11/26, 2:48 PM DEBUG: Success running the external generator in BaseRateGenerator.generateBaseRates
+     [java] 11/11/26, 2:48 PM INFO: Statements done: 0
+     [java] 11/11/26, 2:48 PM INFO: Max. Concurrent Statements: 0
+     [java] 11/11/26, 2:48 PM DEBUG: Done with BaseRateGenerator processID=1, roadTypeID=0, yearID=2015
+     [java] 11/11/26, 2:48 PM DEBUG: BaseRateGenerator.generateBaseRates ms=1145
+     [java] 11/11/26, 2:48 PM INFO: BRG setupTime=49 bundleTime=1490
+     [java] 11/11/26, 2:48 PM INFO: TAG SourceTypeHour2 ms=41
+     [java] 11/11/26, 2:48 PM INFO: TAG AverageSpeed ms=19
+     [java] 11/11/26, 2:48 PM INFO: TAG SHOByAgeRoadwayHour ms=114
+     [java] 11/11/26, 2:48 PM INFO: TAG IdleHoursByAgeHour ms=44
+     [java] 11/11/26, 2:48 PM INFO: TAG StartsPerSampleVehicle ms=49
+     [java] 11/11/26, 2:48 PM INFO: TAG SourceTypesInStartsPerVehicle ms=24
+     [java] 11/11/26, 2:48 PM INFO: TAG StartsPerVehicle ms=21
+     [java] 11/11/26, 2:48 PM INFO: TAG StartsByAgeHour ms=42
+     [java] 11/11/26, 2:48 PM INFO: TAG SHPByAgeHour ms=150
+     [java] 11/11/26, 2:48 PM INFO: TAG setupTime=247 growthTime=532 bundleTime=686 focusTime=0
+     [java] 11/11/26, 2:49 PM INFO: Saved bundle file 326903741123030981_1_TODO
+     [java] 11/11/26, 2:49 PM INFO: Created bundle 1 for workers to process
+     [java] 11/11/26, 2:49 PM INFO: Saved bundle file 326903741123030981_2_TODO
+     [java] 11/11/26, 2:49 PM INFO: Created bundle 2 for workers to process
+     [java] 11/11/26, 2:49 PM INFO: newSBDG setupTime=2 bundleTime=52
+     [java] 11/11/26, 2:49 PM INFO: ROMDG setupTime=25 bundleTime=1
+     [java] 11/11/26, 2:49 PM DEBUG: Not normalizing sourcebin-weighted emission rates
+     [java] 11/11/26, 2:49 PM DEBUG: Not normalizing sourcebin-weighted distance rates
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 1 of 6
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 2 of 6
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 3 of 6
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 4 of 6
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 5 of 6
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 6 of 6
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 1 of 2
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDDISTANCERATE: 1 of 1
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 1 of 1
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 1 of 1
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 2 of 2
+     [java] 11/11/26, 2:49 PM INFO: BRG SBW running concurrent statements...
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDDISTANCERATE: 1 of 1
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 1 of 3
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 1 of 3
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 2 of 3
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 3 of 3
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 2 of 3
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 3 of 3
+     [java] 11/11/26, 2:49 PM INFO: BRG SBW done running concurrent statements.
+     [java] 11/11/26, 2:49 PM INFO: Statements done: 18
+     [java] 11/11/26, 2:49 PM INFO: Avg. Concurrent Statements: 1.6666666666666667
+     [java] 11/11/26, 2:49 PM INFO: Max. Concurrent Statements: 4
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=188
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator: processID=1, applyAvgSpeedDistribution=true, useAvgSpeedBin=false, applySourceBinDistribution=true, keepOpModeID=false, avgSpeedFraction="*coalesce(avgSpeedFraction,0)", sumSBD="*sumSBD"
+     [java] 11/11/26, 2:49 PM DEBUG: Run /opt/moves/generators/externalgenerator64.exe in /opt/moves/MOVESTemporary/GeneratorTemp1
+     [java] 11/11/26, 2:49 PM DEBUG: Command line = 
+     [java] 11/11/26, 2:49 PM DEBUG: -class=BaseRateGenerator.generateBaseRates
+     [java] 11/11/26, 2:49 PM DEBUG: , 
+     [java] 11/11/26, 2:49 PM DEBUG: -db=MOVESExecution1ccc0236_campuscluster_illinois_edu
+     [java] 11/11/26, 2:49 PM DEBUG: , 
+     [java] 11/11/26, 2:49 PM DEBUG: -dbuser=moves
+     [java] 11/11/26, 2:49 PM DEBUG: , 
+     [java] 11/11/26, 2:49 PM DEBUG: -dbpwd=moves
+     [java] 11/11/26, 2:49 PM DEBUG: , 
+     [java] 11/11/26, 2:49 PM DEBUG: -params=nOp,nASB,yASF,ySBD,nRaw,1,2020,0
+     [java] 11/11/26, 2:49 PM DEBUG: , 
+     [java] 11/11/26, 2:49 PM DEBUG: -isproject=0
+     [java] 11/11/26, 2:49 PM DEBUG: , 
+     [java] 11/11/26, 2:49 PM DEBUG: -saveromd=0
+     [java] 11/11/26, 2:49 PM DEBUG: 
+     [java] 11/11/26, 2:49 PM INFO: Time spent on running the external generator (sec): 0.972000002861023 for Process: 1 Running Exhaust
+     [java] State: 26
+     [java] County: 26161
+     [java] Zone: 261610
+     [java] Link: 2616101
+     [java] Road Type: 1
+     [java] Year: 2020
+     [java] Month: -1
+     [java] Day: -1
+     [java] Hour: -1
+     [java] Granularity: YEAR
+     [java] Priority: 98
+     [java] Phase: exec
+     [java] Module: gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator
+     [java] Iteration: 1
+     [java] MovesRunID: 1
+     [java] 11/11/26, 2:49 PM DEBUG: Success running the external generator in BaseRateGenerator.generateBaseRates
+     [java] 11/11/26, 2:49 PM INFO: Statements done: 0
+     [java] 11/11/26, 2:49 PM INFO: Max. Concurrent Statements: 0
+     [java] 11/11/26, 2:49 PM DEBUG: Done with BaseRateGenerator processID=1, roadTypeID=0, yearID=2020
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator.generateBaseRates ms=980
+     [java] 11/11/26, 2:49 PM INFO: BRG setupTime=49 bundleTime=2659
+     [java] 11/11/26, 2:49 PM INFO: TAG SourceTypeHour2 ms=43
+     [java] 11/11/26, 2:49 PM INFO: TAG AverageSpeed ms=20
+     [java] 11/11/26, 2:49 PM INFO: TAG SHOByAgeRoadwayHour ms=125
+     [java] 11/11/26, 2:49 PM INFO: TAG IdleHoursByAgeHour ms=51
+     [java] 11/11/26, 2:49 PM INFO: TAG StartsByAgeHour ms=66
+     [java] 11/11/26, 2:49 PM INFO: TAG SHPByAgeHour ms=278
+     [java] 11/11/26, 2:49 PM INFO: TAG setupTime=247 growthTime=1106 bundleTime=1626 focusTime=0
+     [java] 11/11/26, 2:49 PM INFO: Saved bundle file 326903741123030981_3_TODO
+     [java] 11/11/26, 2:49 PM INFO: Created bundle 3 for workers to process
+     [java] 11/11/26, 2:49 PM INFO: Saved bundle file 326903741123030981_4_TODO
+     [java] 11/11/26, 2:49 PM INFO: Created bundle 4 for workers to process
+     [java] 11/11/26, 2:49 PM INFO: newSBDG setupTime=2 bundleTime=0
+     [java] 11/11/26, 2:49 PM INFO: ROMDG setupTime=25 bundleTime=1
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/11/26, 2:49 PM INFO: BRG setupTime=49 bundleTime=2659
+     [java] 11/11/26, 2:49 PM INFO: TAG SourceTypeHour2 ms=44
+     [java] 11/11/26, 2:49 PM INFO: TAG AverageSpeed ms=20
+     [java] 11/11/26, 2:49 PM INFO: TAG SHOByAgeRoadwayHour ms=115
+     [java] 11/11/26, 2:49 PM INFO: TAG IdleHoursByAgeHour ms=186
+     [java] 11/11/26, 2:49 PM INFO: TAG StartsByAgeHour ms=65
+     [java] 11/11/26, 2:49 PM INFO: TAG SHPByAgeHour ms=278
+     [java] 11/11/26, 2:49 PM INFO: TAG setupTime=247 growthTime=1634 bundleTime=2350 focusTime=0
+     [java] 11/11/26, 2:49 PM INFO: Saved bundle file 326903741123030981_5_TODO
+     [java] 11/11/26, 2:49 PM INFO: Created bundle 5 for workers to process
+     [java] 11/11/26, 2:49 PM INFO: Saved bundle file 326903741123030981_6_TODO
+     [java] 11/11/26, 2:49 PM INFO: Created bundle 6 for workers to process
+     [java] 11/11/26, 2:49 PM INFO: newSBDG setupTime=2 bundleTime=0
+     [java] 11/11/26, 2:49 PM INFO: ROMDG setupTime=25 bundleTime=1
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/11/26, 2:49 PM INFO: BRG setupTime=49 bundleTime=2659
+     [java] 11/11/26, 2:49 PM INFO: TAG SourceTypeHour2 ms=50
+     [java] 11/11/26, 2:49 PM INFO: TAG AverageSpeed ms=20
+     [java] 11/11/26, 2:49 PM INFO: TAG SHOByAgeRoadwayHour ms=126
+     [java] 11/11/26, 2:49 PM INFO: TAG IdleHoursByAgeHour ms=44
+     [java] 11/11/26, 2:49 PM INFO: TAG StartsByAgeHour ms=66
+     [java] 11/11/26, 2:49 PM INFO: TAG SHPByAgeHour ms=277
+     [java] 11/11/26, 2:49 PM INFO: TAG setupTime=247 growthTime=2185 bundleTime=2950 focusTime=0
+     [java] 11/11/26, 2:49 PM INFO: Saved bundle file 326903741123030981_7_TODO
+     [java] 11/11/26, 2:49 PM INFO: Created bundle 7 for workers to process
+     [java] 11/11/26, 2:49 PM DEBUG: Worker found 7 TODO files.
+     [java] 11/11/26, 2:49 PM INFO: Found work file: 326903741123030981_1_TODO
+     [java] 11/11/26, 2:49 PM INFO: Worker Processing 326903741123030981_1_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: Saved bundle file 326903741123030981_8_TODO
+     [java] 11/11/26, 2:49 PM INFO: Created bundle 8 for workers to process
+     [java] 11/11/26, 2:49 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/11/26, 2:49 PM INFO: WorkerComputerID=ccc0236.campuscluster.illinois.edu
+     [java] 11/11/26, 2:49 PM INFO: WorkerID=6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: newSBDG setupTime=2 bundleTime=0
+     [java] 11/11/26, 2:49 PM INFO: ROMDG setupTime=25 bundleTime=1
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/11/26, 2:49 PM INFO: BRG setupTime=49 bundleTime=2659
+     [java] 11/11/26, 2:49 PM DEBUG: Run /opt/moves/calc/externalcalculatorgo64.exe in /opt/moves/MOVESTemporary/manyworkers/workerfolder/WorkerTemp
+     [java] 11/11/26, 2:49 PM DEBUG: Command line = 
+     [java] 11/11/26, 2:49 PM DEBUG: -isproject=0
+     [java] 11/11/26, 2:49 PM DEBUG: 
+     [java] 11/11/26, 2:49 PM INFO: Time spent on running the external calculator (sec): 0.12399999797344208
+     [java] 11/11/26, 2:49 PM INFO: Time spent on absorbing external calculator results (sec): 0.029999999329447746
+     [java] 11/11/26, 2:49 PM INFO: Extracted 644 rows from MOVESWorkerOutput
+     [java] 11/11/26, 2:49 PM INFO: TAG SourceTypeHour2 ms=45
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/11/26, 2:49 PM INFO: TAG AverageSpeed ms=25
+     [java] 11/11/26, 2:49 PM INFO: Worker finished processing: 326903741123030981_1_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: Worker is idle
+     [java] 11/11/26, 2:49 PM INFO: Found work file: 326903741123030981_2_TODO
+     [java] 11/11/26, 2:49 PM INFO: Received bundle from worker
+     [java] 11/11/26, 2:49 PM INFO: Worker Processing 326903741123030981_2_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: Bundle 1 is from worker: 'ccc0236.campuscluster.illinois.edu'/'MOVES5.0.1'/'6533668697583852935'
+     [java] 11/11/26, 2:49 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/11/26, 2:49 PM INFO: WorkerComputerID=ccc0236.campuscluster.illinois.edu
+     [java] 11/11/26, 2:49 PM INFO: WorkerID=6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: TAG SHOByAgeRoadwayHour ms=132
+     [java] 11/11/26, 2:49 PM DEBUG: Run /opt/moves/calc/externalcalculatorgo64.exe in /opt/moves/MOVESTemporary/manyworkers/workerfolder/WorkerTemp2
+     [java] 11/11/26, 2:49 PM DEBUG: Command line = 
+     [java] 11/11/26, 2:49 PM DEBUG: -isproject=0
+     [java] 11/11/26, 2:49 PM DEBUG: 
+     [java] 11/11/26, 2:49 PM INFO: TAG IdleHoursByAgeHour ms=85
+     [java] 11/11/26, 2:49 PM INFO: Time spent on running the external calculator (sec): 0.12999999523162842
+     [java] 11/11/26, 2:49 PM INFO: TAG StartsByAgeHour ms=71
+     [java] 11/11/26, 2:49 PM INFO: Time spent on absorbing external calculator results (sec): 0.03700000047683716
+     [java] 11/11/26, 2:49 PM INFO: TAG SHPByAgeHour ms=318
+     [java] 11/11/26, 2:49 PM INFO: TAG setupTime=247 growthTime=2755 bundleTime=3644 focusTime=0
+     [java] 11/11/26, 2:49 PM INFO: Extracted 644 rows from MOVESWorkerOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/11/26, 2:49 PM INFO: Worker finished processing: 326903741123030981_2_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: Worker is idle
+     [java] 11/11/26, 2:49 PM INFO: Found work file: 326903741123030981_3_TODO
+     [java] 11/11/26, 2:49 PM INFO: Worker Processing 326903741123030981_3_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: Saved bundle file 326903741123030981_9_TODO
+     [java] 11/11/26, 2:49 PM INFO: Created bundle 9 for workers to process
+     [java] 11/11/26, 2:49 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/11/26, 2:49 PM INFO: WorkerComputerID=ccc0236.campuscluster.illinois.edu
+     [java] 11/11/26, 2:49 PM INFO: WorkerID=6533668697583852935
+     [java] 11/11/26, 2:49 PM DEBUG: Run /opt/moves/calc/externalcalculatorgo64.exe in /opt/moves/MOVESTemporary/manyworkers/workerfolder/WorkerTemp3
+     [java] 11/11/26, 2:49 PM DEBUG: Command line = 
+     [java] 11/11/26, 2:49 PM DEBUG: -isproject=0
+     [java] 11/11/26, 2:49 PM DEBUG: 
+     [java] 11/11/26, 2:49 PM INFO: Time spent on running the external calculator (sec): 0.11900000274181366
+     [java] 11/11/26, 2:49 PM INFO: Time spent on absorbing external calculator results (sec): 0.03500000014901161
+     [java] 11/11/26, 2:49 PM INFO: Saved bundle file 326903741123030981_10_TODO
+     [java] 11/11/26, 2:49 PM INFO: Created bundle 10 for workers to process
+     [java] 11/11/26, 2:49 PM INFO: newSBDG setupTime=2 bundleTime=0
+     [java] 11/11/26, 2:49 PM INFO: ROMDG setupTime=25 bundleTime=1
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/11/26, 2:49 PM INFO: BRG setupTime=49 bundleTime=2659
+     [java] 11/11/26, 2:49 PM INFO: Extracted 700 rows from MOVESWorkerOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/11/26, 2:49 PM INFO: Worker finished processing: 326903741123030981_3_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: Worker is idle
+     [java] 11/11/26, 2:49 PM INFO: Found work file: 326903741123030981_4_TODO
+     [java] 11/11/26, 2:49 PM INFO: Worker Processing 326903741123030981_4_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/11/26, 2:49 PM INFO: WorkerComputerID=ccc0236.campuscluster.illinois.edu
+     [java] 11/11/26, 2:49 PM INFO: WorkerID=6533668697583852935
+     [java] 11/11/26, 2:49 PM DEBUG: Run /opt/moves/calc/externalcalculatorgo64.exe in /opt/moves/MOVESTemporary/manyworkers/workerfolder/WorkerTemp4
+     [java] 11/11/26, 2:49 PM DEBUG: Command line = 
+     [java] 11/11/26, 2:49 PM DEBUG: -isproject=0
+     [java] 11/11/26, 2:49 PM DEBUG: 
+     [java] 11/11/26, 2:49 PM INFO: Time spent on running the external calculator (sec): 0.11999999731779099
+     [java] 11/11/26, 2:49 PM INFO: TAG SourceTypeHour2 ms=63
+     [java] 11/11/26, 2:49 PM INFO: TAG AverageSpeed ms=20
+     [java] 11/11/26, 2:49 PM INFO: Time spent on absorbing external calculator results (sec): 0.035999998450279236
+     [java] 11/11/26, 2:49 PM INFO: TAG SHOByAgeRoadwayHour ms=116
+     [java] 11/11/26, 2:49 PM INFO: TAG IdleHoursByAgeHour ms=45
+     [java] 11/11/26, 2:49 PM INFO: TAG StartsByAgeHour ms=75
+     [java] 11/11/26, 2:49 PM INFO: Received bundle from worker
+     [java] 11/11/26, 2:49 PM INFO: Bundle 2 is from worker: 'ccc0236.campuscluster.illinois.edu'/'MOVES5.0.1'/'6533668697583852935'
+     [java] 11/11/26, 2:49 PM INFO: Extracted 700 rows from MOVESWorkerOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/11/26, 2:49 PM INFO: Worker finished processing: 326903741123030981_4_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: Worker is idle
+     [java] 11/11/26, 2:49 PM INFO: Found work file: 326903741123030981_5_TODO
+     [java] 11/11/26, 2:49 PM INFO: Received bundle from worker
+     [java] 11/11/26, 2:49 PM INFO: Bundle 3 is from worker: 'ccc0236.campuscluster.illinois.edu'/'MOVES5.0.1'/'6533668697583852935'
+     [java] 11/11/26, 2:49 PM INFO: Worker Processing 326903741123030981_5_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/11/26, 2:49 PM INFO: WorkerComputerID=ccc0236.campuscluster.illinois.edu
+     [java] 11/11/26, 2:49 PM INFO: WorkerID=6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: TAG SHPByAgeHour ms=369
+     [java] 11/11/26, 2:49 PM DEBUG: Run /opt/moves/calc/externalcalculatorgo64.exe in /opt/moves/MOVESTemporary/manyworkers/workerfolder/WorkerTemp5
+     [java] 11/11/26, 2:49 PM DEBUG: Command line = 
+     [java] 11/11/26, 2:49 PM DEBUG: -isproject=0
+     [java] 11/11/26, 2:49 PM DEBUG: 
+     [java] 11/11/26, 2:49 PM INFO: TAG setupTime=247 growthTime=3298 bundleTime=4347 focusTime=0
+     [java] 11/11/26, 2:49 PM INFO: Time spent on running the external calculator (sec): 0.1080000028014183
+     [java] 11/11/26, 2:49 PM INFO: Time spent on absorbing external calculator results (sec): 0.02800000086426735
+     [java] 11/11/26, 2:49 PM INFO: Saved bundle file 326903741123030981_11_TODO
+     [java] 11/11/26, 2:49 PM INFO: Created bundle 11 for workers to process
+     [java] 11/11/26, 2:49 PM INFO: Extracted 644 rows from MOVESWorkerOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/11/26, 2:49 PM INFO: Worker finished processing: 326903741123030981_5_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: Worker is idle
+     [java] 11/11/26, 2:49 PM INFO: Found work file: 326903741123030981_6_TODO
+     [java] 11/11/26, 2:49 PM INFO: Saved bundle file 326903741123030981_12_TODO
+     [java] 11/11/26, 2:49 PM INFO: Created bundle 12 for workers to process
+     [java] 11/11/26, 2:49 PM INFO: newSBDG setupTime=2 bundleTime=0
+     [java] 11/11/26, 2:49 PM INFO: ROMDG setupTime=25 bundleTime=1
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/11/26, 2:49 PM INFO: BRG setupTime=49 bundleTime=2659
+     [java] 11/11/26, 2:49 PM INFO: Worker Processing 326903741123030981_6_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/11/26, 2:49 PM INFO: WorkerComputerID=ccc0236.campuscluster.illinois.edu
+     [java] 11/11/26, 2:49 PM INFO: WorkerID=6533668697583852935
+     [java] 11/11/26, 2:49 PM DEBUG: Run /opt/moves/calc/externalcalculatorgo64.exe in /opt/moves/MOVESTemporary/manyworkers/workerfolder/WorkerTemp6
+     [java] 11/11/26, 2:49 PM DEBUG: Command line = 
+     [java] 11/11/26, 2:49 PM DEBUG: -isproject=0
+     [java] 11/11/26, 2:49 PM DEBUG: 
+     [java] 11/11/26, 2:49 PM INFO: Time spent on running the external calculator (sec): 0.09200000017881393
+     [java] 11/11/26, 2:49 PM INFO: Time spent on absorbing external calculator results (sec): 0.03200000151991844
+     [java] 11/11/26, 2:49 PM INFO: TAG SourceTypeHour2 ms=39
+     [java] 11/11/26, 2:49 PM INFO: TAG AverageSpeed ms=19
+     [java] 11/11/26, 2:49 PM INFO: Extracted 644 rows from MOVESWorkerOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/11/26, 2:49 PM INFO: Worker finished processing: 326903741123030981_6_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: Worker is idle
+     [java] 11/11/26, 2:49 PM INFO: Found work file: 326903741123030981_7_TODO
+     [java] 11/11/26, 2:49 PM INFO: TAG SHOByAgeRoadwayHour ms=115
+     [java] 11/11/26, 2:49 PM INFO: Worker Processing 326903741123030981_7_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: TAG IdleHoursByAgeHour ms=42
+     [java] 11/11/26, 2:49 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/11/26, 2:49 PM INFO: WorkerComputerID=ccc0236.campuscluster.illinois.edu
+     [java] 11/11/26, 2:49 PM INFO: WorkerID=6533668697583852935
+     [java] 11/11/26, 2:49 PM DEBUG: Run /opt/moves/calc/externalcalculatorgo64.exe in /opt/moves/MOVESTemporary/manyworkers/workerfolder/WorkerTemp7
+     [java] 11/11/26, 2:49 PM DEBUG: Command line = 
+     [java] 11/11/26, 2:49 PM DEBUG: -isproject=0
+     [java] 11/11/26, 2:49 PM DEBUG: 
+     [java] 11/11/26, 2:49 PM INFO: TAG StartsByAgeHour ms=61
+     [java] 11/11/26, 2:49 PM INFO: Time spent on running the external calculator (sec): 0.1080000028014183
+     [java] 11/11/26, 2:49 PM INFO: Time spent on absorbing external calculator results (sec): 0.04800000041723251
+     [java] 11/11/26, 2:49 PM INFO: TAG SHPByAgeHour ms=266
+     [java] 11/11/26, 2:49 PM INFO: TAG setupTime=247 growthTime=3846 bundleTime=4903 focusTime=0
+     [java] 11/11/26, 2:49 PM INFO: Received bundle from worker
+     [java] 11/11/26, 2:49 PM INFO: Bundle 4 is from worker: 'ccc0236.campuscluster.illinois.edu'/'MOVES5.0.1'/'6533668697583852935'
+     [java] 11/11/26, 2:49 PM INFO: Saved bundle file 326903741123030981_13_TODO
+     [java] 11/11/26, 2:49 PM INFO: Created bundle 13 for workers to process
+     [java] 11/11/26, 2:49 PM INFO: Extracted 700 rows from MOVESWorkerOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/11/26, 2:49 PM INFO: Received bundle from worker
+     [java] 11/11/26, 2:49 PM INFO: Bundle 5 is from worker: 'ccc0236.campuscluster.illinois.edu'/'MOVES5.0.1'/'6533668697583852935'
+     [java] 11/11/26, 2:49 PM INFO: Worker finished processing: 326903741123030981_7_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: Worker is idle
+     [java] 11/11/26, 2:49 PM DEBUG: Worker found 6 TODO files.
+     [java] 11/11/26, 2:49 PM INFO: Found work file: 326903741123030981_8_TODO
+     [java] 11/11/26, 2:49 PM INFO: Worker Processing 326903741123030981_8_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: Received bundle from worker
+     [java] 11/11/26, 2:49 PM INFO: Bundle 6 is from worker: 'ccc0236.campuscluster.illinois.edu'/'MOVES5.0.1'/'6533668697583852935'
+     [java] 11/11/26, 2:49 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/11/26, 2:49 PM INFO: WorkerComputerID=ccc0236.campuscluster.illinois.edu
+     [java] 11/11/26, 2:49 PM INFO: WorkerID=6533668697583852935
+     [java] 11/11/26, 2:49 PM DEBUG: Run /opt/moves/calc/externalcalculatorgo64.exe in /opt/moves/MOVESTemporary/manyworkers/workerfolder/WorkerTemp8
+     [java] 11/11/26, 2:49 PM DEBUG: Command line = 
+     [java] 11/11/26, 2:49 PM DEBUG: -isproject=0
+     [java] 11/11/26, 2:49 PM DEBUG: 
+     [java] 11/11/26, 2:49 PM INFO: Time spent on running the external calculator (sec): 0.07400000095367432
+     [java] 11/11/26, 2:49 PM INFO: Saved bundle file 326903741123030981_14_TODO
+     [java] 11/11/26, 2:49 PM INFO: Created bundle 14 for workers to process
+     [java] 11/11/26, 2:49 PM INFO: newSBDG setupTime=2 bundleTime=0
+     [java] 11/11/26, 2:49 PM INFO: ROMDG setupTime=25 bundleTime=1
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/11/26, 2:49 PM INFO: BRG setupTime=49 bundleTime=2659
+     [java] 11/11/26, 2:49 PM INFO: Time spent on absorbing external calculator results (sec): 0.03400000184774399
+     [java] 11/11/26, 2:49 PM INFO: Extracted 700 rows from MOVESWorkerOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/11/26, 2:49 PM INFO: Worker finished processing: 326903741123030981_8_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: Worker is idle
+     [java] 11/11/26, 2:49 PM INFO: Found work file: 326903741123030981_9_TODO
+     [java] 11/11/26, 2:49 PM INFO: Worker Processing 326903741123030981_9_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/11/26, 2:49 PM INFO: WorkerComputerID=ccc0236.campuscluster.illinois.edu
+     [java] 11/11/26, 2:49 PM INFO: WorkerID=6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: TAG SourceTypeHour2 ms=55
+     [java] 11/11/26, 2:49 PM DEBUG: Run /opt/moves/calc/externalcalculatorgo64.exe in /opt/moves/MOVESTemporary/manyworkers/workerfolder/WorkerTemp9
+     [java] 11/11/26, 2:49 PM DEBUG: Command line = 
+     [java] 11/11/26, 2:49 PM DEBUG: -isproject=0
+     [java] 11/11/26, 2:49 PM DEBUG: 
+     [java] 11/11/26, 2:49 PM INFO: TAG AverageSpeed ms=19
+     [java] 11/11/26, 2:49 PM INFO: Time spent on running the external calculator (sec): 0.09700000286102295
+     [java] 11/11/26, 2:49 PM INFO: TAG SHOByAgeRoadwayHour ms=110
+     [java] 11/11/26, 2:49 PM INFO: Time spent on absorbing external calculator results (sec): 0.03400000184774399
+     [java] 11/11/26, 2:49 PM INFO: TAG IdleHoursByAgeHour ms=48
+     [java] 11/11/26, 2:49 PM INFO: TAG StartsByAgeHour ms=66
+     [java] 11/11/26, 2:49 PM INFO: Extracted 644 rows from MOVESWorkerOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/11/26, 2:49 PM INFO: TAG SHPByAgeHour ms=271
+     [java] 11/11/26, 2:49 PM INFO: TAG setupTime=247 growthTime=4351 bundleTime=5503 focusTime=0
+     [java] 11/11/26, 2:49 PM INFO: Worker finished processing: 326903741123030981_9_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: Worker is idle
+     [java] 11/11/26, 2:49 PM INFO: Found work file: 326903741123030981_10_TODO
+     [java] 11/11/26, 2:49 PM INFO: Worker Processing 326903741123030981_10_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/11/26, 2:49 PM INFO: WorkerComputerID=ccc0236.campuscluster.illinois.edu
+     [java] 11/11/26, 2:49 PM INFO: WorkerID=6533668697583852935
+     [java] 11/11/26, 2:49 PM DEBUG: Run /opt/moves/calc/externalcalculatorgo64.exe in /opt/moves/MOVESTemporary/manyworkers/workerfolder/WorkerTemp10
+     [java] 11/11/26, 2:49 PM DEBUG: Command line = 
+     [java] 11/11/26, 2:49 PM DEBUG: -isproject=0
+     [java] 11/11/26, 2:49 PM DEBUG: 
+     [java] 11/11/26, 2:49 PM INFO: Time spent on running the external calculator (sec): 0.08399999886751175
+     [java] 11/11/26, 2:49 PM INFO: Saved bundle file 326903741123030981_15_TODO
+     [java] 11/11/26, 2:49 PM INFO: Created bundle 15 for workers to process
+     [java] 11/11/26, 2:49 PM INFO: Time spent on absorbing external calculator results (sec): 0.03400000184774399
+     [java] 11/11/26, 2:49 PM INFO: Saved bundle file 326903741123030981_16_TODO
+     [java] 11/11/26, 2:49 PM INFO: Created bundle 16 for workers to process
+     [java] 11/11/26, 2:49 PM INFO: newSBDG setupTime=2 bundleTime=0
+     [java] 11/11/26, 2:49 PM INFO: ROMDG setupTime=25 bundleTime=1
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/11/26, 2:49 PM INFO: BRG setupTime=49 bundleTime=2659
+     [java] 11/11/26, 2:49 PM INFO: Extracted 644 rows from MOVESWorkerOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/11/26, 2:49 PM INFO: Worker finished processing: 326903741123030981_10_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: Worker is idle
+     [java] 11/11/26, 2:49 PM INFO: Found work file: 326903741123030981_11_TODO
+     [java] 11/11/26, 2:49 PM INFO: Worker Processing 326903741123030981_11_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: Received bundle from worker
+     [java] 11/11/26, 2:49 PM INFO: Bundle 10 is from worker: 'ccc0236.campuscluster.illinois.edu'/'MOVES5.0.1'/'6533668697583852935'
+     [java] 11/11/26, 2:49 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/11/26, 2:49 PM INFO: WorkerComputerID=ccc0236.campuscluster.illinois.edu
+     [java] 11/11/26, 2:49 PM INFO: WorkerID=6533668697583852935
+     [java] 11/11/26, 2:49 PM DEBUG: Run /opt/moves/calc/externalcalculatorgo64.exe in /opt/moves/MOVESTemporary/manyworkers/workerfolder/WorkerTemp11
+     [java] 11/11/26, 2:49 PM DEBUG: Command line = 
+     [java] 11/11/26, 2:49 PM DEBUG: -isproject=0
+     [java] 11/11/26, 2:49 PM DEBUG: 
+     [java] 11/11/26, 2:49 PM INFO: Time spent on running the external calculator (sec): 0.06400000303983688
+     [java] 11/11/26, 2:49 PM INFO: Received bundle from worker
+     [java] 11/11/26, 2:49 PM INFO: Bundle 7 is from worker: 'ccc0236.campuscluster.illinois.edu'/'MOVES5.0.1'/'6533668697583852935'
+     [java] 11/11/26, 2:49 PM INFO: Time spent on absorbing external calculator results (sec): 0.03099999949336052
+     [java] 11/11/26, 2:49 PM INFO: Received bundle from worker
+     [java] 11/11/26, 2:49 PM INFO: Bundle 8 is from worker: 'ccc0236.campuscluster.illinois.edu'/'MOVES5.0.1'/'6533668697583852935'
+     [java] 11/11/26, 2:49 PM INFO: Received bundle from worker
+     [java] 11/11/26, 2:49 PM INFO: Bundle 9 is from worker: 'ccc0236.campuscluster.illinois.edu'/'MOVES5.0.1'/'6533668697583852935'
+     [java] 11/11/26, 2:49 PM INFO: TAG SourceTypeHour2 ms=44
+     [java] 11/11/26, 2:49 PM INFO: TAG AverageSpeed ms=19
+     [java] 11/11/26, 2:49 PM INFO: TAG SHOByAgeRoadwayHour ms=114
+     [java] 11/11/26, 2:49 PM INFO: TAG IdleHoursByAgeHour ms=44
+     [java] 11/11/26, 2:49 PM INFO: Extracted 700 rows from MOVESWorkerOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/11/26, 2:49 PM INFO: Worker finished processing: 326903741123030981_11_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: Worker is idle
+     [java] 11/11/26, 2:49 PM INFO: Found work file: 326903741123030981_12_TODO
+     [java] 11/11/26, 2:49 PM INFO: TAG StartsByAgeHour ms=60
+     [java] 11/11/26, 2:49 PM INFO: Worker Processing 326903741123030981_12_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/11/26, 2:49 PM INFO: WorkerComputerID=ccc0236.campuscluster.illinois.edu
+     [java] 11/11/26, 2:49 PM INFO: WorkerID=6533668697583852935
+     [java] 11/11/26, 2:49 PM DEBUG: Run /opt/moves/calc/externalcalculatorgo64.exe in /opt/moves/MOVESTemporary/manyworkers/workerfolder/WorkerTemp12
+     [java] 11/11/26, 2:49 PM DEBUG: Command line = 
+     [java] 11/11/26, 2:49 PM DEBUG: -isproject=0
+     [java] 11/11/26, 2:49 PM DEBUG: 
+     [java] 11/11/26, 2:49 PM INFO: Time spent on running the external calculator (sec): 0.07199999690055847
+     [java] 11/11/26, 2:49 PM INFO: TAG SHPByAgeHour ms=262
+     [java] 11/11/26, 2:49 PM INFO: TAG setupTime=247 growthTime=4890 bundleTime=6061 focusTime=0
+     [java] 11/11/26, 2:49 PM INFO: Time spent on absorbing external calculator results (sec): 0.029999999329447746
+     [java] 11/11/26, 2:49 PM INFO: Saved bundle file 326903741123030981_17_TODO
+     [java] 11/11/26, 2:49 PM INFO: Created bundle 17 for workers to process
+     [java] 11/11/26, 2:49 PM INFO: Extracted 700 rows from MOVESWorkerOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/11/26, 2:49 PM INFO: Worker finished processing: 326903741123030981_12_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: Worker is idle
+     [java] 11/11/26, 2:49 PM INFO: Found work file: 326903741123030981_13_TODO
+     [java] 11/11/26, 2:49 PM INFO: Worker Processing 326903741123030981_13_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/11/26, 2:49 PM INFO: WorkerComputerID=ccc0236.campuscluster.illinois.edu
+     [java] 11/11/26, 2:49 PM INFO: WorkerID=6533668697583852935
+     [java] 11/11/26, 2:49 PM DEBUG: Run /opt/moves/calc/externalcalculatorgo64.exe in /opt/moves/MOVESTemporary/manyworkers/workerfolder/WorkerTemp13
+     [java] 11/11/26, 2:49 PM DEBUG: Command line = 
+     [java] 11/11/26, 2:49 PM DEBUG: -isproject=0
+     [java] 11/11/26, 2:49 PM DEBUG: 
+     [java] 11/11/26, 2:49 PM INFO: Saved bundle file 326903741123030981_18_TODO
+     [java] 11/11/26, 2:49 PM INFO: Created bundle 18 for workers to process
+     [java] 11/11/26, 2:49 PM INFO: newSBDG setupTime=2 bundleTime=0
+     [java] 11/11/26, 2:49 PM INFO: ROMDG setupTime=25 bundleTime=1
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/11/26, 2:49 PM INFO: BRG setupTime=49 bundleTime=2659
+     [java] 11/11/26, 2:49 PM INFO: Time spent on running the external calculator (sec): 0.050999999046325684
+     [java] 11/11/26, 2:49 PM INFO: Time spent on absorbing external calculator results (sec): 0.03099999949336052
+     [java] 11/11/26, 2:49 PM INFO: Extracted 644 rows from MOVESWorkerOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/11/26, 2:49 PM INFO: Worker finished processing: 326903741123030981_13_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: Worker is idle
+     [java] 11/11/26, 2:49 PM DEBUG: Worker found 5 TODO files.
+     [java] 11/11/26, 2:49 PM INFO: Found work file: 326903741123030981_14_TODO
+     [java] 11/11/26, 2:49 PM INFO: Worker Processing 326903741123030981_14_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: TAG SourceTypeHour2 ms=48
+     [java] 11/11/26, 2:49 PM INFO: TAG AverageSpeed ms=19
+     [java] 11/11/26, 2:49 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/11/26, 2:49 PM INFO: WorkerComputerID=ccc0236.campuscluster.illinois.edu
+     [java] 11/11/26, 2:49 PM INFO: WorkerID=6533668697583852935
+     [java] 11/11/26, 2:49 PM DEBUG: Run /opt/moves/calc/externalcalculatorgo64.exe in /opt/moves/MOVESTemporary/manyworkers/workerfolder/WorkerTemp14
+     [java] 11/11/26, 2:49 PM DEBUG: Command line = 
+     [java] 11/11/26, 2:49 PM DEBUG: -isproject=0
+     [java] 11/11/26, 2:49 PM DEBUG: 
+     [java] 11/11/26, 2:49 PM INFO: TAG SHOByAgeRoadwayHour ms=108
+     [java] 11/11/26, 2:49 PM INFO: Time spent on running the external calculator (sec): 0.08699999749660492
+     [java] 11/11/26, 2:49 PM INFO: TAG IdleHoursByAgeHour ms=42
+     [java] 11/11/26, 2:49 PM INFO: Time spent on absorbing external calculator results (sec): 0.03200000151991844
+     [java] 11/11/26, 2:49 PM INFO: TAG StartsByAgeHour ms=61
+     [java] 11/11/26, 2:49 PM INFO: Received bundle from worker
+     [java] 11/11/26, 2:49 PM INFO: Bundle 11 is from worker: 'ccc0236.campuscluster.illinois.edu'/'MOVES5.0.1'/'6533668697583852935'
+     [java] 11/11/26, 2:49 PM INFO: TAG SHPByAgeHour ms=248
+     [java] 11/11/26, 2:49 PM INFO: TAG setupTime=247 growthTime=5429 bundleTime=6600 focusTime=0
+     [java] 11/11/26, 2:49 PM INFO: Received bundle from worker
+     [java] 11/11/26, 2:49 PM INFO: Bundle 12 is from worker: 'ccc0236.campuscluster.illinois.edu'/'MOVES5.0.1'/'6533668697583852935'
+     [java] 11/11/26, 2:49 PM INFO: Extracted 644 rows from MOVESWorkerOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/11/26, 2:49 PM INFO: Worker finished processing: 326903741123030981_14_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: Worker is idle
+     [java] 11/11/26, 2:49 PM INFO: Found work file: 326903741123030981_15_TODO
+     [java] 11/11/26, 2:49 PM INFO: Received bundle from worker
+     [java] 11/11/26, 2:49 PM INFO: Bundle 13 is from worker: 'ccc0236.campuscluster.illinois.edu'/'MOVES5.0.1'/'6533668697583852935'
+     [java] 11/11/26, 2:49 PM INFO: Worker Processing 326903741123030981_15_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/11/26, 2:49 PM INFO: WorkerComputerID=ccc0236.campuscluster.illinois.edu
+     [java] 11/11/26, 2:49 PM INFO: WorkerID=6533668697583852935
+     [java] 11/11/26, 2:49 PM DEBUG: Run /opt/moves/calc/externalcalculatorgo64.exe in /opt/moves/MOVESTemporary/manyworkers/workerfolder/WorkerTemp15
+     [java] 11/11/26, 2:49 PM DEBUG: Command line = 
+     [java] 11/11/26, 2:49 PM DEBUG: -isproject=0
+     [java] 11/11/26, 2:49 PM DEBUG: 
+     [java] 11/11/26, 2:49 PM INFO: Saved bundle file 326903741123030981_19_TODO
+     [java] 11/11/26, 2:49 PM INFO: Created bundle 19 for workers to process
+     [java] 11/11/26, 2:49 PM INFO: Time spent on running the external calculator (sec): 0.08399999886751175
+     [java] 11/11/26, 2:49 PM INFO: Time spent on absorbing external calculator results (sec): 0.02800000086426735
+     [java] 11/11/26, 2:49 PM INFO: Saved bundle file 326903741123030981_20_TODO
+     [java] 11/11/26, 2:49 PM INFO: Created bundle 20 for workers to process
+     [java] 11/11/26, 2:49 PM INFO: MetGen setupTime=165 bundleTime=0
+     [java] 11/11/26, 2:49 PM DEBUG: newSBD Generator called for process: Extended Idle Exhaust
+     [java] 11/11/26, 2:49 PM DEBUG: Processing pollutant-process: Total Energy Consumption - Extended Idle Exhaust
+     [java] 11/11/26, 2:49 PM INFO: Extracted 700 rows from MOVESWorkerOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/11/26, 2:49 PM INFO: newSBDG setupTime=2 bundleTime=166
+     [java] 11/11/26, 2:49 PM DEBUG: RatesOpModeDistributionGenerator.calculateOpModeFractions ms=4
+     [java] 11/11/26, 2:49 PM INFO: ROMDG setupTime=25 bundleTime=6
+     [java] 11/11/26, 2:49 PM INFO: Worker finished processing: 326903741123030981_15_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: Worker is idle
+     [java] 11/11/26, 2:49 PM INFO: Found work file: 326903741123030981_16_TODO
+     [java] 11/11/26, 2:49 PM INFO: Worker Processing 326903741123030981_16_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/11/26, 2:49 PM INFO: WorkerComputerID=ccc0236.campuscluster.illinois.edu
+     [java] 11/11/26, 2:49 PM INFO: WorkerID=6533668697583852935
+     [java] 11/11/26, 2:49 PM DEBUG: Run /opt/moves/calc/externalcalculatorgo64.exe in /opt/moves/MOVESTemporary/manyworkers/workerfolder/WorkerTemp16
+     [java] 11/11/26, 2:49 PM DEBUG: Command line = 
+     [java] 11/11/26, 2:49 PM DEBUG: -isproject=0
+     [java] 11/11/26, 2:49 PM DEBUG: 
+     [java] 11/11/26, 2:49 PM INFO: Time spent on running the external calculator (sec): 0.06199999898672104
+     [java] 11/11/26, 2:49 PM INFO: Time spent on absorbing external calculator results (sec): 0.02800000086426735
+     [java] 11/11/26, 2:49 PM INFO: TAG SourceTypeHour2 ms=51
+     [java] 11/11/26, 2:49 PM INFO: TAG AverageSpeed ms=33
+     [java] 11/11/26, 2:49 PM INFO: Extracted 700 rows from MOVESWorkerOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/11/26, 2:49 PM INFO: Worker finished processing: 326903741123030981_16_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: Worker is idle
+     [java] 11/11/26, 2:49 PM INFO: Found work file: 326903741123030981_17_TODO
+     [java] 11/11/26, 2:49 PM INFO: Worker Processing 326903741123030981_17_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/11/26, 2:49 PM INFO: WorkerComputerID=ccc0236.campuscluster.illinois.edu
+     [java] 11/11/26, 2:49 PM INFO: WorkerID=6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: TAG SHOByAgeRoadwayHour ms=260
+     [java] 11/11/26, 2:49 PM DEBUG: Run /opt/moves/calc/externalcalculatorgo64.exe in /opt/moves/MOVESTemporary/manyworkers/workerfolder/WorkerTemp17
+     [java] 11/11/26, 2:49 PM DEBUG: Command line = 
+     [java] 11/11/26, 2:49 PM DEBUG: -isproject=0
+     [java] 11/11/26, 2:49 PM DEBUG: 
+     [java] 11/11/26, 2:49 PM INFO: TAG IdleHoursByAgeHour ms=85
+     [java] 11/11/26, 2:49 PM INFO: TAG StartsByAgeHour ms=71
+     [java] 11/11/26, 2:49 PM INFO: Time spent on running the external calculator (sec): 0.3160000145435333
+     [java] 11/11/26, 2:49 PM INFO: Time spent on absorbing external calculator results (sec): 0.03099999949336052
+     [java] 11/11/26, 2:49 PM INFO: TAG SHPByAgeHour ms=290
+     [java] 11/11/26, 2:49 PM INFO: Received bundle from worker
+     [java] 11/11/26, 2:49 PM INFO: Bundle 14 is from worker: 'ccc0236.campuscluster.illinois.edu'/'MOVES5.0.1'/'6533668697583852935'
+     [java] 11/11/26, 2:49 PM INFO: Received bundle from worker
+     [java] 11/11/26, 2:49 PM INFO: Bundle 15 is from worker: 'ccc0236.campuscluster.illinois.edu'/'MOVES5.0.1'/'6533668697583852935'
+     [java] 11/11/26, 2:49 PM INFO: Extracted 644 rows from MOVESWorkerOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/11/26, 2:49 PM INFO: Worker finished processing: 326903741123030981_17_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: Worker is idle
+     [java] 11/11/26, 2:49 PM INFO: Found work file: 326903741123030981_18_TODO
+     [java] 11/11/26, 2:49 PM INFO: Received bundle from worker
+     [java] 11/11/26, 2:49 PM INFO: Bundle 16 is from worker: 'ccc0236.campuscluster.illinois.edu'/'MOVES5.0.1'/'6533668697583852935'
+     [java] 11/11/26, 2:49 PM INFO: Worker Processing 326903741123030981_18_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/11/26, 2:49 PM INFO: WorkerComputerID=ccc0236.campuscluster.illinois.edu
+     [java] 11/11/26, 2:49 PM INFO: WorkerID=6533668697583852935
+     [java] 11/11/26, 2:49 PM DEBUG: Run /opt/moves/calc/externalcalculatorgo64.exe in /opt/moves/MOVESTemporary/manyworkers/workerfolder/WorkerTemp18
+     [java] 11/11/26, 2:49 PM DEBUG: Command line = 
+     [java] 11/11/26, 2:49 PM DEBUG: -isproject=0
+     [java] 11/11/26, 2:49 PM DEBUG: 
+     [java] 11/11/26, 2:49 PM INFO: Time spent on running the external calculator (sec): 0.40799999237060547
+     [java] 11/11/26, 2:49 PM INFO: Time spent on absorbing external calculator results (sec): 0.03200000151991844
+     [java] 11/11/26, 2:49 PM INFO: Extracted 644 rows from MOVESWorkerOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/11/26, 2:49 PM INFO: Worker finished processing: 326903741123030981_18_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: Worker is idle
+     [java] 11/11/26, 2:49 PM DEBUG: Worker found 2 TODO files.
+     [java] 11/11/26, 2:49 PM INFO: Found work file: 326903741123030981_19_TODO
+     [java] 11/11/26, 2:49 PM INFO: TAG setupTime=247 growthTime=5934 bundleTime=8927 focusTime=0
+     [java] 11/11/26, 2:49 PM DEBUG: Base Rate Generator called for process: Extended Idle Exhaust
+     [java] 11/11/26, 2:49 PM DEBUG: Not normalizing sourcebin-weighted emission rates
+     [java] 11/11/26, 2:49 PM INFO: Worker Processing 326903741123030981_19_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 1 of 6
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 2 of 6
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 3 of 6
+     [java] 11/11/26, 2:49 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/11/26, 2:49 PM INFO: WorkerComputerID=ccc0236.campuscluster.illinois.edu
+     [java] 11/11/26, 2:49 PM INFO: WorkerID=6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 4 of 6
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 5 of 6
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 6 of 6
+     [java] 11/11/26, 2:49 PM DEBUG: Run /opt/moves/calc/externalcalculatorgo64.exe in /opt/moves/MOVESTemporary/manyworkers/workerfolder/WorkerTemp19
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 1 of 2
+     [java] 11/11/26, 2:49 PM DEBUG: Command line = 
+     [java] 11/11/26, 2:49 PM DEBUG: -isproject=0
+     [java] 11/11/26, 2:49 PM DEBUG: 
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 2 of 2
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDDISTANCERATE: 1 of 1
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 1 of 1
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 1 of 1
+     [java] 11/11/26, 2:49 PM INFO: BRG SBW running concurrent statements...
+     [java] 11/11/26, 2:49 PM INFO: Time spent on running the external calculator (sec): 0.3269999921321869
+     [java] 11/11/26, 2:49 PM INFO: Time spent on absorbing external calculator results (sec): 0.03099999949336052
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 1 of 3
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 2 of 3
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 3 of 3
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 1 of 3
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 2 of 3
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 3 of 3
+     [java] 11/11/26, 2:49 PM INFO: BRG SBW done running concurrent statements.
+     [java] 11/11/26, 2:49 PM INFO: Statements done: 17
+     [java] 11/11/26, 2:49 PM INFO: Avg. Concurrent Statements: 1.0
+     [java] 11/11/26, 2:49 PM INFO: Max. Concurrent Statements: 1
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=540
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator: processID=90, applyAvgSpeedDistribution=false, useAvgSpeedBin=false, applySourceBinDistribution=true, keepOpModeID=false, avgSpeedFraction="", sumSBD="*sumSBD"
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator processID=90, roadTypeID=0, yearID=2015 has 1 iterations
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator executing concurrent SQL...
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #BASERATE: 1 of 2
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #BASERATE: 2 of 2
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #BASERATEBYAGE: 1 of 1
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator executing BaseRateByAgeHelper...
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator executing BaseRateByAgeHelper Done
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator concurrent SQL done.
+     [java] 11/11/26, 2:49 PM INFO: Statements done: 3
+     [java] 11/11/26, 2:49 PM INFO: Avg. Concurrent Statements: 1.0
+     [java] 11/11/26, 2:49 PM INFO: Max. Concurrent Statements: 1
+     [java] 11/11/26, 2:49 PM DEBUG: Done with BaseRateGenerator processID=90, roadTypeID=0, yearID=2015
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator.generateBaseRates ms=142
+     [java] 11/11/26, 2:49 PM INFO: BRG setupTime=49 bundleTime=3342
+     [java] 11/11/26, 2:49 PM INFO: Extracted 700 rows from MOVESWorkerOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/11/26, 2:49 PM INFO: Worker finished processing: 326903741123030981_19_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: Worker is idle
+     [java] 11/11/26, 2:49 PM INFO: Found work file: 326903741123030981_20_TODO
+     [java] 11/11/26, 2:49 PM INFO: Received bundle from worker
+     [java] 11/11/26, 2:49 PM INFO: Bundle 17 is from worker: 'ccc0236.campuscluster.illinois.edu'/'MOVES5.0.1'/'6533668697583852935'
+     [java] 11/11/26, 2:49 PM INFO: Worker Processing 326903741123030981_20_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/11/26, 2:49 PM INFO: WorkerComputerID=ccc0236.campuscluster.illinois.edu
+     [java] 11/11/26, 2:49 PM INFO: WorkerID=6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: Saved bundle file 326903741123030981_21_TODO
+     [java] 11/11/26, 2:49 PM INFO: Created bundle 21 for workers to process
+     [java] 11/11/26, 2:49 PM INFO: Received bundle from worker
+     [java] 11/11/26, 2:49 PM INFO: Bundle 18 is from worker: 'ccc0236.campuscluster.illinois.edu'/'MOVES5.0.1'/'6533668697583852935'
+     [java] 11/11/26, 2:49 PM DEBUG: Run /opt/moves/calc/externalcalculatorgo64.exe in /opt/moves/MOVESTemporary/manyworkers/workerfolder/WorkerTemp20
+     [java] 11/11/26, 2:49 PM DEBUG: Command line = 
+     [java] 11/11/26, 2:49 PM DEBUG: -isproject=0
+     [java] 11/11/26, 2:49 PM DEBUG: 
+     [java] 11/11/26, 2:49 PM INFO: Received bundle from worker
+     [java] 11/11/26, 2:49 PM INFO: Bundle 19 is from worker: 'ccc0236.campuscluster.illinois.edu'/'MOVES5.0.1'/'6533668697583852935'
+     [java] 11/11/26, 2:49 PM INFO: Time spent on running the external calculator (sec): 0.20499999821186066
+     [java] 11/11/26, 2:49 PM INFO: Time spent on absorbing external calculator results (sec): 0.039000000804662704
+     [java] 11/11/26, 2:49 PM INFO: Saved bundle file 326903741123030981_22_TODO
+     [java] 11/11/26, 2:49 PM INFO: Created bundle 22 for workers to process
+     [java] 11/11/26, 2:49 PM INFO: newSBDG setupTime=2 bundleTime=68
+     [java] 11/11/26, 2:49 PM INFO: ROMDG setupTime=25 bundleTime=6
+     [java] 11/11/26, 2:49 PM INFO: Extracted 700 rows from MOVESWorkerOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/11/26, 2:49 PM INFO: Worker finished processing: 326903741123030981_20_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: Worker is idle
+     [java] 11/11/26, 2:49 PM DEBUG: Worker found 2 TODO files.
+     [java] 11/11/26, 2:49 PM INFO: Found work file: 326903741123030981_21_TODO
+     [java] 11/11/26, 2:49 PM INFO: Worker Processing 326903741123030981_21_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/11/26, 2:49 PM INFO: WorkerComputerID=ccc0236.campuscluster.illinois.edu
+     [java] 11/11/26, 2:49 PM INFO: WorkerID=6533668697583852935
+     [java] 11/11/26, 2:49 PM DEBUG: Run /opt/moves/calc/externalcalculatorgo64.exe in /opt/moves/MOVESTemporary/manyworkers/workerfolder/WorkerTemp21
+     [java] 11/11/26, 2:49 PM DEBUG: Command line = 
+     [java] 11/11/26, 2:49 PM DEBUG: -isproject=0
+     [java] 11/11/26, 2:49 PM DEBUG: 
+     [java] 11/11/26, 2:49 PM INFO: Time spent on running the external calculator (sec): 0.09200000017881393
+     [java] 11/11/26, 2:49 PM INFO: Time spent on absorbing external calculator results (sec): 0.03099999949336052
+     [java] 11/11/26, 2:49 PM INFO: TAG SourceTypeHour2 ms=53
+     [java] 11/11/26, 2:49 PM INFO: TAG AverageSpeed ms=25
+     [java] 11/11/26, 2:49 PM INFO: TAG SHOByAgeRoadwayHour ms=155
+     [java] 11/11/26, 2:49 PM INFO: Extracted 180 rows from MOVESWorkerOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/11/26, 2:49 PM INFO: Worker finished processing: 326903741123030981_21_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: Worker is idle
+     [java] 11/11/26, 2:49 PM INFO: Found work file: 326903741123030981_22_TODO
+     [java] 11/11/26, 2:49 PM INFO: TAG IdleHoursByAgeHour ms=67
+     [java] 11/11/26, 2:49 PM INFO: TAG StartsByAgeHour ms=72
+     [java] 11/11/26, 2:49 PM INFO: Worker Processing 326903741123030981_22_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/11/26, 2:49 PM INFO: WorkerComputerID=ccc0236.campuscluster.illinois.edu
+     [java] 11/11/26, 2:49 PM INFO: WorkerID=6533668697583852935
+     [java] 11/11/26, 2:49 PM DEBUG: Run /opt/moves/calc/externalcalculatorgo64.exe in /opt/moves/MOVESTemporary/manyworkers/workerfolder/WorkerTemp22
+     [java] 11/11/26, 2:49 PM DEBUG: Command line = 
+     [java] 11/11/26, 2:49 PM DEBUG: -isproject=0
+     [java] 11/11/26, 2:49 PM DEBUG: 
+     [java] 11/11/26, 2:49 PM INFO: Time spent on running the external calculator (sec): 0.15299999713897705
+     [java] 11/11/26, 2:49 PM INFO: Time spent on absorbing external calculator results (sec): 0.029999999329447746
+     [java] 11/11/26, 2:49 PM INFO: TAG SHPByAgeHour ms=296
+     [java] 11/11/26, 2:49 PM INFO: Extracted 180 rows from MOVESWorkerOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/11/26, 2:49 PM INFO: Received bundle from worker
+     [java] 11/11/26, 2:49 PM INFO: Worker finished processing: 326903741123030981_22_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: Worker is idle
+     [java] 11/11/26, 2:49 PM INFO: Bundle 20 is from worker: 'ccc0236.campuscluster.illinois.edu'/'MOVES5.0.1'/'6533668697583852935'
+     [java] 11/11/26, 2:49 PM INFO: Received bundle from worker
+     [java] 11/11/26, 2:49 PM INFO: Bundle 21 is from worker: 'ccc0236.campuscluster.illinois.edu'/'MOVES5.0.1'/'6533668697583852935'
+     [java] 11/11/26, 2:49 PM INFO: TAG setupTime=247 growthTime=6644 bundleTime=11611 focusTime=0
+     [java] 11/11/26, 2:49 PM DEBUG: Not normalizing sourcebin-weighted emission rates
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 1 of 6
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 2 of 6
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 3 of 6
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 4 of 6
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 5 of 6
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 6 of 6
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 1 of 2
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 2 of 2
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDDISTANCERATE: 1 of 1
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 1 of 1
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 1 of 1
+     [java] 11/11/26, 2:49 PM INFO: BRG SBW running concurrent statements...
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 1 of 3
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 2 of 3
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 3 of 3
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 1 of 3
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 2 of 3
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 3 of 3
+     [java] 11/11/26, 2:49 PM INFO: BRG SBW done running concurrent statements.
+     [java] 11/11/26, 2:49 PM INFO: Statements done: 17
+     [java] 11/11/26, 2:49 PM INFO: Avg. Concurrent Statements: 1.1176470588235294
+     [java] 11/11/26, 2:49 PM INFO: Max. Concurrent Statements: 2
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=229
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator: processID=90, applyAvgSpeedDistribution=false, useAvgSpeedBin=false, applySourceBinDistribution=true, keepOpModeID=false, avgSpeedFraction="", sumSBD="*sumSBD"
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator processID=90, roadTypeID=0, yearID=2020 has 1 iterations
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator executing concurrent SQL...
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #BASERATE: 1 of 2
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #BASERATE: 2 of 2
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #BASERATEBYAGE: 1 of 1
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator executing BaseRateByAgeHelper...
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator executing BaseRateByAgeHelper Done
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator concurrent SQL done.
+     [java] 11/11/26, 2:49 PM INFO: Statements done: 3
+     [java] 11/11/26, 2:49 PM INFO: Avg. Concurrent Statements: 1.0
+     [java] 11/11/26, 2:49 PM INFO: Max. Concurrent Statements: 1
+     [java] 11/11/26, 2:49 PM DEBUG: Done with BaseRateGenerator processID=90, roadTypeID=0, yearID=2020
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator.generateBaseRates ms=82
+     [java] 11/11/26, 2:49 PM INFO: BRG setupTime=49 bundleTime=3653
+     [java] 11/11/26, 2:49 PM INFO: Saved bundle file 326903741123030981_23_TODO
+     [java] 11/11/26, 2:49 PM INFO: Received bundle from worker
+     [java] 11/11/26, 2:49 PM INFO: Created bundle 23 for workers to process
+     [java] 11/11/26, 2:49 PM INFO: Bundle 22 is from worker: 'ccc0236.campuscluster.illinois.edu'/'MOVES5.0.1'/'6533668697583852935'
+     [java] 11/11/26, 2:49 PM INFO: Saved bundle file 326903741123030981_24_TODO
+     [java] 11/11/26, 2:49 PM INFO: Created bundle 24 for workers to process
+     [java] 11/11/26, 2:49 PM INFO: newSBDG setupTime=2 bundleTime=0
+     [java] 11/11/26, 2:49 PM INFO: ROMDG setupTime=25 bundleTime=6
+     [java] 11/11/26, 2:49 PM INFO: TAG SourceTypeHour2 ms=63
+     [java] 11/11/26, 2:49 PM INFO: TAG AverageSpeed ms=21
+     [java] 11/11/26, 2:49 PM INFO: TAG SHOByAgeRoadwayHour ms=258
+     [java] 11/11/26, 2:49 PM INFO: TAG IdleHoursByAgeHour ms=120
+     [java] 11/11/26, 2:49 PM INFO: TAG StartsByAgeHour ms=83
+     [java] 11/11/26, 2:49 PM INFO: TAG SHPByAgeHour ms=468
+     [java] 11/11/26, 2:49 PM INFO: TAG setupTime=247 growthTime=7383 bundleTime=12647 focusTime=0
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/11/26, 2:49 PM INFO: BRG setupTime=49 bundleTime=3653
+     [java] 11/11/26, 2:49 PM INFO: newSBDG setupTime=2 bundleTime=0
+     [java] 11/11/26, 2:49 PM INFO: ROMDG setupTime=25 bundleTime=6
+     [java] 11/11/26, 2:49 PM INFO: TAG SourceTypeHour2 ms=41
+     [java] 11/11/26, 2:49 PM INFO: TAG AverageSpeed ms=21
+     [java] 11/11/26, 2:49 PM INFO: TAG SHOByAgeRoadwayHour ms=144
+     [java] 11/11/26, 2:49 PM INFO: TAG IdleHoursByAgeHour ms=61
+     [java] 11/11/26, 2:49 PM INFO: TAG StartsByAgeHour ms=76
+     [java] 11/11/26, 2:49 PM INFO: TAG SHPByAgeHour ms=324
+     [java] 11/11/26, 2:49 PM INFO: TAG setupTime=247 growthTime=7998 bundleTime=13332 focusTime=0
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/11/26, 2:49 PM INFO: BRG setupTime=49 bundleTime=3654
+     [java] 11/11/26, 2:49 PM INFO: newSBDG setupTime=2 bundleTime=0
+     [java] 11/11/26, 2:49 PM INFO: ROMDG setupTime=25 bundleTime=6
+     [java] 11/11/26, 2:49 PM INFO: TAG SourceTypeHour2 ms=52
+     [java] 11/11/26, 2:49 PM INFO: TAG AverageSpeed ms=21
+     [java] 11/11/26, 2:49 PM INFO: TAG SHOByAgeRoadwayHour ms=148
+     [java] 11/11/26, 2:49 PM INFO: TAG IdleHoursByAgeHour ms=60
+     [java] 11/11/26, 2:49 PM INFO: TAG StartsByAgeHour ms=72
+     [java] 11/11/26, 2:49 PM INFO: TAG SHPByAgeHour ms=306
+     [java] 11/11/26, 2:49 PM INFO: TAG setupTime=247 growthTime=8609 bundleTime=14003 focusTime=0
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/11/26, 2:49 PM INFO: BRG setupTime=49 bundleTime=3654
+     [java] 11/11/26, 2:49 PM INFO: newSBDG setupTime=2 bundleTime=0
+     [java] 11/11/26, 2:49 PM INFO: ROMDG setupTime=25 bundleTime=6
+     [java] 11/11/26, 2:49 PM INFO: TAG SourceTypeHour2 ms=56
+     [java] 11/11/26, 2:49 PM INFO: TAG AverageSpeed ms=23
+     [java] 11/11/26, 2:49 PM INFO: TAG SHOByAgeRoadwayHour ms=126
+     [java] 11/11/26, 2:49 PM INFO: TAG IdleHoursByAgeHour ms=51
+     [java] 11/11/26, 2:49 PM INFO: TAG StartsByAgeHour ms=97
+     [java] 11/11/26, 2:49 PM INFO: TAG SHPByAgeHour ms=289
+     [java] 11/11/26, 2:49 PM INFO: TAG setupTime=247 growthTime=9300 bundleTime=14660 focusTime=0
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/11/26, 2:49 PM INFO: BRG setupTime=49 bundleTime=3654
+     [java] 11/11/26, 2:49 PM INFO: newSBDG setupTime=2 bundleTime=0
+     [java] 11/11/26, 2:49 PM INFO: ROMDG setupTime=25 bundleTime=6
+     [java] 11/11/26, 2:49 PM INFO: TAG SourceTypeHour2 ms=46
+     [java] 11/11/26, 2:49 PM INFO: TAG AverageSpeed ms=20
+     [java] 11/11/26, 2:49 PM INFO: TAG SHOByAgeRoadwayHour ms=134
+     [java] 11/11/26, 2:49 PM INFO: TAG IdleHoursByAgeHour ms=52
+     [java] 11/11/26, 2:49 PM INFO: TAG StartsByAgeHour ms=66
+     [java] 11/11/26, 2:49 PM INFO: TAG SHPByAgeHour ms=295
+     [java] 11/11/26, 2:49 PM INFO: TAG setupTime=247 growthTime=9865 bundleTime=15287 focusTime=0
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/11/26, 2:49 PM INFO: BRG setupTime=49 bundleTime=3654
+     [java] 11/11/26, 2:49 PM INFO: newSBDG setupTime=2 bundleTime=0
+     [java] 11/11/26, 2:49 PM INFO: ROMDG setupTime=25 bundleTime=6
+     [java] 11/11/26, 2:49 PM INFO: TAG SourceTypeHour2 ms=43
+     [java] 11/11/26, 2:49 PM INFO: TAG AverageSpeed ms=21
+     [java] 11/11/26, 2:49 PM INFO: TAG SHOByAgeRoadwayHour ms=127
+     [java] 11/11/26, 2:49 PM INFO: TAG IdleHoursByAgeHour ms=52
+     [java] 11/11/26, 2:49 PM INFO: TAG StartsByAgeHour ms=80
+     [java] 11/11/26, 2:49 PM INFO: TAG SHPByAgeHour ms=313
+     [java] 11/11/26, 2:49 PM INFO: TAG setupTime=247 growthTime=10579 bundleTime=15937 focusTime=0
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/11/26, 2:49 PM INFO: BRG setupTime=49 bundleTime=3654
+     [java] 11/11/26, 2:49 PM INFO: newSBDG setupTime=2 bundleTime=0
+     [java] 11/11/26, 2:49 PM INFO: ROMDG setupTime=25 bundleTime=6
+     [java] 11/11/26, 2:49 PM INFO: TAG SourceTypeHour2 ms=44
+     [java] 11/11/26, 2:49 PM INFO: TAG AverageSpeed ms=33
+     [java] 11/11/26, 2:49 PM INFO: TAG SHOByAgeRoadwayHour ms=237
+     [java] 11/11/26, 2:49 PM INFO: TAG IdleHoursByAgeHour ms=78
+     [java] 11/11/26, 2:49 PM INFO: TAG StartsByAgeHour ms=79
+     [java] 11/11/26, 2:49 PM INFO: TAG SHPByAgeHour ms=358
+     [java] 11/11/26, 2:49 PM INFO: TAG setupTime=247 growthTime=11126 bundleTime=16779 focusTime=0
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/11/26, 2:49 PM INFO: BRG setupTime=49 bundleTime=3654
+     [java] 11/11/26, 2:49 PM INFO: newSBDG setupTime=2 bundleTime=0
+     [java] 11/11/26, 2:49 PM INFO: ROMDG setupTime=25 bundleTime=6
+     [java] 11/11/26, 2:49 PM INFO: TAG SourceTypeHour2 ms=69
+     [java] 11/11/26, 2:49 PM INFO: TAG AverageSpeed ms=33
+     [java] 11/11/26, 2:49 PM INFO: TAG SHOByAgeRoadwayHour ms=226
+     [java] 11/11/26, 2:49 PM INFO: TAG IdleHoursByAgeHour ms=79
+     [java] 11/11/26, 2:49 PM INFO: TAG StartsByAgeHour ms=80
+     [java] 11/11/26, 2:49 PM INFO: TAG SHPByAgeHour ms=477
+     [java] 11/11/26, 2:49 PM INFO: TAG setupTime=247 growthTime=11801 bundleTime=17763 focusTime=0
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/11/26, 2:49 PM INFO: BRG setupTime=49 bundleTime=3655
+     [java] 11/11/26, 2:49 PM INFO: MetGen setupTime=165 bundleTime=0
+     [java] 11/11/26, 2:49 PM DEBUG: newSBD Generator called for process: Auxiliary Power Exhaust
+     [java] 11/11/26, 2:49 PM DEBUG: Processing pollutant-process: Total Energy Consumption - Auxiliary Power Exhaust
+     [java] 11/11/26, 2:49 PM INFO: newSBDG setupTime=2 bundleTime=179
+     [java] 11/11/26, 2:49 PM DEBUG: RatesOpModeDistributionGenerator.calculateOpModeFractions ms=7
+     [java] 11/11/26, 2:49 PM INFO: ROMDG setupTime=25 bundleTime=13
+     [java] 11/11/26, 2:49 PM INFO: TAG SourceTypeHour2 ms=46
+     [java] 11/11/26, 2:49 PM INFO: TAG AverageSpeed ms=33
+     [java] 11/11/26, 2:49 PM INFO: TAG SHOByAgeRoadwayHour ms=235
+     [java] 11/11/26, 2:49 PM INFO: TAG IdleHoursByAgeHour ms=77
+     [java] 11/11/26, 2:49 PM INFO: TAG StartsByAgeHour ms=77
+     [java] 11/11/26, 2:49 PM INFO: TAG SHPByAgeHour ms=460
+     [java] 11/11/26, 2:49 PM DEBUG: Worker found 2 TODO files.
+     [java] 11/11/26, 2:49 PM INFO: Found work file: 326903741123030981_23_TODO
+     [java] 11/11/26, 2:49 PM INFO: Worker Processing 326903741123030981_23_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/11/26, 2:49 PM INFO: WorkerComputerID=ccc0236.campuscluster.illinois.edu
+     [java] 11/11/26, 2:49 PM INFO: WorkerID=6533668697583852935
+     [java] 11/11/26, 2:49 PM DEBUG: Run /opt/moves/calc/externalcalculatorgo64.exe in /opt/moves/MOVESTemporary/manyworkers/workerfolder/WorkerTemp23
+     [java] 11/11/26, 2:49 PM DEBUG: Command line = 
+     [java] 11/11/26, 2:49 PM DEBUG: -isproject=0
+     [java] 11/11/26, 2:49 PM DEBUG: 
+     [java] 11/11/26, 2:49 PM INFO: Time spent on running the external calculator (sec): 0.1080000028014183
+     [java] 11/11/26, 2:49 PM INFO: Time spent on absorbing external calculator results (sec): 0.032999999821186066
+     [java] 11/11/26, 2:49 PM INFO: Extracted 200 rows from MOVESWorkerOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/11/26, 2:49 PM INFO: Worker finished processing: 326903741123030981_23_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: Worker is idle
+     [java] 11/11/26, 2:49 PM INFO: Found work file: 326903741123030981_24_TODO
+     [java] 11/11/26, 2:49 PM INFO: Worker Processing 326903741123030981_24_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/11/26, 2:49 PM INFO: WorkerComputerID=ccc0236.campuscluster.illinois.edu
+     [java] 11/11/26, 2:49 PM INFO: WorkerID=6533668697583852935
+     [java] 11/11/26, 2:49 PM DEBUG: Run /opt/moves/calc/externalcalculatorgo64.exe in /opt/moves/MOVESTemporary/manyworkers/workerfolder/WorkerTemp24
+     [java] 11/11/26, 2:49 PM DEBUG: Command line = 
+     [java] 11/11/26, 2:49 PM DEBUG: -isproject=0
+     [java] 11/11/26, 2:49 PM DEBUG: 
+     [java] 11/11/26, 2:49 PM INFO: Time spent on running the external calculator (sec): 0.1080000028014183
+     [java] 11/11/26, 2:49 PM INFO: Time spent on absorbing external calculator results (sec): 0.035999998450279236
+     [java] 11/11/26, 2:49 PM INFO: Extracted 200 rows from MOVESWorkerOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/11/26, 2:49 PM INFO: Worker finished processing: 326903741123030981_24_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: Worker is idle
+     [java] 11/11/26, 2:49 PM INFO: TAG setupTime=247 growthTime=12577 bundleTime=20804 focusTime=0
+     [java] 11/11/26, 2:49 PM DEBUG: Base Rate Generator called for process: Auxiliary Power Exhaust
+     [java] 11/11/26, 2:49 PM DEBUG: Not normalizing sourcebin-weighted emission rates
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 1 of 6
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 2 of 6
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 3 of 6
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 4 of 6
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 5 of 6
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 6 of 6
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 1 of 2
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 2 of 2
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDDISTANCERATE: 1 of 1
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 1 of 1
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 1 of 1
+     [java] 11/11/26, 2:49 PM INFO: BRG SBW running concurrent statements...
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 1 of 3
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 1 of 3
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 2 of 3
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 3 of 3
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 2 of 3
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 3 of 3
+     [java] 11/11/26, 2:49 PM INFO: BRG SBW done running concurrent statements.
+     [java] 11/11/26, 2:49 PM INFO: Statements done: 17
+     [java] 11/11/26, 2:49 PM INFO: Avg. Concurrent Statements: 1.4705882352941178
+     [java] 11/11/26, 2:49 PM INFO: Max. Concurrent Statements: 3
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=193
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator: processID=91, applyAvgSpeedDistribution=false, useAvgSpeedBin=false, applySourceBinDistribution=true, keepOpModeID=false, avgSpeedFraction="", sumSBD="*sumSBD"
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator processID=91, roadTypeID=0, yearID=2015 has 1 iterations
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator executing concurrent SQL...
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #BASERATE: 1 of 2
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #BASERATEBYAGE: 1 of 1
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator executing BaseRateByAgeHelper...
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #BASERATE: 2 of 2
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator executing BaseRateByAgeHelper Done
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator concurrent SQL done.
+     [java] 11/11/26, 2:49 PM INFO: Statements done: 3
+     [java] 11/11/26, 2:49 PM INFO: Avg. Concurrent Statements: 1.6666666666666667
+     [java] 11/11/26, 2:49 PM INFO: Max. Concurrent Statements: 2
+     [java] 11/11/26, 2:49 PM DEBUG: Done with BaseRateGenerator processID=91, roadTypeID=0, yearID=2015
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator.generateBaseRates ms=43
+     [java] 11/11/26, 2:49 PM INFO: BRG setupTime=49 bundleTime=3892
+     [java] 11/11/26, 2:49 PM INFO: Received bundle from worker
+     [java] 11/11/26, 2:49 PM INFO: Bundle 23 is from worker: 'ccc0236.campuscluster.illinois.edu'/'MOVES5.0.1'/'6533668697583852935'
+     [java] 11/11/26, 2:49 PM INFO: Received bundle from worker
+     [java] 11/11/26, 2:49 PM INFO: Bundle 24 is from worker: 'ccc0236.campuscluster.illinois.edu'/'MOVES5.0.1'/'6533668697583852935'
+     [java] 11/11/26, 2:49 PM INFO: Saved bundle file 326903741123030981_25_TODO
+     [java] 11/11/26, 2:49 PM INFO: Created bundle 25 for workers to process
+     [java] 11/11/26, 2:49 PM INFO: Saved bundle file 326903741123030981_26_TODO
+     [java] 11/11/26, 2:49 PM INFO: Created bundle 26 for workers to process
+     [java] 11/11/26, 2:49 PM INFO: newSBDG setupTime=2 bundleTime=58
+     [java] 11/11/26, 2:49 PM INFO: ROMDG setupTime=25 bundleTime=13
+     [java] 11/11/26, 2:49 PM INFO: TAG SourceTypeHour2 ms=47
+     [java] 11/11/26, 2:49 PM INFO: TAG AverageSpeed ms=20
+     [java] 11/11/26, 2:49 PM INFO: TAG SHOByAgeRoadwayHour ms=132
+     [java] 11/11/26, 2:49 PM INFO: TAG IdleHoursByAgeHour ms=52
+     [java] 11/11/26, 2:49 PM INFO: TAG StartsByAgeHour ms=75
+     [java] 11/11/26, 2:49 PM INFO: TAG SHPByAgeHour ms=300
+     [java] 11/11/26, 2:49 PM INFO: TAG setupTime=247 growthTime=13130 bundleTime=23184 focusTime=0
+     [java] 11/11/26, 2:49 PM DEBUG: Not normalizing sourcebin-weighted emission rates
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 1 of 6
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 2 of 6
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 3 of 6
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 4 of 6
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 5 of 6
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 6 of 6
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 1 of 2
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #CORE: 2 of 2
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDDISTANCERATE: 1 of 1
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 1 of 1
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 1 of 1
+     [java] 11/11/26, 2:49 PM INFO: BRG SBW running concurrent statements...
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 1 of 3
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 1 of 3
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 2 of 3
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATEBYAGE: 3 of 3
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 2 of 3
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #SBWEIGHTEDEMISSIONRATE: 3 of 3
+     [java] 11/11/26, 2:49 PM INFO: BRG SBW done running concurrent statements.
+     [java] 11/11/26, 2:49 PM INFO: Statements done: 17
+     [java] 11/11/26, 2:49 PM INFO: Avg. Concurrent Statements: 1.411764705882353
+     [java] 11/11/26, 2:49 PM INFO: Max. Concurrent Statements: 3
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=173
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator: processID=91, applyAvgSpeedDistribution=false, useAvgSpeedBin=false, applySourceBinDistribution=true, keepOpModeID=false, avgSpeedFraction="", sumSBD="*sumSBD"
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator processID=91, roadTypeID=0, yearID=2020 has 1 iterations
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator executing concurrent SQL...
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #BASERATE: 1 of 2
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #BASERATE: 2 of 2
+     [java] 11/11/26, 2:49 PM INFO: Running Statement: #BASERATEBYAGE: 1 of 1
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator executing BaseRateByAgeHelper...
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator executing BaseRateByAgeHelper Done
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator concurrent SQL done.
+     [java] 11/11/26, 2:49 PM INFO: Statements done: 3
+     [java] 11/11/26, 2:49 PM INFO: Avg. Concurrent Statements: 1.3333333333333333
+     [java] 11/11/26, 2:49 PM INFO: Max. Concurrent Statements: 2
+     [java] 11/11/26, 2:49 PM DEBUG: Done with BaseRateGenerator processID=91, roadTypeID=0, yearID=2020
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator.generateBaseRates ms=33
+     [java] 11/11/26, 2:49 PM INFO: BRG setupTime=49 bundleTime=4098
+     [java] 11/11/26, 2:49 PM INFO: Saved bundle file 326903741123030981_27_TODO
+     [java] 11/11/26, 2:49 PM INFO: Created bundle 27 for workers to process
+     [java] 11/11/26, 2:49 PM INFO: Saved bundle file 326903741123030981_28_TODO
+     [java] 11/11/26, 2:49 PM INFO: Created bundle 28 for workers to process
+     [java] 11/11/26, 2:49 PM INFO: newSBDG setupTime=2 bundleTime=0
+     [java] 11/11/26, 2:49 PM INFO: ROMDG setupTime=25 bundleTime=13
+     [java] 11/11/26, 2:49 PM INFO: TAG SourceTypeHour2 ms=45
+     [java] 11/11/26, 2:49 PM INFO: TAG AverageSpeed ms=21
+     [java] 11/11/26, 2:49 PM INFO: TAG SHOByAgeRoadwayHour ms=153
+     [java] 11/11/26, 2:49 PM INFO: TAG IdleHoursByAgeHour ms=56
+     [java] 11/11/26, 2:49 PM INFO: TAG StartsByAgeHour ms=71
+     [java] 11/11/26, 2:49 PM INFO: TAG SHPByAgeHour ms=319
+     [java] 11/11/26, 2:49 PM INFO: TAG setupTime=247 growthTime=13780 bundleTime=23864 focusTime=0
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/11/26, 2:49 PM INFO: BRG setupTime=49 bundleTime=4099
+     [java] 11/11/26, 2:49 PM INFO: newSBDG setupTime=2 bundleTime=0
+     [java] 11/11/26, 2:49 PM INFO: ROMDG setupTime=25 bundleTime=13
+     [java] 11/11/26, 2:49 PM INFO: TAG SourceTypeHour2 ms=52
+     [java] 11/11/26, 2:49 PM INFO: TAG AverageSpeed ms=21
+     [java] 11/11/26, 2:49 PM INFO: TAG SHOByAgeRoadwayHour ms=147
+     [java] 11/11/26, 2:49 PM INFO: TAG IdleHoursByAgeHour ms=61
+     [java] 11/11/26, 2:49 PM INFO: TAG StartsByAgeHour ms=77
+     [java] 11/11/26, 2:49 PM INFO: TAG SHPByAgeHour ms=317
+     [java] 11/11/26, 2:49 PM INFO: TAG setupTime=247 growthTime=14472 bundleTime=24557 focusTime=0
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/11/26, 2:49 PM INFO: BRG setupTime=49 bundleTime=4112
+     [java] 11/11/26, 2:49 PM INFO: newSBDG setupTime=2 bundleTime=0
+     [java] 11/11/26, 2:49 PM INFO: ROMDG setupTime=25 bundleTime=13
+     [java] 11/11/26, 2:49 PM INFO: TAG SourceTypeHour2 ms=45
+     [java] 11/11/26, 2:49 PM INFO: TAG AverageSpeed ms=20
+     [java] 11/11/26, 2:49 PM INFO: TAG SHOByAgeRoadwayHour ms=147
+     [java] 11/11/26, 2:49 PM INFO: TAG IdleHoursByAgeHour ms=59
+     [java] 11/11/26, 2:49 PM INFO: TAG StartsByAgeHour ms=71
+     [java] 11/11/26, 2:49 PM INFO: TAG SHPByAgeHour ms=320
+     [java] 11/11/26, 2:49 PM INFO: TAG setupTime=247 growthTime=15074 bundleTime=25245 focusTime=0
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/11/26, 2:49 PM INFO: BRG setupTime=49 bundleTime=4112
+     [java] 11/11/26, 2:49 PM INFO: newSBDG setupTime=2 bundleTime=0
+     [java] 11/11/26, 2:49 PM INFO: ROMDG setupTime=25 bundleTime=13
+     [java] 11/11/26, 2:49 PM INFO: TAG SourceTypeHour2 ms=45
+     [java] 11/11/26, 2:49 PM INFO: TAG AverageSpeed ms=21
+     [java] 11/11/26, 2:49 PM INFO: TAG SHOByAgeRoadwayHour ms=132
+     [java] 11/11/26, 2:49 PM INFO: TAG IdleHoursByAgeHour ms=51
+     [java] 11/11/26, 2:49 PM INFO: TAG StartsByAgeHour ms=68
+     [java] 11/11/26, 2:49 PM INFO: TAG SHPByAgeHour ms=300
+     [java] 11/11/26, 2:49 PM INFO: TAG setupTime=247 growthTime=15668 bundleTime=25876 focusTime=0
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/11/26, 2:49 PM INFO: BRG setupTime=49 bundleTime=4112
+     [java] 11/11/26, 2:49 PM INFO: newSBDG setupTime=2 bundleTime=0
+     [java] 11/11/26, 2:49 PM INFO: ROMDG setupTime=25 bundleTime=13
+     [java] 11/11/26, 2:49 PM INFO: TAG SourceTypeHour2 ms=42
+     [java] 11/11/26, 2:49 PM INFO: TAG AverageSpeed ms=33
+     [java] 11/11/26, 2:49 PM INFO: TAG SHOByAgeRoadwayHour ms=233
+     [java] 11/11/26, 2:49 PM INFO: TAG IdleHoursByAgeHour ms=81
+     [java] 11/11/26, 2:49 PM INFO: TAG StartsByAgeHour ms=77
+     [java] 11/11/26, 2:49 PM DEBUG: Worker found 4 TODO files.
+     [java] 11/11/26, 2:49 PM INFO: Found work file: 326903741123030981_25_TODO
+     [java] 11/11/26, 2:49 PM INFO: Worker Processing 326903741123030981_25_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/11/26, 2:49 PM INFO: WorkerComputerID=ccc0236.campuscluster.illinois.edu
+     [java] 11/11/26, 2:49 PM INFO: WorkerID=6533668697583852935
+     [java] 11/11/26, 2:49 PM DEBUG: Run /opt/moves/calc/externalcalculatorgo64.exe in /opt/moves/MOVESTemporary/manyworkers/workerfolder/WorkerTemp25
+     [java] 11/11/26, 2:49 PM DEBUG: Command line = 
+     [java] 11/11/26, 2:49 PM DEBUG: -isproject=0
+     [java] 11/11/26, 2:49 PM DEBUG: 
+     [java] 11/11/26, 2:49 PM INFO: TAG SHPByAgeHour ms=502
+     [java] 11/11/26, 2:49 PM INFO: TAG setupTime=247 growthTime=16468 bundleTime=26858 focusTime=0
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/11/26, 2:49 PM INFO: BRG setupTime=49 bundleTime=4112
+     [java] 11/11/26, 2:49 PM INFO: newSBDG setupTime=2 bundleTime=0
+     [java] 11/11/26, 2:49 PM INFO: ROMDG setupTime=25 bundleTime=13
+     [java] 11/11/26, 2:49 PM INFO: Time spent on running the external calculator (sec): 0.13899999856948853
+     [java] 11/11/26, 2:49 PM INFO: Time spent on absorbing external calculator results (sec): 0.035999998450279236
+     [java] 11/11/26, 2:49 PM INFO: Extracted 344 rows from MOVESWorkerOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/11/26, 2:49 PM INFO: Worker finished processing: 326903741123030981_25_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: Worker is idle
+     [java] 11/11/26, 2:49 PM INFO: Found work file: 326903741123030981_26_TODO
+     [java] 11/11/26, 2:49 PM INFO: Worker Processing 326903741123030981_26_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/11/26, 2:49 PM INFO: WorkerComputerID=ccc0236.campuscluster.illinois.edu
+     [java] 11/11/26, 2:49 PM INFO: Received bundle from worker
+     [java] 11/11/26, 2:49 PM INFO: WorkerID=6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: Bundle 25 is from worker: 'ccc0236.campuscluster.illinois.edu'/'MOVES5.0.1'/'6533668697583852935'
+     [java] 11/11/26, 2:49 PM DEBUG: Run /opt/moves/calc/externalcalculatorgo64.exe in /opt/moves/MOVESTemporary/manyworkers/workerfolder/WorkerTemp26
+     [java] 11/11/26, 2:49 PM DEBUG: Command line = 
+     [java] 11/11/26, 2:49 PM DEBUG: -isproject=0
+     [java] 11/11/26, 2:49 PM DEBUG: 
+     [java] 11/11/26, 2:49 PM INFO: TAG SourceTypeHour2 ms=60
+     [java] 11/11/26, 2:49 PM INFO: TAG AverageSpeed ms=29
+     [java] 11/11/26, 2:49 PM INFO: Time spent on running the external calculator (sec): 0.1679999977350235
+     [java] 11/11/26, 2:49 PM INFO: Time spent on absorbing external calculator results (sec): 0.03500000014901161
+     [java] 11/11/26, 2:49 PM INFO: TAG SHOByAgeRoadwayHour ms=183
+     [java] 11/11/26, 2:49 PM INFO: TAG IdleHoursByAgeHour ms=74
+     [java] 11/11/26, 2:49 PM INFO: TAG StartsByAgeHour ms=64
+     [java] 11/11/26, 2:49 PM INFO: Extracted 344 rows from MOVESWorkerOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/11/26, 2:49 PM INFO: Worker finished processing: 326903741123030981_26_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: Worker is idle
+     [java] 11/11/26, 2:49 PM INFO: Found work file: 326903741123030981_27_TODO
+     [java] 11/11/26, 2:49 PM INFO: Worker Processing 326903741123030981_27_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: TAG SHPByAgeHour ms=296
+     [java] 11/11/26, 2:49 PM INFO: TAG setupTime=247 growthTime=17239 bundleTime=27579 focusTime=0
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/11/26, 2:49 PM INFO: BRG setupTime=49 bundleTime=4112
+     [java] 11/11/26, 2:49 PM INFO: newSBDG setupTime=2 bundleTime=0
+     [java] 11/11/26, 2:49 PM INFO: ROMDG setupTime=25 bundleTime=13
+     [java] 11/11/26, 2:49 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/11/26, 2:49 PM INFO: WorkerComputerID=ccc0236.campuscluster.illinois.edu
+     [java] 11/11/26, 2:49 PM INFO: WorkerID=6533668697583852935
+     [java] 11/11/26, 2:49 PM DEBUG: Run /opt/moves/calc/externalcalculatorgo64.exe in /opt/moves/MOVESTemporary/manyworkers/workerfolder/WorkerTemp27
+     [java] 11/11/26, 2:49 PM DEBUG: Command line = 
+     [java] 11/11/26, 2:49 PM DEBUG: -isproject=0
+     [java] 11/11/26, 2:49 PM DEBUG: 
+     [java] 11/11/26, 2:49 PM INFO: Time spent on running the external calculator (sec): 0.1420000046491623
+     [java] 11/11/26, 2:49 PM INFO: Time spent on absorbing external calculator results (sec): 0.032999999821186066
+     [java] 11/11/26, 2:49 PM INFO: Extracted 364 rows from MOVESWorkerOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/11/26, 2:49 PM INFO: Worker finished processing: 326903741123030981_27_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: Worker is idle
+     [java] 11/11/26, 2:49 PM INFO: Found work file: 326903741123030981_28_TODO
+     [java] 11/11/26, 2:49 PM INFO: TAG SourceTypeHour2 ms=62
+     [java] 11/11/26, 2:49 PM INFO: TAG AverageSpeed ms=25
+     [java] 11/11/26, 2:49 PM INFO: Worker Processing 326903741123030981_28_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: WorkerVersion=MOVES5.0.1
+     [java] 11/11/26, 2:49 PM INFO: WorkerComputerID=ccc0236.campuscluster.illinois.edu
+     [java] 11/11/26, 2:49 PM INFO: WorkerID=6533668697583852935
+     [java] 11/11/26, 2:49 PM DEBUG: Run /opt/moves/calc/externalcalculatorgo64.exe in /opt/moves/MOVESTemporary/manyworkers/workerfolder/WorkerTemp28
+     [java] 11/11/26, 2:49 PM INFO: TAG SHOByAgeRoadwayHour ms=127
+     [java] 11/11/26, 2:49 PM DEBUG: Command line = 
+     [java] 11/11/26, 2:49 PM DEBUG: -isproject=0
+     [java] 11/11/26, 2:49 PM DEBUG: 
+     [java] 11/11/26, 2:49 PM INFO: TAG IdleHoursByAgeHour ms=63
+     [java] 11/11/26, 2:49 PM INFO: Time spent on running the external calculator (sec): 0.1850000023841858
+     [java] 11/11/26, 2:49 PM INFO: TAG StartsByAgeHour ms=75
+     [java] 11/11/26, 2:49 PM INFO: Time spent on absorbing external calculator results (sec): 0.03400000184774399
+     [java] 11/11/26, 2:49 PM INFO: TAG SHPByAgeHour ms=299
+     [java] 11/11/26, 2:49 PM INFO: TAG setupTime=247 growthTime=17902 bundleTime=28255 focusTime=0
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/11/26, 2:49 PM INFO: BRG setupTime=49 bundleTime=4112
+     [java] 11/11/26, 2:49 PM INFO: newSBDG setupTime=2 bundleTime=0
+     [java] 11/11/26, 2:49 PM INFO: ROMDG setupTime=25 bundleTime=13
+     [java] 11/11/26, 2:49 PM INFO: Received bundle from worker
+     [java] 11/11/26, 2:49 PM INFO: Bundle 26 is from worker: 'ccc0236.campuscluster.illinois.edu'/'MOVES5.0.1'/'6533668697583852935'
+     [java] 11/11/26, 2:49 PM INFO: Received bundle from worker
+     [java] 11/11/26, 2:49 PM INFO: Bundle 27 is from worker: 'ccc0236.campuscluster.illinois.edu'/'MOVES5.0.1'/'6533668697583852935'
+     [java] 11/11/26, 2:49 PM INFO: Extracted 364 rows from MOVESWorkerOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from MOVESWorkerActivityOutput
+     [java] 11/11/26, 2:49 PM INFO: Extracted 0 rows from BaseRateOutput
+     [java] 11/11/26, 2:49 PM INFO: Worker finished processing: 326903741123030981_28_InProgress_6533668697583852935
+     [java] 11/11/26, 2:49 PM INFO: Worker is idle
+     [java] 11/11/26, 2:49 PM INFO: TAG SourceTypeHour2 ms=64
+     [java] 11/11/26, 2:49 PM INFO: TAG AverageSpeed ms=24
+     [java] 11/11/26, 2:49 PM INFO: TAG SHOByAgeRoadwayHour ms=137
+     [java] 11/11/26, 2:49 PM INFO: TAG IdleHoursByAgeHour ms=60
+     [java] 11/11/26, 2:49 PM INFO: TAG StartsByAgeHour ms=66
+     [java] 11/11/26, 2:49 PM INFO: TAG SHPByAgeHour ms=316
+     [java] 11/11/26, 2:49 PM INFO: TAG setupTime=247 growthTime=18585 bundleTime=28935 focusTime=0
+     [java] 11/11/26, 2:49 PM DEBUG: BaseRateGenerator.generateSBWeightedEmissionRates ms=0
+     [java] 11/11/26, 2:49 PM INFO: BRG setupTime=49 bundleTime=4112
+     [java] 11/11/26, 2:49 PM INFO: Thread shutdown starting for class gov.epa.otaq.moves.master.framework.MasterLoop.
+     [java] 11/11/26, 2:49 PM INFO: Thread shutdown starting for class gov.epa.otaq.moves.master.framework.MasterLoopableThread.
+     [java] 11/11/26, 2:49 PM INFO: Thread shutdown complete for class gov.epa.otaq.moves.master.framework.MasterLoopableThread.
+     [java] 11/11/26, 2:49 PM INFO: Thread shutdown complete for class gov.epa.otaq.moves.master.framework.MasterLoop.
+     [java] 11/11/26, 2:49 PM INFO: Received bundle from worker
+     [java] 11/11/26, 2:49 PM INFO: Bundle 28 is from worker: 'ccc0236.campuscluster.illinois.edu'/'MOVES5.0.1'/'6533668697583852935'
+     [java] 11/11/26, 2:50 PM INFO: Final aggregation is being done by default.
+     [java] 11/11/26, 2:50 PM INFO: Final Aggregation starting...
+     [java] 11/11/26, 2:50 PM INFO: Final Aggregation complete.
+     [java] 11/11/26, 2:50 PM INFO: Unit conversions starting...
+     [java] 11/11/26, 2:50 PM INFO: Time Measurement System = Seconds
+     [java] 11/11/26, 2:50 PM INFO: Output Time Step = Hour
+     [java] 11/11/26, 2:50 PM INFO: Output Time Step average hours = 1.0
+     [java] 11/11/26, 2:50 PM INFO: Unit conversions done.
+     [java] 11/11/26, 2:50 PM INFO: No final post processing required.
+     [java] 11/11/26, 2:50 PM INFO: Unbundler has detected completion conditions. Exiting.
+     [java] 11/11/26, 2:50 PM INFO: Generated bundles = 28 Retrieved bundles = 28
+     [java] 11/11/26, 2:50 PM INFO: Thread shutdown starting for class gov.epa.otaq.moves.master.framework.EmissionCalculatorInboundUnbundler.
+     [java] 11/11/26, 2:50 PM INFO: Thread shutdown complete for class gov.epa.otaq.moves.master.framework.EmissionCalculatorInboundUnbundler.
+     [java] 11/11/26, 2:50 PM INFO: Thread shutdown starting for class gov.epa.otaq.moves.master.framework.HeartbeatDetectionThread.
+     [java] 11/11/26, 2:50 PM INFO: Thread shutdown complete for class gov.epa.otaq.moves.master.framework.HeartbeatDetectionThread.
+     [java] MOVESCommandLine after runApplication
+     [java] 11/11/26, 2:50 PM INFO: Thread shutdown starting for class gov.epa.otaq.moves.worker.framework.WorkerHeartbeatThread.
+     [java] 11/11/26, 2:50 PM INFO: Thread shutdown complete for class gov.epa.otaq.moves.worker.framework.WorkerHeartbeatThread.
+     [echo] MOVES and 1 worker finished.
+     [echo] MOVES has been shutdown, but not MySQL since it was already running.
+
+BUILD SUCCESSFUL
+Total time: 1 minute 25 seconds

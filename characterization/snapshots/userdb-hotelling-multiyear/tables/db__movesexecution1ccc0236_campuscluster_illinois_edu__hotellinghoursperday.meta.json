@@ -1,0 +1,33 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0236_campuscluster_illinois_edu__hotellinghoursperday",
+  "schema": [
+    {
+      "name": "yearID",
+      "kind": "int64"
+    },
+    {
+      "name": "zoneID",
+      "kind": "int64"
+    },
+    {
+      "name": "dayID",
+      "kind": "int64"
+    },
+    {
+      "name": "hotellingHoursPerDay",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "yearID",
+    "zoneID",
+    "dayID"
+  ],
+  "row_count": 4,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "e88109c1b3a8676bbbd0d8f06bda466f13711e48a9e80a689e322b1aeea6aa0a"
+}
