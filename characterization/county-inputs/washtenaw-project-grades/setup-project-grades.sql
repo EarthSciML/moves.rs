@@ -193,7 +193,7 @@ VALUES (1, 26161, 261610, 4, 1.0, 1000.0, 30.0, 'project-grades: restricted, lev
        (2, 26161, 261610, 4, 0.8,  900.0, 30.0, 'project-grades: restricted, uphill', 4.0),
        (3, 26161, 261610, 5, 0.5,  600.0, 25.0, 'project-grades: unrestricted, downhill', -3.0),
        (4, 26161, 261610, 4, 1.2, 1200.0, 80.0, 'project-grades: restricted, above every schedule', 0.0),
-       (5, 26161, 261610, 5, 0.2,  300.0,  2.0, 'project-grades: unrestricted, below source type 21''s schedules', 1.5);
+       (5, 26161, 261610, 5, 0.2,  300.0,  2.0, 'project-grades: unrestricted, below every source type 21 schedule', 1.5);
 
 CREATE TABLE IF NOT EXISTS linkSourceTypeHour LIKE movesdb20241112.linkSourceTypeHour;
 INSERT INTO linkSourceTypeHour (linkID, sourceTypeID, sourceTypeHourFraction)
