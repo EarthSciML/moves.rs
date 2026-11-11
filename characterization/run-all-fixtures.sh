@@ -123,6 +123,11 @@ declare -a SKIP_BY_DEFAULT=(
     "project-grades"
     "project-useromd-gaps"
     "project-startconflict"
+    # project-driveschedule, project-zerospeed: a user drive schedule on two
+    # links (driveScheduleSecondLink), and an on-network link of zero speed,
+    # which the generator walks as thirty seconds of idling.
+    "project-driveschedule"
+    "project-zerospeed"
     # error-*: deliberately invalid RunSpecs that are expected to fail parsing.
     # They are tested by the Rust regression suite's error_fixtures_return_expected_errors
     # test, not by canonical-MOVES runs.
@@ -278,7 +283,7 @@ county_sql_for() {
             echo "${HERE}/county-inputs/washtenaw-project-crankcase/setup-project-crankcase.sql" ;;
         project-useromd|rates-project-useromd)
             echo "${HERE}/county-inputs/washtenaw-project-useromd/setup-project-useromd.sql" ;;
-        project-multilink|project-grades|project-useromd-gaps|project-startconflict)
+        project-multilink|project-grades|project-useromd-gaps|project-startconflict|project-driveschedule|project-zerospeed)
             echo "${HERE}/county-inputs/washtenaw-$1/setup-$1.sql" ;;
         *)
             echo "" ;;
