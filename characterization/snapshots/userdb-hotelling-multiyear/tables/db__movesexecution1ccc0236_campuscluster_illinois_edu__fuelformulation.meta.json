@@ -1,0 +1,91 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0236_campuscluster_illinois_edu__fuelformulation",
+  "schema": [
+    {
+      "name": "fuelFormulationID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelSubtypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "RVP",
+      "kind": "float64"
+    },
+    {
+      "name": "sulfurLevel",
+      "kind": "float64"
+    },
+    {
+      "name": "ETOHVolume",
+      "kind": "float64"
+    },
+    {
+      "name": "MTBEVolume",
+      "kind": "float64"
+    },
+    {
+      "name": "ETBEVolume",
+      "kind": "float64"
+    },
+    {
+      "name": "TAMEVolume",
+      "kind": "float64"
+    },
+    {
+      "name": "aromaticContent",
+      "kind": "float64"
+    },
+    {
+      "name": "olefinContent",
+      "kind": "float64"
+    },
+    {
+      "name": "benzeneContent",
+      "kind": "float64"
+    },
+    {
+      "name": "e200",
+      "kind": "float64"
+    },
+    {
+      "name": "e300",
+      "kind": "float64"
+    },
+    {
+      "name": "volToWtPercentOxy",
+      "kind": "float64"
+    },
+    {
+      "name": "BioDieselEsterVolume",
+      "kind": "float64"
+    },
+    {
+      "name": "CetaneIndex",
+      "kind": "float64"
+    },
+    {
+      "name": "PAHContent",
+      "kind": "float64"
+    },
+    {
+      "name": "T50",
+      "kind": "float64"
+    },
+    {
+      "name": "T90",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "fuelFormulationID"
+  ],
+  "row_count": 2160,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "50c616a75f463657c04fdc83993e32907d8dbb55aa4f0c22db56af9c53414a0d"
+}
