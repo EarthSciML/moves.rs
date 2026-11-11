@@ -1,0 +1,68 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0236_campuscluster_illinois_edu__hotsoaktemperature",
+  "schema": [
+    {
+      "name": "monthID",
+      "kind": "int64"
+    },
+    {
+      "name": "tankTemperatureGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "vehID",
+      "kind": "int64"
+    },
+    {
+      "name": "tripID",
+      "kind": "int64"
+    },
+    {
+      "name": "hourDayID",
+      "kind": "int64"
+    },
+    {
+      "name": "hotSoakTime",
+      "kind": "int64"
+    },
+    {
+      "name": "initialTankTemp",
+      "kind": "float64"
+    },
+    {
+      "name": "soakTankTemp",
+      "kind": "float64"
+    },
+    {
+      "name": "temperature",
+      "kind": "float64"
+    },
+    {
+      "name": "tempDelta",
+      "kind": "float64"
+    },
+    {
+      "name": "coldSoakTemp",
+      "kind": "float64"
+    },
+    {
+      "name": "opModeID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "monthID",
+    "tankTemperatureGroupID",
+    "vehID",
+    "tripID",
+    "hourDayID",
+    "hotSoakTime"
+  ],
+  "row_count": 250781,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "aca38c4ee3a73a66125667f1418e782189a9075975775ed707bdda1c595d440f"
+}

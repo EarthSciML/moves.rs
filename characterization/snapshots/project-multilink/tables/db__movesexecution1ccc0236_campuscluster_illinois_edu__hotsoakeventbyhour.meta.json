@@ -1,0 +1,49 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0236_campuscluster_illinois_edu__hotsoakeventbyhour",
+  "schema": [
+    {
+      "name": "vehID",
+      "kind": "int64"
+    },
+    {
+      "name": "tripID",
+      "kind": "int64"
+    },
+    {
+      "name": "hourDayID",
+      "kind": "int64"
+    },
+    {
+      "name": "endOfHour",
+      "kind": "int64"
+    },
+    {
+      "name": "hotSoakBegin",
+      "kind": "int64"
+    },
+    {
+      "name": "hotSoakEnd",
+      "kind": "int64"
+    },
+    {
+      "name": "startOfHotSoak",
+      "kind": "int64"
+    },
+    {
+      "name": "endOfHotSoak",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "vehID",
+    "tripID",
+    "hourDayID"
+  ],
+  "row_count": 28782,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "21ecbf5c4e237ee33fe1ca2dd46b4806e9ff8258bb6f4c29eb4f8e170c1fab4d"
+}

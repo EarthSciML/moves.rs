@@ -1,0 +1,11 @@
+{
+  "provenance_version": "moves-fixture-capture/v1",
+  "fixture_name": "project-grades",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-projstruct/characterization/fixture-image.lock",
+  "runspec_path": "/scratch/ctessum/moves-county-fixture/project-grades/project-grades.xml",
+  "runspec_sha256": "e5a7c4a7bf738077b1225c480c055238a998a5519426b47425a3d59ebb9aee32",
+  "snapshot_aggregate_sha256": "1c23db72e6d8e270a10742680b0de7e69d02081d6470af1e33ad7b5c390fe08d",
+  "output_database": "out_project_grades",
+  "scale_input_database": "washtenaw_cdb"
+}
