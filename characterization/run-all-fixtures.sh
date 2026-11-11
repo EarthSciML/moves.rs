@@ -94,9 +94,13 @@ declare -a SKIP_BY_DEFAULT=(
     # hotelling adjustment tables populated (COUNTY_SQL_FOR below). Skipped by
     # default for the seed pass, as scale-county is.
     "scale-county-idle-adjust"
-    # scale-county-hotelling-multiyear: the same adjustment tables at two
-    # calendar years (COUNTY_SQL_FOR below). Skipped by default, as above.
-    "scale-county-hotelling-multiyear"
+    # userdb-hotelling-multiyear: a DEFAULT-domain run at two calendar years
+    # whose user input database (<databaseselection> washtenaw_cdb, seeded by
+    # COUNTY_SQL_FOR below) states the idle and hotelling adjustment tables.
+    # MOVES refuses a county domain database with two years
+    # (ImporterManager.java:2311), so a user database is the only way they
+    # reach a multi-year run. Skipped by default: it needs the seeded database.
+    "userdb-hotelling-multiyear"
     # project-crankcase, project-refueling, rates-project-evap: the chained
     # processes and the Rates-scale evaporative processes in PROJECT domain,
     # on their project databases (COUNTY_SQL_FOR below).
@@ -248,8 +252,8 @@ county_sql_for() {
             echo "${HERE}/county-inputs/washtenaw-county/setup-county.sql" ;;
         scale-county-idle-adjust)
             echo "${HERE}/county-inputs/washtenaw-county-idle-adjust/setup-idle-adjust.sql" ;;
-        scale-county-hotelling-multiyear)
-            echo "${HERE}/county-inputs/washtenaw-county-hotelling-multiyear/setup-hotelling-multiyear.sql" ;;
+        userdb-hotelling-multiyear)
+            echo "${HERE}/county-inputs/washtenaw-userdb-hotelling-multiyear/setup-userdb-hotelling-multiyear.sql" ;;
         scale-project|rates-project)
             echo "${HERE}/county-inputs/washtenaw-project/setup-project.sql" ;;
         project-links)

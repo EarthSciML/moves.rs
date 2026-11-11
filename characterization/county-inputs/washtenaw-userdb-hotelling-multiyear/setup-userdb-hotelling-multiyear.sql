@@ -1,11 +1,12 @@
--- setup-hotelling-multiyear.sql -- Washtenaw County (FIPS 26161, zone 261610),
--- calendar years 2015 AND 2020: ../washtenaw-county-idle-adjust/setup-idle-adjust.sql
--- (the six idle and hotelling ADJUSTMENT tables populated) with every
--- year-keyed table stated at BOTH years.
+-- setup-userdb-hotelling-multiyear.sql -- Washtenaw County (FIPS 26161, zone
+-- 261610), calendar years 2015 AND 2020: a USER INPUT DATABASE holding
+-- ../washtenaw-county-idle-adjust/setup-idle-adjust.sql's rows (the six idle
+-- and hotelling ADJUSTMENT tables populated) with every year-keyed table
+-- stated at BOTH years.
 --
--- Serves fixture: characterization/fixtures/scale-county-hotelling-multiyear.xml
---   (SINGLE domain; 2015 and 2020; April and August, both day types, hours 7
---   and 8; the gasoline passenger car and the diesel combination long-haul
+-- Serves fixture: characterization/fixtures/userdb-hotelling-multiyear.xml
+--   (DEFAULT domain, this database named in <databaseselections>; 2015
+--   and 2020; April and August, both day types, hours 7 and 8; the gasoline passenger car and the diesel combination long-haul
 --   truck; road types 1 and 4; Total Energy for running exhaust, extended idle
 --   and APU.)
 -- Loaded into database `washtenaw_cdb` by run-all-fixtures.sh's
@@ -21,10 +22,17 @@
 -- neither the defaults nor the rewrite filter on yearID. The hotellingHoursPerDay
 -- block alone is per year. A one-year county database cannot show this.
 --
--- The County Data Manager accepts one year (ImporterManager.java:3151-3182);
--- this fixture skips domain validation, as every county fixture here does,
--- and states each year-keyed table at both years so that MOVES has a
--- population, VMT and fuel supply at each:
+-- WHY A USER DATABASE AND NOT A COUNTY DOMAIN DATABASE
+-- ----------------------------------------------------
+-- MOVES refuses a county (SINGLE) or project domain run with more than one
+-- calendar year, even with domain validation skipped ("A domain database can
+-- contain only one calendar year", ImporterManager.java:2311; tried first). A
+-- DEFAULT-domain run may select several years and merges every user input
+-- database it names, input rows first, so this database is named in the
+-- RunSpec's <databaseselections>. Its rows are setup-idle-adjust.sql's, every
+-- year-keyed table stated at both years (rows that copy the default's merge as
+-- no-ops, as Zone's and ZoneRoadType's 12-decimal truncations shadow it, the
+-- same row merge as at county scale):
 --   Year, SourceTypeYear, SourceTypeAgeDistribution, HPMSVtypeYear: the
 --     default's rows at 2015 and 2020 (both base years);
 --   fuelSupply, fuelUsageFraction: the default's rows at fuel years 2015 and
@@ -34,7 +42,6 @@
 -- Everything else is setup-idle-adjust.sql verbatim; its header explains each
 -- adjustment table's values.
 --
-
 -- ===========================================================================
 -- Geography and time
 -- ===========================================================================
@@ -50,7 +57,7 @@ INSERT INTO Zone SELECT * FROM movesdb20241112.Zone WHERE zoneID = 261610;
 CREATE TABLE IF NOT EXISTS ZoneRoadType LIKE movesdb20241112.ZoneRoadType;
 INSERT INTO ZoneRoadType SELECT * FROM movesdb20241112.ZoneRoadType WHERE zoneID = 261610;
 
--- Both years (see the header): the County Data Manager would accept one.
+-- Both years (see the header).
 CREATE TABLE IF NOT EXISTS Year LIKE movesdb20241112.Year;
 INSERT INTO Year SELECT * FROM movesdb20241112.Year WHERE yearID IN (2015, 2020);
 

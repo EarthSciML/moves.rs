@@ -1,21 +1,23 @@
 <runspec version="MOVES5.0.1">
-	<description><![CDATA[County-domain (SINGLE) inventory for Washtenaw at TWO calendar years, 2015
-and 2020, whose county database populates the six idle and hotelling
-ADJUSTMENT tables and states every year-keyed table at both years
-(county-inputs/washtenaw-county-hotelling-multiyear/setup-hotelling-multiyear.sql).
-It is scale-county-idle-adjust with a second year. AdjustHotelling.sql runs
-once per (zone, year) over a hotellingHours table that still holds the
-earlier year's adjusted rows, and its hour, age and month blocks take their
-default shares over every row the table holds. Two months (April, August;
-month keys are 0-based), both day types and two hours (7, 8; hour keys are
-hourID-1). Passenger car (gasoline) and combination long-haul truck (diesel)
-on road types 1 and 4; Total Energy for running exhaust (off-network idle on
-road type 1), extended idle and APU.]]></description>
+	<description><![CDATA[DEFAULT-domain inventory for Washtenaw at TWO calendar years, 2015 and
+2020, with a USER INPUT DATABASE (<databaseselection> washtenaw_cdb, built from
+county-inputs/washtenaw-userdb-hotelling-multiyear/setup-userdb-hotelling-multiyear.sql)
+that states the six idle and hotelling ADJUSTMENT tables. A county domain
+database may hold one calendar year only (ImporterManager.java:2311, a hard
+error even with domain validation skipped), so a user database merged into a
+DEFAULT-domain run is the way these tables reach a multi-year run.
+AdjustHotelling.sql runs once per (zone, year) over a hotellingHours table
+that still holds the earlier year's adjusted rows, and its hour, age and
+month blocks take their default shares over every row the table holds. Two
+months (April, August; month keys are 0-based), both day types and two hours
+(7, 8; hour keys are hourID-1). Passenger car (gasoline) and combination
+long-haul truck (diesel) on road types 1 and 4; Total Energy for running
+exhaust (off-network idle on road type 1), extended idle and APU.]]></description>
 	<models>
 		<model value="ONROAD"/>
 	</models>
 	<modelscale value="Inv"/>
-	<modeldomain value="SINGLE"/>
+	<modeldomain value="DEFAULT"/>
 	<geographicselections>
 		<geographicselection type="COUNTY" key="26161" description="MICHIGAN - Washtenaw County"/>
 	</geographicselections>
@@ -48,6 +50,7 @@ road type 1), extended idle and APU.]]></description>
 		<pollutantprocessassociation pollutantkey="91" pollutantname="Total Energy Consumption" processkey="91" processname="Auxiliary Power Exhaust"/>
 	</pollutantprocessassociations>
 	<databaseselections>
+		<databaseselection servername="localhost" databasename="washtenaw_cdb" description="Washtenaw user input database: idle and hotelling adjustment tables at 2015 and 2020"/>
 	</databaseselections>
 	<internalcontrolstrategies>
 	</internalcontrolstrategies>
@@ -70,7 +73,7 @@ road type 1), extended idle and APU.]]></description>
 	    <segment selected="false"/>
 	    <hpclass selected="false"/>
 	</outputemissionsbreakdownselection>
-	<outputdatabase servername="" databasename="out_scale_county_hotelling_multiyear" description=""/>
+	<outputdatabase servername="" databasename="out_userdb_hotelling_multiyear" description=""/>
 	<outputtimestep value="Hour"/>
 	<outputvmtdata value="false"/>
 	<outputsho value="false"/>
