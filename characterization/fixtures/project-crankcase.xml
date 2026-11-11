@@ -1,0 +1,90 @@
+<runspec version="MOVES5.0.1">
+	<description><![CDATA[Project-domain run (model_domain=PROJECT) of the crankcase processes, each chained to its parent: crankcase running (15) to running exhaust on two on-network links (road types 4 and 5), crankcase start (16) to start exhaust and crankcase extended idle (17) to extended idle on the off-network link. THC, CO and NOx; gasoline passenger cars and diesel long-haul trucks. The project database states the user start modes, without which PROJECT-domain MOVES writes no start exhaust. Snapshot capture supplies the project DB from county-inputs/washtenaw-project-crankcase/setup-project-crankcase.sql.]]></description>
+	<models>
+		<model value="ONROAD"/>
+	</models>
+	<modelscale value="Inv"/>
+	<modeldomain value="PROJECT"/>
+	<geographicselections>
+		<geographicselection type="COUNTY" key="26161" description="MICHIGAN - Washtenaw County"/>
+	</geographicselections>
+	<timespan>
+		<year key="2020"/>
+		<month key="7"/>
+		<day id="5"/>
+		<beginhour key="8"/>
+		<endhour key="8"/>
+	</timespan>
+	<onroadvehicleselections>
+		<onroadvehicleselection fueltypeid="1" fueltypedesc="Gasoline" sourcetypeid="21" sourcetypename="Passenger Car"/>
+		<onroadvehicleselection fueltypeid="2" fueltypedesc="Diesel Fuel" sourcetypeid="62" sourcetypename="Combination Long-haul Truck"/>
+	</onroadvehicleselections>
+	<offroadvehicleselections>
+	</offroadvehicleselections>
+	<offroadvehiclesccs>
+	</offroadvehiclesccs>
+	<roadtypes>
+		<roadtype roadtypeid="1" roadtypename="Off-Network" modelCombination="M1"/>
+		<roadtype roadtypeid="4" roadtypename="Urban Restricted Access" modelCombination="M1"/>
+		<roadtype roadtypeid="5" roadtypename="Urban Unrestricted Access" modelCombination="M1"/>
+	</roadtypes>
+	<pollutantprocessassociations>
+		<pollutantprocessassociation pollutantkey="1" pollutantname="Total Gaseous Hydrocarbons" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="2" pollutantname="Carbon Monoxide (CO)" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="3" pollutantname="Oxides of Nitrogen (NOx)" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="1" pollutantname="Total Gaseous Hydrocarbons" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="2" pollutantname="Carbon Monoxide (CO)" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="3" pollutantname="Oxides of Nitrogen (NOx)" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="1" pollutantname="Total Gaseous Hydrocarbons" processkey="90" processname="Extended Idle Exhaust"/>
+		<pollutantprocessassociation pollutantkey="2" pollutantname="Carbon Monoxide (CO)" processkey="90" processname="Extended Idle Exhaust"/>
+		<pollutantprocessassociation pollutantkey="3" pollutantname="Oxides of Nitrogen (NOx)" processkey="90" processname="Extended Idle Exhaust"/>
+		<pollutantprocessassociation pollutantkey="1" pollutantname="Total Gaseous Hydrocarbons" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="2" pollutantname="Carbon Monoxide (CO)" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="3" pollutantname="Oxides of Nitrogen (NOx)" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="1" pollutantname="Total Gaseous Hydrocarbons" processkey="16" processname="Crankcase Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="2" pollutantname="Carbon Monoxide (CO)" processkey="16" processname="Crankcase Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="3" pollutantname="Oxides of Nitrogen (NOx)" processkey="16" processname="Crankcase Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="1" pollutantname="Total Gaseous Hydrocarbons" processkey="17" processname="Crankcase Extended Idle Exhaust"/>
+		<pollutantprocessassociation pollutantkey="2" pollutantname="Carbon Monoxide (CO)" processkey="17" processname="Crankcase Extended Idle Exhaust"/>
+		<pollutantprocessassociation pollutantkey="3" pollutantname="Oxides of Nitrogen (NOx)" processkey="17" processname="Crankcase Extended Idle Exhaust"/>
+	</pollutantprocessassociations>
+	<databaseselections>
+	</databaseselections>
+	<internalcontrolstrategies>
+	</internalcontrolstrategies>
+	<inputdatabase servername="" databasename="" description=""/>
+	<uncertaintyparameters uncertaintymodeenabled="false" numberofrunspersimulation="0" numberofsimulations="0"/>
+	<geographicoutputdetail description="LINK"/>
+	<outputemissionsbreakdownselection>
+	    <modelyear selected="true"/>
+	    <fueltype selected="true"/>
+	    <emissionprocess selected="true"/>
+	    <distinguishparticulates selected="true"/>
+	    <onroadoffroad selected="true"/>
+	    <roadtype selected="true"/>
+	    <sourceusetype selected="false"/>
+	    <movesvehicletype selected="false"/>
+	    <onroadscc selected="true"/>
+	    <offroadscc selected="false"/>
+	    <estimateuncertainty selected="false"/>
+	    <segment selected="false"/>
+	    <hpclass selected="false"/>
+	</outputemissionsbreakdownselection>
+	<outputdatabase servername="" databasename="out_project_crankcase" description=""/>
+	<outputtimestep value="Hour"/>
+	<outputvmtdata value="false"/>
+	<outputsho value="false"/>
+	<outputsh value="false"/>
+	<outputshp value="false"/>
+	<outputshidling value="false"/>
+	<outputstarts value="false"/>
+	<outputpopulation value="false"/>
+	<scaleinputdatabase servername="" databasename="" description=""/>
+	<pmsize value="0"/>
+	<outputfactors>
+		<timefactors selected="true" units="Seconds"/>
+		<distancefactors selected="true" units="Miles"/>
+		<massfactors selected="true" units="Grams" energyunits="Million BTU"/>
+	</outputfactors>
+	<skipdomaindatabasevalidation selected="true"/>
+</runspec>

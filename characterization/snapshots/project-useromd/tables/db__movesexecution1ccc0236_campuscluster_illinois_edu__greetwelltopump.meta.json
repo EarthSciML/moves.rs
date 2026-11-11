@@ -1,0 +1,37 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0236_campuscluster_illinois_edu__greetwelltopump",
+  "schema": [
+    {
+      "name": "yearID",
+      "kind": "int64"
+    },
+    {
+      "name": "pollutantID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelSubtypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "emissionRate",
+      "kind": "float64"
+    },
+    {
+      "name": "emissionRateUncertainty",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "yearID",
+    "pollutantID",
+    "fuelSubtypeID"
+  ],
+  "row_count": 558,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "620e8309746a14ce01c02eb46e78448271c75eff326174d8b98a9aff77310659"
+}

@@ -1,0 +1,19 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution__runspecprocess",
+  "schema": [
+    {
+      "name": "processID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "processID"
+  ],
+  "row_count": 3,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "99171513558d743430c07703f73fa5a25b64cea6cdc99f179bec6f476f6f9a12"
+}

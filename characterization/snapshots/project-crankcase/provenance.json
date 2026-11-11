@@ -1,0 +1,11 @@
+{
+  "provenance_version": "moves-fixture-capture/v1",
+  "fixture_name": "project-crankcase",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-projx/characterization/fixture-image.lock",
+  "runspec_path": "/scratch/ctessum/moves-county-fixture/project-crankcase/project-crankcase.xml",
+  "runspec_sha256": "d677a6161de9b8b8e3175e9dcc5ae92d400241d26abfbdc7cfdd2cd16fa6f94c",
+  "snapshot_aggregate_sha256": "7625286715b4fd3e22439f700c5955a277df910ec906f8f9dbf0181a7e1f9139",
+  "output_database": "out_project_crankcase",
+  "scale_input_database": "washtenaw_cdb"
+}

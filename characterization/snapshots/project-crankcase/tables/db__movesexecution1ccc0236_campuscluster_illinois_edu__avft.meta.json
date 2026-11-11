@@ -1,0 +1,38 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0236_campuscluster_illinois_edu__avft",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "engTechID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelEngFraction",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "sourceTypeID",
+    "modelYearID",
+    "fuelTypeID",
+    "engTechID"
+  ],
+  "row_count": 888,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "4963896b5862ba66dd872437c17447fbfdd2878e9f35674d4548562d1bf700c1"
+}

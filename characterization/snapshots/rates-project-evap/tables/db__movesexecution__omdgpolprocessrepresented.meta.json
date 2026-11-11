@@ -1,0 +1,23 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution__omdgpolprocessrepresented",
+  "schema": [
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "representingPolProcessID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "polProcessID"
+  ],
+  "row_count": 1,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "fad17213da835624dd0e484e2b86e75afabf98bfe27ab16d93fc5fe0dca8e13d"
+}
