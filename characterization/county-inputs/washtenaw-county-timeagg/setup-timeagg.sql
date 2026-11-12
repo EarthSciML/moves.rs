@@ -13,7 +13,11 @@
 -- and characterization/fixtures/scale-county-timeagg-year.xml
 --   (the same months; <aggregateBy key="Year"/>, <outputtimestep value="Year"/>;
 --   also crankcase running and extended idle, brake and tire wear, and
---   running energy and CO2).
+--   running energy and CO2)
+-- and characterization/fixtures/scale-county-timeagg-year-toxics.xml and
+--   scale-county-timeagg-year-pm.xml (the Year collapse again, source types
+--   21 and 62 only: the gaseous species and air toxics at running and start
+--   exhaust, and the running-exhaust PM species).
 -- Both: the gasoline passenger car (21), the gasoline light commercial truck
 -- (32) and the diesel combination long-haul truck (62); road types 1 and 4;
 -- THC, CO and NOx for running exhaust, start exhaust, crankcase start,
