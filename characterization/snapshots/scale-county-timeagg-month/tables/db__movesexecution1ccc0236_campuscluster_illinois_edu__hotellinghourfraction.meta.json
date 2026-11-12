@@ -1,0 +1,33 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0236_campuscluster_illinois_edu__hotellinghourfraction",
+  "schema": [
+    {
+      "name": "zoneID",
+      "kind": "int64"
+    },
+    {
+      "name": "dayID",
+      "kind": "int64"
+    },
+    {
+      "name": "hourID",
+      "kind": "int64"
+    },
+    {
+      "name": "hourFraction",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "zoneID",
+    "dayID",
+    "hourID"
+  ],
+  "row_count": 1,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "57ee4939c7da7d0efa44337b4a0c380d3bf78cba78fe71f93a01cf111768acf5"
+}

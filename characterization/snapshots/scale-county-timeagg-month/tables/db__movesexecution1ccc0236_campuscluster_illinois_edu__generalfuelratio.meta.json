@@ -1,0 +1,72 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0236_campuscluster_illinois_edu__generalfuelratio",
+  "schema": [
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelFormulationID",
+      "kind": "int64"
+    },
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "pollutantID",
+      "kind": "int64"
+    },
+    {
+      "name": "processID",
+      "kind": "int64"
+    },
+    {
+      "name": "minModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "maxModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "minAgeID",
+      "kind": "int64"
+    },
+    {
+      "name": "maxAgeID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelEffectRatio",
+      "kind": "float64"
+    },
+    {
+      "name": "fuelEffectRatioGPA",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "fuelTypeID",
+    "fuelFormulationID",
+    "polProcessID",
+    "pollutantID",
+    "processID",
+    "minModelYearID",
+    "maxModelYearID",
+    "minAgeID",
+    "maxAgeID",
+    "sourceTypeID"
+  ],
+  "row_count": 117,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "f1592c49f7bc0870608184fcafbd639e77917cfc4db24d4c053e6d4052490035"
+}

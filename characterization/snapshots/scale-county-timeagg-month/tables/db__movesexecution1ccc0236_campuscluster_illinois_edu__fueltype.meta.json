@@ -1,0 +1,35 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0236_campuscluster_illinois_edu__fueltype",
+  "schema": [
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "defaultFormulationID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeDesc",
+      "kind": "utf8"
+    },
+    {
+      "name": "fuelDensity",
+      "kind": "float64"
+    },
+    {
+      "name": "subjectToEvapCalculations",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "fuelTypeID"
+  ],
+  "row_count": 5,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "19f8ba77573931298dcd7bc0bef9653535b1ba9614a7102c1848ebb660eb1a35"
+}

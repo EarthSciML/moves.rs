@@ -101,6 +101,12 @@ declare -a SKIP_BY_DEFAULT=(
     # (ImporterManager.java:2311), so a user database is the only way they
     # reach a multi-year run. Skipped by default: it needs the seeded database.
     "userdb-hotelling-multiyear"
+    # scale-county-timeagg-day, scale-county-timeagg-month: county inventories
+    # with TIME AGGREGATION (aggregateBy 24-Hour Day / Month, output Month /
+    # Year) over a county database stating startsPerDay and the hotelling
+    # tables (COUNTY_SQL_FOR below). Skipped by default for the seed pass.
+    "scale-county-timeagg-day"
+    "scale-county-timeagg-month"
     # project-crankcase, project-refueling, rates-project-evap: the chained
     # processes and the Rates-scale evaporative processes in PROJECT domain,
     # on their project databases (COUNTY_SQL_FOR below).
@@ -273,6 +279,8 @@ county_sql_for() {
             echo "${HERE}/county-inputs/washtenaw-county-idle-adjust/setup-idle-adjust.sql" ;;
         userdb-hotelling-multiyear)
             echo "${HERE}/county-inputs/washtenaw-userdb-hotelling-multiyear/setup-userdb-hotelling-multiyear.sql" ;;
+        scale-county-timeagg-day|scale-county-timeagg-month)
+            echo "${HERE}/county-inputs/washtenaw-county-timeagg/setup-timeagg.sql" ;;
         scale-project|rates-project)
             echo "${HERE}/county-inputs/washtenaw-project/setup-project.sql" ;;
         project-links)

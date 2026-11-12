@@ -1,0 +1,48 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0236_campuscluster_illinois_edu__idlehoursbyagehour",
+  "schema": [
+    {
+      "name": "yearID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "ageID",
+      "kind": "int64"
+    },
+    {
+      "name": "monthID",
+      "kind": "int64"
+    },
+    {
+      "name": "dayID",
+      "kind": "int64"
+    },
+    {
+      "name": "hourID",
+      "kind": "int64"
+    },
+    {
+      "name": "idleHours",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "yearID",
+    "sourceTypeID",
+    "ageID",
+    "monthID",
+    "dayID",
+    "hourID"
+  ],
+  "row_count": 164,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "bae705110060754f753c7bcc4581fef36de742c5b600b1bef2b90fb1584a5607"
+}

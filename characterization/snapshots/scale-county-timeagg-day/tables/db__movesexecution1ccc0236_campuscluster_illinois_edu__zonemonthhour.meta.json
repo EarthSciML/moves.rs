@@ -1,0 +1,49 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0236_campuscluster_illinois_edu__zonemonthhour",
+  "schema": [
+    {
+      "name": "monthID",
+      "kind": "int64"
+    },
+    {
+      "name": "zoneID",
+      "kind": "int64"
+    },
+    {
+      "name": "hourID",
+      "kind": "int64"
+    },
+    {
+      "name": "temperature",
+      "kind": "float64"
+    },
+    {
+      "name": "relHumidity",
+      "kind": "float64"
+    },
+    {
+      "name": "heatIndex",
+      "kind": "float64"
+    },
+    {
+      "name": "specificHumidity",
+      "kind": "float64"
+    },
+    {
+      "name": "molWaterFraction",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "monthID",
+    "zoneID",
+    "hourID"
+  ],
+  "row_count": 2,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "2214480c2af4eac2cc787501658316f9c0b5f6ab51ee1a57decc772e0b685f95"
+}

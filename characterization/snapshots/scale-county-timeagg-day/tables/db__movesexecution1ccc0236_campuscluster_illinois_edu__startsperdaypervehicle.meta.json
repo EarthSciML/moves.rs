@@ -1,0 +1,28 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0236_campuscluster_illinois_edu__startsperdaypervehicle",
+  "schema": [
+    {
+      "name": "dayID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "startsPerDayPerVehicle",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "dayID",
+    "sourceTypeID"
+  ],
+  "row_count": 6,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "e6f85edd99c27ce3101690c95cf9d8c37cea67ed5544ec4b201bebd24ad8319d"
+}

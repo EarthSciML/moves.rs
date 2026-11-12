@@ -1,0 +1,28 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0236_campuscluster_illinois_edu__startsmonthadjust",
+  "schema": [
+    {
+      "name": "monthID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "monthAdjustment",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "monthID",
+    "sourceTypeID"
+  ],
+  "row_count": 6,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "ae63046640ea7ca30c8bf007981b0c3a4b576fc7ebd7fb1be64256bd68f48beb"
+}
