@@ -207,7 +207,7 @@ county-inputs/washtenaw-county-timeagg/setup-timeagg.sql.]]></description>
 	    <segment selected="false"/>
 	    <hpclass selected="false"/>
 	</outputemissionsbreakdownselection>
-	<outputdatabase servername="" databasename="scale_county_timeagg_year_toxics_idle" description=""/>
+	<outputdatabase servername="" databasename="out_scale_county_timeagg_year_toxics_idle" description=""/>
 	<outputtimestep value="Year"/>
 	<outputvmtdata value="false"/>
 	<outputsho value="false"/>
