@@ -107,6 +107,12 @@ declare -a SKIP_BY_DEFAULT=(
     # tables (COUNTY_SQL_FOR below). Skipped by default for the seed pass.
     "scale-county-timeagg-day"
     "scale-county-timeagg-month"
+    # scale-county-timeagg-processes-day, -month: the same county database
+    # under aggregateBy 24-Hour Day (output Year) and Month (output Month),
+    # selecting EVERY on-road process: evaporative, refueling, crankcase,
+    # brake and tire wear beside the exhaust ones.
+    "scale-county-timeagg-processes-day"
+    "scale-county-timeagg-processes-month"
     # project-crankcase, project-refueling, rates-project-evap: the chained
     # processes and the Rates-scale evaporative processes in PROJECT domain,
     # on their project databases (COUNTY_SQL_FOR below).
@@ -279,7 +285,7 @@ county_sql_for() {
             echo "${HERE}/county-inputs/washtenaw-county-idle-adjust/setup-idle-adjust.sql" ;;
         userdb-hotelling-multiyear)
             echo "${HERE}/county-inputs/washtenaw-userdb-hotelling-multiyear/setup-userdb-hotelling-multiyear.sql" ;;
-        scale-county-timeagg-day|scale-county-timeagg-month)
+        scale-county-timeagg-day|scale-county-timeagg-month|scale-county-timeagg-processes-day|scale-county-timeagg-processes-month)
             echo "${HERE}/county-inputs/washtenaw-county-timeagg/setup-timeagg.sql" ;;
         scale-project|rates-project)
             echo "${HERE}/county-inputs/washtenaw-project/setup-project.sql" ;;
