@@ -10,7 +10,9 @@
 #   --fixture NAME    Fixture name (e.g. process-crankcase-start-single).
 #                     RunSpec: characterization/fixtures/<NAME>.xml.
 #   --county-sql FILE Path to the SQL file that creates and populates the
-#                     county input DB (washtenaw_cdb).
+#                     county input DB (washtenaw_cdb). May be repeated: the
+#                     files are concatenated in the order given (a stated
+#                     table layered over a shared county database).
 #
 # Optional:
 #   --output-dir DIR  Snapshot output (default: characterization/snapshots/<NAME>).
@@ -35,7 +37,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "${HERE}/../.." && pwd)"
 
 FIXTURE_NAME=""
-COUNTY_SQL=""
+COUNTY_SQL=()
 OUTPUT_DIR=""
 USE_FAKEROOT=0
 SIF="/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/apptainer/moves-fixture.sif"
@@ -43,7 +45,7 @@ SIF="/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/a
 while [ $# -gt 0 ]; do
     case "$1" in
         --fixture)    FIXTURE_NAME="$2"; shift 2 ;;
-        --county-sql) COUNTY_SQL="$2";   shift 2 ;;
+        --county-sql) COUNTY_SQL+=("$2"); shift 2 ;;
         --output-dir) OUTPUT_DIR="$2";   shift 2 ;;
         --sif)        SIF="$2";          shift 2 ;;
         -f|--fakeroot) USE_FAKEROOT=1;   shift 1 ;;
@@ -66,8 +68,10 @@ if [ "${USE_FAKEROOT}" = "1" ]; then
 fi
 
 [[ -z "${FIXTURE_NAME}" ]] && { echo "FATAL: --fixture required" >&2; exit 2; }
-[[ -z "${COUNTY_SQL}" ]]   && { echo "FATAL: --county-sql required" >&2; exit 2; }
-[[ ! -f "${COUNTY_SQL}" ]] && { echo "FATAL: county SQL not found: ${COUNTY_SQL}" >&2; exit 2; }
+[[ "${#COUNTY_SQL[@]}" -eq 0 ]] && { echo "FATAL: --county-sql required" >&2; exit 2; }
+for f in "${COUNTY_SQL[@]}"; do
+    [[ ! -f "${f}" ]] && { echo "FATAL: county SQL not found: ${f}" >&2; exit 2; }
+done
 [[ ! -f "${SIF}" ]]        && { echo "FATAL: SIF not found: ${SIF}" >&2; exit 2; }
 
 RUNSPEC="${ROOT}/characterization/fixtures/${FIXTURE_NAME}.xml"
@@ -84,7 +88,7 @@ sed "s|scaleinputdatabase servername=\"\" databasename=\"\" description=\"\"|sca
     "${RUNSPEC}" > "${TEMP_RUNSPEC}"
 
 echo "[county-capture] fixture    = ${FIXTURE_NAME}"
-echo "[county-capture] county-sql = ${COUNTY_SQL}"
+echo "[county-capture] county-sql = ${COUNTY_SQL[*]}"
 echo "[county-capture] output-dir = ${OUTPUT_DIR}"
 echo "[county-capture] workdir    = ${WORKDIR}"
 
@@ -102,7 +106,7 @@ echo "[county-capture] step 1/2 — seeding MariaDB and creating county DB"
 
 # Copy the SQL to the workdir so it has a clean path inside the container
 COUNTY_SQL_IN_WORKDIR="${WORKDIR}/county-setup.sql"
-cp "${COUNTY_SQL}" "${COUNTY_SQL_IN_WORKDIR}"
+cat "${COUNTY_SQL[@]}" > "${COUNTY_SQL_IN_WORKDIR}"
 
 # Use --writable-tmpfs (same as run-moves.sh) so the container can write to
 # its root filesystem. Bind the same paths run-moves.sh uses.

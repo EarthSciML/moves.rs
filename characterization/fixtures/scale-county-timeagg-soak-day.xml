@@ -1,0 +1,89 @@
+<runspec version="MOVES5.0.1">
+	<description><![CDATA[County-domain (SINGLE) inventory for Washtenaw with TIME AGGREGATION over a
+stated soakActivityFraction: <aggregateBy key="24-Hour Day"/> collapses the
+24 hours of each day type (PreAggDAY.sql) before any generator runs, and
+<outputtimestep value="Month"/> sums the day types. January and July 2020
+(month keys are 0-based), both day types, all 24 hours.
+Gasoline passenger car (21) and light commercial truck (32) on road types 1
+and 4, THC at evaporative permeation, fuel vapor venting and fuel leaks.
+The county database is county-inputs/washtenaw-county-timeagg/setup-timeagg.sql
+followed by setup-soak-activity.sql: a STATED hourly soakActivityFraction
+(modes 150 and 151, every hour-day; source type 21 every month, 32 January
+only), which PreAggDAY.sql collapses to sum(soakActivityFraction x
+HourWeighting2) per day type before TankTemperatureGenerator TTG-6 keeps it
+in place of its own.]]></description>
+	<models>
+		<model value="ONROAD"/>
+	</models>
+	<modelscale value="Inv"/>
+	<modeldomain value="SINGLE"/>
+	<geographicselections>
+		<geographicselection type="COUNTY" key="26161" description="MICHIGAN - Washtenaw County"/>
+	</geographicselections>
+	<timespan>
+		<year key="2020"/>
+		<month key="0"/>
+		<month key="6"/>
+		<day id="2"/>
+		<day id="5"/>
+		<beginhour key="0"/>
+		<endhour key="23"/>
+		<aggregateBy key="24-Hour Day"/>
+	</timespan>
+	<onroadvehicleselections>
+		<onroadvehicleselection fueltypeid="1" fueltypedesc="Gasoline" sourcetypeid="21" sourcetypename="Passenger Car"/>
+		<onroadvehicleselection fueltypeid="1" fueltypedesc="Gasoline" sourcetypeid="32" sourcetypename="Light Commercial Truck"/>
+	</onroadvehicleselections>
+	<offroadvehicleselections>
+	</offroadvehicleselections>
+	<offroadvehiclesccs>
+	</offroadvehiclesccs>
+	<roadtypes>
+		<roadtype roadtypeid="1" roadtypename="Off-Network" modelCombination="M1"/>
+		<roadtype roadtypeid="4" roadtypename="Urban Restricted Access" modelCombination="M1"/>
+	</roadtypes>
+	<pollutantprocessassociations>
+		<pollutantprocessassociation pollutantkey="1" pollutantname="Total Gaseous Hydrocarbons" processkey="11" processname="Evap Permeation"/>
+		<pollutantprocessassociation pollutantkey="1" pollutantname="Total Gaseous Hydrocarbons" processkey="12" processname="Evap Fuel Vapor Venting"/>
+		<pollutantprocessassociation pollutantkey="1" pollutantname="Total Gaseous Hydrocarbons" processkey="13" processname="Evap Fuel Leaks"/>
+	</pollutantprocessassociations>
+	<databaseselections>
+	</databaseselections>
+	<internalcontrolstrategies>
+	</internalcontrolstrategies>
+	<skipdomaindatabasevalidation selected="true"/>
+	<inputdatabase servername="" databasename="" description=""/>
+	<uncertaintyparameters uncertaintymodeenabled="false" numberofrunspersimulation="0" numberofsimulations="0"/>
+	<geographicoutputdetail description="COUNTY"/>
+	<outputemissionsbreakdownselection>
+	    <modelyear selected="true"/>
+	    <fueltype selected="true"/>
+	    <emissionprocess selected="true"/>
+	    <distinguishparticulates selected="true"/>
+	    <onroadoffroad selected="true"/>
+	    <roadtype selected="true"/>
+	    <sourceusetype selected="false"/>
+	    <movesvehicletype selected="false"/>
+	    <onroadscc selected="true"/>
+	    <offroadscc selected="false"/>
+	    <estimateuncertainty selected="false"/>
+	    <segment selected="false"/>
+	    <hpclass selected="false"/>
+	</outputemissionsbreakdownselection>
+	<outputdatabase servername="" databasename="out_scale_county_timeagg_soak_day" description=""/>
+	<outputtimestep value="Month"/>
+	<outputvmtdata value="false"/>
+	<outputsho value="false"/>
+	<outputsh value="false"/>
+	<outputshp value="false"/>
+	<outputshidling value="false"/>
+	<outputstarts value="false"/>
+	<outputpopulation value="false"/>
+	<scaleinputdatabase servername="" databasename="" description=""/>
+	<pmsize value="0"/>
+	<outputfactors>
+		<timefactors selected="true" units="Seconds"/>
+		<distancefactors selected="true" units="Miles"/>
+		<massfactors selected="true" units="Grams" energyunits="Million BTU"/>
+	</outputfactors>
+</runspec>
