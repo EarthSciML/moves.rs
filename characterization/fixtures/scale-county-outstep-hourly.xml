@@ -69,7 +69,7 @@ hotelling tables.]]></description>
 	    <segment selected="false"/>
 	    <hpclass selected="false"/>
 	</outputemissionsbreakdownselection>
-	<outputdatabase servername="" databasename="out_scale_county_outstep_day" description=""/>
+	<outputdatabase servername="" databasename="out_scale_county_outstep_hourly" description=""/>
 	<outputtimestep value="24-Hour Day"/>
 	<outputvmtdata value="false"/>
 	<outputsho value="false"/>

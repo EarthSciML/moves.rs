@@ -107,10 +107,10 @@ declare -a SKIP_BY_DEFAULT=(
     # tables (COUNTY_SQL_FOR below). Skipped by default for the seed pass.
     "scale-county-timeagg-day"
     "scale-county-timeagg-month"
-    # scale-county-outstep-day, -week, -dayagg: the 24-Hour Day and Portion of
+    # scale-county-outstep-hourly, -week, -dayagg: the 24-Hour Day and Portion of
     # Week output time steps (at aggregateBy Hour, 24-Hour Day, 24-Hour Day)
     # over the same county database. Skipped by default for the seed pass.
-    "scale-county-outstep-day"
+    "scale-county-outstep-hourly"
     "scale-county-outstep-week"
     "scale-county-outstep-dayagg"
     # scale-county-idle-adjust-day/-month, scale-county-timeagg-weekday,
@@ -294,7 +294,7 @@ county_sql_for() {
             echo "${HERE}/county-inputs/washtenaw-county-idle-adjust/setup-idle-adjust.sql" ;;
         userdb-hotelling-multiyear|userdb-hotelling-multiyear-day|userdb-hotelling-multiyear-month)
             echo "${HERE}/county-inputs/washtenaw-userdb-hotelling-multiyear/setup-userdb-hotelling-multiyear.sql" ;;
-        scale-county-timeagg-day|scale-county-timeagg-month|scale-county-outstep-day|scale-county-outstep-week|scale-county-outstep-dayagg|scale-county-timeagg-weekday)
+        scale-county-timeagg-day|scale-county-timeagg-month|scale-county-outstep-hourly|scale-county-outstep-week|scale-county-outstep-dayagg|scale-county-timeagg-weekday)
             echo "${HERE}/county-inputs/washtenaw-county-timeagg/setup-timeagg.sql" ;;
         scale-project|rates-project)
             echo "${HERE}/county-inputs/washtenaw-project/setup-project.sql" ;;
