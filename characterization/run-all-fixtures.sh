@@ -112,8 +112,10 @@ declare -a SKIP_BY_DEFAULT=(
     "scale-county-timeagg-year"
     # scale-county-timeagg-year-toxics, -pm: the same Year collapse selecting
     # the gaseous species and air toxics at running and start exhaust, and the
-    # running-exhaust PM species, for source types 21 and 62.
+    # running-exhaust PM species, for source types 21 and 62; -toxics-idle the
+    # gaseous species at extended idle, APU and the crankcase processes.
     "scale-county-timeagg-year-toxics"
+    "scale-county-timeagg-year-toxics-idle"
     "scale-county-timeagg-year-pm"
     # scale-county-timeagg-processes-day, -month: the same county database
     # under aggregateBy 24-Hour Day (output Year) and Month (output Month),
@@ -308,7 +310,7 @@ county_sql_for() {
             echo "${HERE}/county-inputs/washtenaw-county-idle-adjust/setup-idle-adjust.sql" ;;
         userdb-hotelling-multiyear|userdb-hotelling-multiyear-day|userdb-hotelling-multiyear-month)
             echo "${HERE}/county-inputs/washtenaw-userdb-hotelling-multiyear/setup-userdb-hotelling-multiyear.sql" ;;
-        scale-county-timeagg-day|scale-county-timeagg-month|scale-county-timeagg-year|scale-county-timeagg-year-toxics|scale-county-timeagg-year-pm|scale-county-timeagg-processes-day|scale-county-timeagg-processes-month|scale-county-outstep-hourday|scale-county-outstep-week|scale-county-outstep-dayagg|scale-county-timeagg-weekday)
+        scale-county-timeagg-day|scale-county-timeagg-month|scale-county-timeagg-year|scale-county-timeagg-year-toxics|scale-county-timeagg-year-toxics-idle|scale-county-timeagg-year-pm|scale-county-timeagg-processes-day|scale-county-timeagg-processes-month|scale-county-outstep-hourday|scale-county-outstep-week|scale-county-outstep-dayagg|scale-county-timeagg-weekday)
             echo "${HERE}/county-inputs/washtenaw-county-timeagg/setup-timeagg.sql" ;;
         scale-project|rates-project)
             echo "${HERE}/county-inputs/washtenaw-project/setup-project.sql" ;;

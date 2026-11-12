@@ -17,7 +17,9 @@
 -- and characterization/fixtures/scale-county-timeagg-year-toxics.xml and
 --   scale-county-timeagg-year-pm.xml (the Year collapse again, source types
 --   21 and 62 only: the gaseous species and air toxics at running and start
---   exhaust, and the running-exhaust PM species).
+--   exhaust, and the running-exhaust PM species)
+-- and characterization/fixtures/scale-county-timeagg-year-toxics-idle.xml (the
+--   same gaseous species at extended idle, APU and the crankcase processes).
 -- Both: the gasoline passenger car (21), the gasoline light commercial truck
 -- (32) and the diesel combination long-haul truck (62); road types 1 and 4;
 -- THC, CO and NOx for running exhaust, start exhaust, crankcase start,
