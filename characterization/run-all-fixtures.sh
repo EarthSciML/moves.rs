@@ -113,6 +113,15 @@ declare -a SKIP_BY_DEFAULT=(
     "scale-county-outstep-day"
     "scale-county-outstep-week"
     "scale-county-outstep-dayagg"
+    # scale-county-idle-adjust-day/-month, scale-county-timeagg-weekday,
+    # userdb-hotelling-multiyear-day/-month: time aggregation over the idle
+    # adjustment tables, a RunSpec of one day type, and hotelling at two
+    # calendar years (COUNTY_SQL_FOR below). Skipped by default.
+    "scale-county-idle-adjust-day"
+    "scale-county-idle-adjust-month"
+    "scale-county-timeagg-weekday"
+    "userdb-hotelling-multiyear-day"
+    "userdb-hotelling-multiyear-month"
     # project-crankcase, project-refueling, rates-project-evap: the chained
     # processes and the Rates-scale evaporative processes in PROJECT domain,
     # on their project databases (COUNTY_SQL_FOR below).
@@ -281,11 +290,11 @@ county_sql_for() {
             echo "${HERE}/county-inputs/washtenaw-county/setup-starts.sql" ;;
         scale-county)
             echo "${HERE}/county-inputs/washtenaw-county/setup-county.sql" ;;
-        scale-county-idle-adjust)
+        scale-county-idle-adjust|scale-county-idle-adjust-day|scale-county-idle-adjust-month)
             echo "${HERE}/county-inputs/washtenaw-county-idle-adjust/setup-idle-adjust.sql" ;;
-        userdb-hotelling-multiyear)
+        userdb-hotelling-multiyear|userdb-hotelling-multiyear-day|userdb-hotelling-multiyear-month)
             echo "${HERE}/county-inputs/washtenaw-userdb-hotelling-multiyear/setup-userdb-hotelling-multiyear.sql" ;;
-        scale-county-timeagg-day|scale-county-timeagg-month|scale-county-outstep-day|scale-county-outstep-week|scale-county-outstep-dayagg)
+        scale-county-timeagg-day|scale-county-timeagg-month|scale-county-outstep-day|scale-county-outstep-week|scale-county-outstep-dayagg|scale-county-timeagg-weekday)
             echo "${HERE}/county-inputs/washtenaw-county-timeagg/setup-timeagg.sql" ;;
         scale-project|rates-project)
             echo "${HERE}/county-inputs/washtenaw-project/setup-project.sql" ;;
