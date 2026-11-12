@@ -48,3 +48,7 @@ execution-db.bundle
 # `git check-ignore` that this path is still trackable; if you add a `*.log`
 # rule above, that test is what will tell you.
 !characterization/snapshots/*/moves-run.log
+
+# Fixture snapshots are regenerable capture output (characterization/run-all-fixtures.sh),
+# not source: kept on disk for the moves.esm suite, never committed (2026-11-12).
+/characterization/snapshots/*/

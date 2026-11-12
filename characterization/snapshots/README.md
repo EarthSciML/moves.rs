@@ -1,5 +1,10 @@
 # Fixture snapshots
 
+**Not tracked since 2026-11-12.** Each sub-directory is the output of a capture
+(`characterization/run-all-fixtures.sh`, the RunSpec in `characterization/fixtures/`
+and its `county-inputs/` SQL) and is regenerated, not versioned; the history before
+that date still holds every snapshot. The moves.esm suite reads them from disk.
+
 This directory holds the canonical-MOVES snapshots produced by Phase 0
 Task 4 (`mo-kbjl`). One sub-directory per fixture; each is the
 deterministic, content-addressed regression baseline that every other
