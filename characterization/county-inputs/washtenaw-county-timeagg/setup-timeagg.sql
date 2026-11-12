@@ -9,7 +9,11 @@
 --   <aggregateBy key="24-Hour Day"/>, <outputtimestep value="Month"/>)
 -- and characterization/fixtures/scale-county-timeagg-month.xml
 --   (January, April, July and October; <aggregateBy key="Month"/>,
---   <outputtimestep value="Year"/>).
+--   <outputtimestep value="Year"/>)
+-- and characterization/fixtures/scale-county-timeagg-year.xml
+--   (the same months; <aggregateBy key="Year"/>, <outputtimestep value="Year"/>;
+--   also crankcase running and extended idle, brake and tire wear, and
+--   running energy and CO2).
 -- Both: the gasoline passenger car (21), the gasoline light commercial truck
 -- (32) and the diesel combination long-haul truck (62); road types 1 and 4;
 -- THC, CO and NOx for running exhaust, start exhaust, crankcase start,
