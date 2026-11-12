@@ -6,8 +6,9 @@ worker (AggregationSQLGenerator: hourID NULL, convertDays x 1/noOfRealDays).
 January and July
 2020 (month keys are 0-based), both day types, all 24 hours (hour keys are
 hourID-1). Gasoline passenger car and diesel combination long-haul truck on
-road types 1 and 4; CO and NOx for running exhaust (off-network idle on road
-type 1), start exhaust and extended idle. The county database (county-inputs/
+road types 1 and 4; CO alone (its 96 hour cells make it the heaviest run to
+evaluate; NOx doubled it past 58 GB) for running exhaust (off-network idle on
+road type 1), start exhaust and extended idle. The county database (county-inputs/
 washtenaw-county-timeagg/setup-timeagg.sql) states startsPerDay and the four
 hotelling tables.]]></description>
 	<models>
@@ -42,11 +43,8 @@ hotelling tables.]]></description>
 	</roadtypes>
 	<pollutantprocessassociations>
 		<pollutantprocessassociation pollutantkey="2" pollutantname="Carbon Monoxide (CO)" processkey="1" processname="Running Exhaust"/>
-		<pollutantprocessassociation pollutantkey="3" pollutantname="Oxides of Nitrogen (NOx)" processkey="1" processname="Running Exhaust"/>
 		<pollutantprocessassociation pollutantkey="2" pollutantname="Carbon Monoxide (CO)" processkey="2" processname="Start Exhaust"/>
-		<pollutantprocessassociation pollutantkey="3" pollutantname="Oxides of Nitrogen (NOx)" processkey="2" processname="Start Exhaust"/>
 		<pollutantprocessassociation pollutantkey="2" pollutantname="Carbon Monoxide (CO)" processkey="90" processname="Extended Idle Exhaust"/>
-		<pollutantprocessassociation pollutantkey="3" pollutantname="Oxides of Nitrogen (NOx)" processkey="90" processname="Extended Idle Exhaust"/>
 	</pollutantprocessassociations>
 	<databaseselections>
 	</databaseselections>
