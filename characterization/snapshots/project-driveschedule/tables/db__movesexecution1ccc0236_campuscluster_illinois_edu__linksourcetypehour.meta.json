@@ -1,0 +1,28 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0236_campuscluster_illinois_edu__linksourcetypehour",
+  "schema": [
+    {
+      "name": "linkID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeHourFraction",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "linkID",
+    "sourceTypeID"
+  ],
+  "row_count": 6,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "9243ecee56e247cd34f8061fcec949712f4bfc8b00484c05a9fa230838707a84"
+}

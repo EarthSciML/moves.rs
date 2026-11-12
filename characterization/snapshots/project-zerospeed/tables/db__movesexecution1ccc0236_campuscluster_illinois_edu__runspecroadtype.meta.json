@@ -1,0 +1,19 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0236_campuscluster_illinois_edu__runspecroadtype",
+  "schema": [
+    {
+      "name": "roadTypeID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "roadTypeID"
+  ],
+  "row_count": 1,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "2663d3d27fe6d3704fbbc8f854febdd906d4ad02ac1e762bffdeb118bb1a93e0"
+}
