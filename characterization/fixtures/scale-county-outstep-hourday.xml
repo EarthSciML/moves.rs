@@ -3,11 +3,11 @@
 TIME STEP: <aggregateBy key="Hour"/> computes every (day type, hour) cell, and
 <outputtimestep value="24-Hour Day"/> sums each day type's 24 hours on the
 worker (AggregationSQLGenerator: hourID NULL, convertDays x 1/noOfRealDays).
-January and July
-2020 (month keys are 0-based), both day types, all 24 hours (hour keys are
+July 2020 alone
+(month keys are 0-based; with January too the model's 96 hour cells evaluated
+past 60 GB and were killed), both day types, all 24 hours (hour keys are
 hourID-1). Gasoline passenger car and diesel combination long-haul truck on
-road types 1 and 4; CO alone (its 96 hour cells make it the heaviest run to
-evaluate; NOx doubled it past 58 GB) for running exhaust (off-network idle on
+road types 1 and 4; CO alone for running exhaust (off-network idle on
 road type 1), start exhaust and extended idle. The county database (county-inputs/
 washtenaw-county-timeagg/setup-timeagg.sql) states startsPerDay and the four
 hotelling tables.]]></description>
@@ -21,7 +21,6 @@ hotelling tables.]]></description>
 	</geographicselections>
 	<timespan>
 		<year key="2020"/>
-		<month key="0"/>
 		<month key="6"/>
 		<day id="2"/>
 		<day id="5"/>
@@ -69,7 +68,7 @@ hotelling tables.]]></description>
 	    <segment selected="false"/>
 	    <hpclass selected="false"/>
 	</outputemissionsbreakdownselection>
-	<outputdatabase servername="" databasename="out_scale_county_outstep_hourly" description=""/>
+	<outputdatabase servername="" databasename="out_scale_county_outstep_hourday" description=""/>
 	<outputtimestep value="24-Hour Day"/>
 	<outputvmtdata value="false"/>
 	<outputsho value="false"/>
