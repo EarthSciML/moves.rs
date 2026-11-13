@@ -127,6 +127,12 @@ declare -a SKIP_BY_DEFAULT=(
     # aggregateBy Year (output Year): evaporative and refueling over the
     # month-collapsed tables (PreAggYEAR.sql).
     "scale-county-timeagg-processes-year"
+    # scale-county-timeagg-soak-day, -month: evaporative processes under
+    # aggregateBy 24-Hour Day / Month over setup-timeagg.sql PLUS a STATED
+    # soakActivityFraction (setup-soak-activity.sql), which PreAggDAY.sql and
+    # PreAggMONTH.sql collapse before TankTemperatureGenerator keeps it.
+    "scale-county-timeagg-soak-day"
+    "scale-county-timeagg-soak-month"
     # scale-county-outstep-hourday, -week, -dayagg: the 24-Hour Day and Portion of
     # Week output time steps (at aggregateBy Hour, 24-Hour Day, 24-Hour Day)
     # over the same county database. Skipped by default for the seed pass.
@@ -316,6 +322,8 @@ county_sql_for() {
             echo "${HERE}/county-inputs/washtenaw-userdb-hotelling-multiyear/setup-userdb-hotelling-multiyear.sql" ;;
         scale-county-timeagg-day|scale-county-timeagg-month|scale-county-timeagg-year|scale-county-timeagg-processes-day|scale-county-timeagg-processes-month|scale-county-timeagg-processes-year|scale-county-outstep-hourday|scale-county-outstep-week|scale-county-outstep-dayagg|scale-county-timeagg-weekday|scale-county-timeagg-year-toxics|scale-county-timeagg-year-toxics-idle|scale-county-timeagg-year-pm)
             echo "${HERE}/county-inputs/washtenaw-county-timeagg/setup-timeagg.sql" ;;
+        scale-county-timeagg-soak-day|scale-county-timeagg-soak-month)
+            echo "${HERE}/county-inputs/washtenaw-county-timeagg/setup-timeagg.sql ${HERE}/county-inputs/washtenaw-county-timeagg/setup-soak-activity.sql" ;;
         scale-project|rates-project)
             echo "${HERE}/county-inputs/washtenaw-project/setup-project.sql" ;;
         project-links)
@@ -354,7 +362,9 @@ for xml in "${FIXTURES[@]}"; do
         # its own workdir (it must survive between the seeding pass and the
         # MOVES pass), so --workdir-root does not apply to these.
         RUNNER="${CAPTURE_COUNTY}"
-        declare -a ARGS=( --fixture "${name}" --county-sql "${county_sql}" --sif "${SIF}" )
+        declare -a ARGS=( --fixture "${name}" --sif "${SIF}" )
+        # county_sql_for may name several files (space-separated), applied in order.
+        for f in ${county_sql}; do ARGS+=( --county-sql "${f}" ); done
         [ "${USE_FAKEROOT}" = "1" ] && ARGS=( -f "${ARGS[@]}" )
         [ -n "${OUTPUT_ROOT}" ] && ARGS+=( --output-dir "${OUTPUT_ROOT}/${name}" )
     else
