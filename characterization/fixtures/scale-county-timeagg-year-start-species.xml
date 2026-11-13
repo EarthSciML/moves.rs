@@ -1,0 +1,104 @@
+<runspec version="MOVES5.0.1">
+	<description><![CDATA[The Year twin of scale-county-start-species: the same start-exhaust selections
+(N2O, CO2 Equivalent, the six ATRatio air toxics, their hydrocarbon parents,
+energy, CO2 and the start PM species) for source types 21 and 62 over
+setup-timeagg.sql, at scale-county-timeagg-year's months (January, April, July,
+October 2020), both day types, all 24 hours and road types 1 and 4, aggregated
+by Year, output Year. Start exhaust only.]]></description>
+	<models>
+		<model value="ONROAD"/>
+	</models>
+	<modelscale value="Inv"/>
+	<modeldomain value="SINGLE"/>
+	<geographicselections>
+		<geographicselection type="COUNTY" key="26161" description="MICHIGAN - Washtenaw County"/>
+	</geographicselections>
+	<timespan>
+		<year key="2020"/>
+		<month key="0"/>
+		<month key="3"/>
+		<month key="6"/>
+		<month key="9"/>
+		<day id="2"/>
+		<day id="5"/>
+		<beginhour key="0"/>
+		<endhour key="23"/>
+		<aggregateBy key="Year"/>
+	</timespan>
+	<onroadvehicleselections>
+		<onroadvehicleselection fueltypeid="1" fueltypedesc="Gasoline" sourcetypeid="21" sourcetypename="Passenger Car"/>
+		<onroadvehicleselection fueltypeid="2" fueltypedesc="Diesel Fuel" sourcetypeid="62" sourcetypename="Combination Long-haul Truck"/>
+	</onroadvehicleselections>
+	<offroadvehicleselections>
+	</offroadvehicleselections>
+	<offroadvehiclesccs>
+	</offroadvehiclesccs>
+	<roadtypes>
+		<roadtype roadtypeid="1" roadtypename="Off-Network" modelCombination="M1"/>
+		<roadtype roadtypeid="4" roadtypename="Urban Restricted Access" modelCombination="M1"/>
+	</roadtypes>
+	<pollutantprocessassociations>
+		<pollutantprocessassociation pollutantkey="1" pollutantname="Total Gaseous Hydrocarbons" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="5" pollutantname="Methane (CH4)" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="6" pollutantname="Nitrous Oxide (N2O)" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="20" pollutantname="Benzene" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="21" pollutantname="Ethanol" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="24" pollutantname="1,3-Butadiene" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="25" pollutantname="Formaldehyde" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="26" pollutantname="Acetaldehyde" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="27" pollutantname="Acrolein" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="79" pollutantname="Non-Methane Hydrocarbons" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="80" pollutantname="Non-Methane Organic Gases" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="86" pollutantname="Total Organic Gases" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="87" pollutantname="Volatile Organic Compounds" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="90" pollutantname="Atmospheric CO2" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="91" pollutantname="Total Energy Consumption" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="98" pollutantname="CO2 Equivalent" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="100" pollutantname="Primary Exhaust PM10  - Total" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="110" pollutantname="Primary Exhaust PM2.5 - Total" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="111" pollutantname="Organic Carbon" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="112" pollutantname="Elemental Carbon" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="115" pollutantname="Sulfate Particulate" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="118" pollutantname="Composite - NonECPM" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="119" pollutantname="H2O (aerosol)" processkey="2" processname="Start Exhaust"/>
+	</pollutantprocessassociations>
+	<databaseselections>
+	</databaseselections>
+	<internalcontrolstrategies>
+	</internalcontrolstrategies>
+	<skipdomaindatabasevalidation selected="true"/>
+	<inputdatabase servername="" databasename="" description=""/>
+	<uncertaintyparameters uncertaintymodeenabled="false" numberofrunspersimulation="0" numberofsimulations="0"/>
+	<geographicoutputdetail description="COUNTY"/>
+	<outputemissionsbreakdownselection>
+	    <modelyear selected="true"/>
+	    <fueltype selected="true"/>
+	    <emissionprocess selected="true"/>
+	    <distinguishparticulates selected="true"/>
+	    <onroadoffroad selected="true"/>
+	    <roadtype selected="true"/>
+	    <sourceusetype selected="false"/>
+	    <movesvehicletype selected="false"/>
+	    <onroadscc selected="true"/>
+	    <offroadscc selected="false"/>
+	    <estimateuncertainty selected="false"/>
+	    <segment selected="false"/>
+	    <hpclass selected="false"/>
+	</outputemissionsbreakdownselection>
+	<outputdatabase servername="" databasename="out_scale_county_timeagg_year_start_species" description=""/>
+	<outputtimestep value="Year"/>
+	<outputvmtdata value="false"/>
+	<outputsho value="false"/>
+	<outputsh value="false"/>
+	<outputshp value="false"/>
+	<outputshidling value="false"/>
+	<outputstarts value="false"/>
+	<outputpopulation value="false"/>
+	<scaleinputdatabase servername="" databasename="" description=""/>
+	<pmsize value="0"/>
+	<outputfactors>
+		<timefactors selected="true" units="Seconds"/>
+		<distancefactors selected="true" units="Miles"/>
+		<massfactors selected="true" units="Grams" energyunits="Million BTU"/>
+	</outputfactors>
+</runspec>
