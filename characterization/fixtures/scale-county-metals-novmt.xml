@@ -6,7 +6,7 @@ the metals (60-63, 65-67) and dioxins/furans (130-146) at running exhaust with
 the VMT output OFF (<outputvmtdata value="false"/>): AirToxicsDistanceCalculator
 multiplies their rates by SHO.distance, which TotalActivityGenerator's TAG-9
 writes only when VMT output is requested. It measures what MOVES writes then;
-scale-county-minor-species is the same selection with VMT output on. County
+scale-county-minor-running selects them with VMT output on. County
 database county-inputs/washtenaw-county-timeagg/setup-timeagg.sql.]]></description>
 	<models>
 		<model value="ONROAD"/>
