@@ -19,7 +19,9 @@
 --   21 and 62 only: the gaseous species and air toxics at running and start
 --   exhaust, and the running-exhaust PM species)
 -- and characterization/fixtures/scale-county-timeagg-year-toxics-idle.xml (the
---   same gaseous species at extended idle, APU and the crankcase processes).
+--   same gaseous species at extended idle, APU and the crankcase processes)
+-- and characterization/fixtures/scale-county-idle-species.xml (those
+--   selections WITHOUT aggregation: July, weekdays, two hours, output Hour).
 -- Both: the gasoline passenger car (21), the gasoline light commercial truck
 -- (32) and the diesel combination long-haul truck (62); road types 1 and 4;
 -- THC, CO and NOx for running exhaust, start exhaust, crankcase start,
