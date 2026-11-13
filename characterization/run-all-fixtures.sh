@@ -316,11 +316,13 @@ county_sql_for() {
             echo "${HERE}/county-inputs/washtenaw-county/setup-starts.sql" ;;
         scale-county)
             echo "${HERE}/county-inputs/washtenaw-county/setup-county.sql" ;;
-        scale-county-idle-adjust|scale-county-idle-adjust-day|scale-county-idle-adjust-month)
+        scale-county-idle-adjust|scale-county-idle-adjust-day|scale-county-idle-adjust-month|scale-county-idle-adjust-year)
             echo "${HERE}/county-inputs/washtenaw-county-idle-adjust/setup-idle-adjust.sql" ;;
-        userdb-hotelling-multiyear|userdb-hotelling-multiyear-day|userdb-hotelling-multiyear-month)
+        userdb-hotelling-multiyear|userdb-hotelling-multiyear-day|userdb-hotelling-multiyear-month|userdb-hotelling-multiyear-year)
             echo "${HERE}/county-inputs/washtenaw-userdb-hotelling-multiyear/setup-userdb-hotelling-multiyear.sql" ;;
-        scale-county-timeagg-day|scale-county-timeagg-month|scale-county-timeagg-year|scale-county-timeagg-processes-day|scale-county-timeagg-processes-month|scale-county-timeagg-processes-year|scale-county-outstep-hourday|scale-county-outstep-week|scale-county-outstep-dayagg|scale-county-timeagg-weekday|scale-county-timeagg-year-toxics|scale-county-timeagg-year-toxics-idle|scale-county-timeagg-year-pm)
+        userdb-hotelling-threeyear|userdb-hotelling-threeyear-month)
+            echo "${HERE}/county-inputs/washtenaw-userdb-hotelling-threeyear/setup-userdb-hotelling-threeyear.sql" ;;
+        scale-county-timeagg-day|scale-county-timeagg-month|scale-county-timeagg-year|scale-county-timeagg-processes-day|scale-county-timeagg-processes-month|scale-county-timeagg-processes-year|scale-county-outstep-hourday|scale-county-outstep-week|scale-county-outstep-dayagg|scale-county-timeagg-weekday|scale-county-timeagg-year-toxics|scale-county-timeagg-year-toxics-idle|scale-county-timeagg-year-pm|scale-county-timeagg-weekday-year)
             echo "${HERE}/county-inputs/washtenaw-county-timeagg/setup-timeagg.sql" ;;
         scale-county-timeagg-soak-day|scale-county-timeagg-soak-month)
             echo "${HERE}/county-inputs/washtenaw-county-timeagg/setup-timeagg.sql ${HERE}/county-inputs/washtenaw-county-timeagg/setup-soak-activity.sql" ;;
