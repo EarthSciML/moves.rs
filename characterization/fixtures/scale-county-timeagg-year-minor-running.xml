@@ -1,0 +1,188 @@
+<runspec version="MOVES5.0.1">
+	<description><![CDATA[County-domain (SINGLE) inventory for Washtenaw with TIME AGGREGATION by year,
+as scale-county-timeagg-year (<aggregateBy key="Year"/>, <outputtimestep
+value="Year"/>; January, April, July and October 2020, both day types, all 24
+hours), for the gasoline passenger car (21) and the diesel combination
+long-haul truck (62) on road type 4 alone: the PM species (PM10 and PM2.5 totals, EC, OC, NonECPM, sulfate, nitrate,
+ammonium, aerosol water, the PM2.5 elements 51-59, PMOTHR, NCOM, TOM and the
+residual 121-124) and the PAH particles (23, 68-78, 81-84) at running and crankcase
+running exhaust (1, 15), and the metals (60-63, 65-67) and dioxins/furans
+(130-146) at running exhaust, the only process MOVES associates them with. The
+VMT output is on; MOVES writes no metal or dioxin row with it on or off
+(scale-county-metals-novmt): the default database has no sourceTypePolProcess
+row for them. Its non-aggregated twin is scale-county-minor-running. County database county-inputs/washtenaw-county-timeagg/setup-timeagg.sql.
+Split from one capture of all seven processes (75,582 rows at one hour), which
+the moves.esm evaluation could not hold in memory.]]></description>
+	<models>
+		<model value="ONROAD"/>
+	</models>
+	<modelscale value="Inv"/>
+	<modeldomain value="SINGLE"/>
+	<geographicselections>
+		<geographicselection type="COUNTY" key="26161" description="MICHIGAN - Washtenaw County"/>
+	</geographicselections>
+	<timespan>
+		<year key="2020"/>
+		<month key="0"/>
+		<month key="3"/>
+		<month key="6"/>
+		<month key="9"/>
+		<day id="2"/>
+		<day id="5"/>
+		<beginhour key="0"/>
+		<endhour key="23"/>
+		<aggregateBy key="Year"/>
+	</timespan>
+	<onroadvehicleselections>
+		<onroadvehicleselection fueltypeid="1" fueltypedesc="Gasoline" sourcetypeid="21" sourcetypename="Passenger Car"/>
+		<onroadvehicleselection fueltypeid="2" fueltypedesc="Diesel Fuel" sourcetypeid="62" sourcetypename="Combination Long-haul Truck"/>
+	</onroadvehicleselections>
+	<offroadvehicleselections>
+	</offroadvehicleselections>
+	<offroadvehiclesccs>
+	</offroadvehiclesccs>
+	<roadtypes>
+		<roadtype roadtypeid="4" roadtypename="Urban Restricted Access" modelCombination="M1"/>
+	</roadtypes>
+	<pollutantprocessassociations>
+		<pollutantprocessassociation pollutantkey="23" pollutantname="Naphthalene particle" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="35" pollutantname="Nitrate (NO3)" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="36" pollutantname="Ammonium (NH4)" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="51" pollutantname="Chloride" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="52" pollutantname="Sodium" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="53" pollutantname="Potassium" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="54" pollutantname="Magnesium" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="55" pollutantname="Calcium" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="56" pollutantname="Titanium" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="57" pollutantname="Silicon" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="58" pollutantname="Aluminum" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="59" pollutantname="Iron" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="60" pollutantname="Mercury Elemental Gaseous" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="61" pollutantname="Mercury Divalent Gaseous" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="62" pollutantname="Mercury Particulate" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="63" pollutantname="Arsenic Compounds" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="65" pollutantname="Chromium 6+" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="66" pollutantname="Manganese Compounds" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="67" pollutantname="Nickel Compounds" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="68" pollutantname="Dibenzo(a,h)anthracene particle" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="69" pollutantname="Fluoranthene particle" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="70" pollutantname="Acenaphthene particle" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="71" pollutantname="Acenaphthylene particle" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="72" pollutantname="Anthracene particle" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="73" pollutantname="Benz(a)anthracene particle" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="74" pollutantname="Benzo(a)pyrene particle" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="75" pollutantname="Benzo(b)fluoranthene particle" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="76" pollutantname="Benzo(g,h,i)perylene particle" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="77" pollutantname="Benzo(k)fluoranthene particle" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="78" pollutantname="Chrysene particle" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="81" pollutantname="Fluorene particle" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="82" pollutantname="Indeno(1,2,3,c,d)pyrene particle" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="83" pollutantname="Phenanthrene particle" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="84" pollutantname="Pyrene particle" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="100" pollutantname="Primary Exhaust PM10  - Total" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="110" pollutantname="Primary Exhaust PM2.5 - Total" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="111" pollutantname="Organic Carbon" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="112" pollutantname="Elemental Carbon" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="115" pollutantname="Sulfate Particulate" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="118" pollutantname="Composite - NonECPM" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="119" pollutantname="H2O (aerosol)" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="121" pollutantname="CMAQ5.0 Unspeciated (PMOTHR)" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="122" pollutantname="Non-carbon Organic Matter (NCOM)" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="123" pollutantname="Total Organic Matter (TOM)" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="124" pollutantname="Residual PM (NonECNonSO4NonOM)" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="130" pollutantname="1,2,3,7,8,9-Hexachlorodibenzo-p-Dioxin" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="131" pollutantname="Octachlorodibenzo-p-dioxin" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="132" pollutantname="1,2,3,4,6,7,8-Heptachlorodibenzo-p-Dioxin" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="133" pollutantname="Octachlorodibenzofuran" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="134" pollutantname="1,2,3,4,7,8-Hexachlorodibenzo-p-Dioxin" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="135" pollutantname="1,2,3,7,8-Pentachlorodibenzo-p-Dioxin" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="136" pollutantname="2,3,7,8-Tetrachlorodibenzofuran" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="137" pollutantname="1,2,3,4,7,8,9-Heptachlorodibenzofuran" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="138" pollutantname="2,3,4,7,8-Pentachlorodibenzofuran" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="139" pollutantname="1,2,3,7,8-Pentachlorodibenzofuran" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="140" pollutantname="1,2,3,6,7,8-Hexachlorodibenzofuran" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="141" pollutantname="1,2,3,6,7,8-Hexachlorodibenzo-p-Dioxin" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="142" pollutantname="2,3,7,8-Tetrachlorodibenzo-p-Dioxin" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="143" pollutantname="2,3,4,6,7,8-Hexachlorodibenzofuran" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="144" pollutantname="1,2,3,4,6,7,8-Heptachlorodibenzofuran" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="145" pollutantname="1,2,3,4,7,8-Hexachlorodibenzofuran" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="146" pollutantname="1,2,3,7,8,9-Hexachlorodibenzofuran" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="23" pollutantname="Naphthalene particle" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="35" pollutantname="Nitrate (NO3)" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="36" pollutantname="Ammonium (NH4)" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="51" pollutantname="Chloride" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="52" pollutantname="Sodium" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="53" pollutantname="Potassium" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="54" pollutantname="Magnesium" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="55" pollutantname="Calcium" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="56" pollutantname="Titanium" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="57" pollutantname="Silicon" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="58" pollutantname="Aluminum" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="59" pollutantname="Iron" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="68" pollutantname="Dibenzo(a,h)anthracene particle" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="69" pollutantname="Fluoranthene particle" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="70" pollutantname="Acenaphthene particle" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="71" pollutantname="Acenaphthylene particle" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="72" pollutantname="Anthracene particle" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="73" pollutantname="Benz(a)anthracene particle" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="74" pollutantname="Benzo(a)pyrene particle" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="75" pollutantname="Benzo(b)fluoranthene particle" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="76" pollutantname="Benzo(g,h,i)perylene particle" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="77" pollutantname="Benzo(k)fluoranthene particle" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="78" pollutantname="Chrysene particle" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="81" pollutantname="Fluorene particle" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="82" pollutantname="Indeno(1,2,3,c,d)pyrene particle" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="83" pollutantname="Phenanthrene particle" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="84" pollutantname="Pyrene particle" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="100" pollutantname="Primary Exhaust PM10  - Total" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="110" pollutantname="Primary Exhaust PM2.5 - Total" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="111" pollutantname="Organic Carbon" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="112" pollutantname="Elemental Carbon" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="115" pollutantname="Sulfate Particulate" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="118" pollutantname="Composite - NonECPM" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="119" pollutantname="H2O (aerosol)" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="121" pollutantname="CMAQ5.0 Unspeciated (PMOTHR)" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="122" pollutantname="Non-carbon Organic Matter (NCOM)" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="123" pollutantname="Total Organic Matter (TOM)" processkey="15" processname="Crankcase Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="124" pollutantname="Residual PM (NonECNonSO4NonOM)" processkey="15" processname="Crankcase Running Exhaust"/>
+	</pollutantprocessassociations>
+	<databaseselections>
+	</databaseselections>
+	<internalcontrolstrategies>
+	</internalcontrolstrategies>
+	<skipdomaindatabasevalidation selected="true"/>
+	<inputdatabase servername="" databasename="" description=""/>
+	<uncertaintyparameters uncertaintymodeenabled="false" numberofrunspersimulation="0" numberofsimulations="0"/>
+	<geographicoutputdetail description="COUNTY"/>
+	<outputemissionsbreakdownselection>
+	    <modelyear selected="true"/>
+	    <fueltype selected="true"/>
+	    <emissionprocess selected="true"/>
+	    <distinguishparticulates selected="true"/>
+	    <onroadoffroad selected="true"/>
+	    <roadtype selected="true"/>
+	    <sourceusetype selected="false"/>
+	    <movesvehicletype selected="false"/>
+	    <onroadscc selected="true"/>
+	    <offroadscc selected="false"/>
+	    <estimateuncertainty selected="false"/>
+	    <segment selected="false"/>
+	    <hpclass selected="false"/>
+	</outputemissionsbreakdownselection>
+	<outputdatabase servername="" databasename="out_scale_county_timeagg_year_minor_running" description=""/>
+	<outputtimestep value="Year"/>
+	<outputvmtdata value="true"/>
+	<outputsho value="false"/>
+	<outputsh value="false"/>
+	<outputshp value="false"/>
+	<outputshidling value="false"/>
+	<outputstarts value="false"/>
+	<outputpopulation value="false"/>
+	<scaleinputdatabase servername="" databasename="" description=""/>
+	<pmsize value="0"/>
+	<outputfactors>
+		<timefactors selected="true" units="Seconds"/>
+		<distancefactors selected="true" units="Miles"/>
+		<massfactors selected="true" units="Grams" energyunits="Million BTU"/>
+	</outputfactors>
+</runspec>
