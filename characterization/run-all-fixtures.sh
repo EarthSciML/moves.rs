@@ -133,6 +133,8 @@ declare -a SKIP_BY_DEFAULT=(
     # scale-county-timeagg-year-minor-species its Year twin.
     "scale-county-minor-species"
     "scale-county-timeagg-year-minor-species"
+    # scale-county-metals-novmt: the metals and dioxins with VMT output off.
+    "scale-county-metals-novmt"
     # scale-county-timeagg-processes-day, -month: the same county database
     # under aggregateBy 24-Hour Day (output Year) and Month (output Month),
     # selecting EVERY on-road process: evaporative, refueling, crankcase,
@@ -338,7 +340,7 @@ county_sql_for() {
             echo "${HERE}/county-inputs/washtenaw-userdb-hotelling-multiyear/setup-userdb-hotelling-multiyear.sql" ;;
         userdb-hotelling-threeyear|userdb-hotelling-threeyear-month)
             echo "${HERE}/county-inputs/washtenaw-userdb-hotelling-threeyear/setup-userdb-hotelling-threeyear.sql" ;;
-        scale-county-timeagg-day|scale-county-timeagg-month|scale-county-timeagg-year|scale-county-timeagg-processes-day|scale-county-timeagg-processes-month|scale-county-timeagg-processes-year|scale-county-outstep-hourday|scale-county-outstep-week|scale-county-outstep-dayagg|scale-county-timeagg-weekday|scale-county-timeagg-year-toxics|scale-county-timeagg-year-toxics-idle|scale-county-timeagg-year-pm|scale-county-timeagg-weekday-year|scale-county-start-species|scale-county-timeagg-year-start-species|scale-county-idle-species|scale-county-minor-species|scale-county-timeagg-year-minor-species)
+        scale-county-timeagg-day|scale-county-timeagg-month|scale-county-timeagg-year|scale-county-timeagg-processes-day|scale-county-timeagg-processes-month|scale-county-timeagg-processes-year|scale-county-outstep-hourday|scale-county-outstep-week|scale-county-outstep-dayagg|scale-county-timeagg-weekday|scale-county-timeagg-year-toxics|scale-county-timeagg-year-toxics-idle|scale-county-timeagg-year-pm|scale-county-timeagg-weekday-year|scale-county-start-species|scale-county-timeagg-year-start-species|scale-county-idle-species|scale-county-minor-species|scale-county-timeagg-year-minor-species|scale-county-metals-novmt)
             echo "${HERE}/county-inputs/washtenaw-county-timeagg/setup-timeagg.sql" ;;
         scale-county-timeagg-soak-day|scale-county-timeagg-soak-month)
             echo "${HERE}/county-inputs/washtenaw-county-timeagg/setup-timeagg.sql ${HERE}/county-inputs/washtenaw-county-timeagg/setup-soak-activity.sql" ;;

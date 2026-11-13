@@ -10,7 +10,11 @@ particles at running, start, extended idle, APU and crankcase running, start
 and extended idle, and the metals and dioxins/furans at running exhaust.
 Its non-aggregated twin is scale-county-minor-species. No gaseous species, no
 evaporative or refueling process. County database
-county-inputs/washtenaw-county-timeagg/setup-timeagg.sql.]]></description>
+county-inputs/washtenaw-county-timeagg/setup-timeagg.sql. The VMT output is ON
+(<outputvmtdata value="true"/>): AirToxicsDistanceCalculator multiplies the
+metal and dioxin rates by SHO.distance, which TotalActivityGenerator's TAG-9
+writes only when VMT output is requested; scale-county-metals-novmt measures
+the run without it.]]></description>
 	<models>
 		<model value="ONROAD"/>
 	</models>
@@ -360,7 +364,7 @@ county-inputs/washtenaw-county-timeagg/setup-timeagg.sql.]]></description>
 	</outputemissionsbreakdownselection>
 	<outputdatabase servername="" databasename="out_scale_county_timeagg_year_minor_species" description=""/>
 	<outputtimestep value="Year"/>
-	<outputvmtdata value="false"/>
+	<outputvmtdata value="true"/>
 	<outputsho value="false"/>
 	<outputsh value="false"/>
 	<outputshp value="false"/>
