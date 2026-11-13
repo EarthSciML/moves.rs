@@ -8,7 +8,10 @@ check at Year, running and start exhaust: the hydrocarbon species (CH4, NMHC,
 NMOG, TOG, VOC, NonHAPTOG at running), the gaseous air toxics (ATRatio,
 ATRatioNonGas, minorHAPRatio, pahGasRatio; PreAggYEAR.sql averages ATRatio and
 ATBaseEmissions by MonthGroupWeighting before FuelEffectsGenerator runs), NO,
-NO2, HONO, N2O, NH3, SO2, energy, CO2 and CO2 equivalent. No PM (see
+NO2, HONO, N2O, NH3, SO2, energy, CO2 and CO2 equivalent -- at start exhaust
+without N2O, CO2 equivalent and the six ATRatio toxics (benzene, ethanol,
+1,3-butadiene, formaldehyde, acetaldehyde, acrolein), whose start-exhaust
+paths moves.esm does not compute at any aggregation. No PM (see
 scale-county-timeagg-year-pm), no evaporative or refueling process. County
 database county-inputs/washtenaw-county-timeagg/setup-timeagg.sql.]]></description>
 	<models>
@@ -80,13 +83,6 @@ database county-inputs/washtenaw-county-timeagg/setup-timeagg.sql.]]></descripti
 		<pollutantprocessassociation pollutantkey="2" pollutantname="Carbon Monoxide (CO)" processkey="2" processname="Start Exhaust"/>
 		<pollutantprocessassociation pollutantkey="3" pollutantname="Oxides of Nitrogen (NOx)" processkey="2" processname="Start Exhaust"/>
 		<pollutantprocessassociation pollutantkey="5" pollutantname="Methane (CH4)" processkey="2" processname="Start Exhaust"/>
-		<pollutantprocessassociation pollutantkey="6" pollutantname="Nitrous Oxide (N2O)" processkey="2" processname="Start Exhaust"/>
-		<pollutantprocessassociation pollutantkey="20" pollutantname="Benzene" processkey="2" processname="Start Exhaust"/>
-		<pollutantprocessassociation pollutantkey="21" pollutantname="Ethanol" processkey="2" processname="Start Exhaust"/>
-		<pollutantprocessassociation pollutantkey="24" pollutantname="1,3-Butadiene" processkey="2" processname="Start Exhaust"/>
-		<pollutantprocessassociation pollutantkey="25" pollutantname="Formaldehyde" processkey="2" processname="Start Exhaust"/>
-		<pollutantprocessassociation pollutantkey="26" pollutantname="Acetaldehyde" processkey="2" processname="Start Exhaust"/>
-		<pollutantprocessassociation pollutantkey="27" pollutantname="Acrolein" processkey="2" processname="Start Exhaust"/>
 		<pollutantprocessassociation pollutantkey="30" pollutantname="Ammonia (NH3)" processkey="2" processname="Start Exhaust"/>
 		<pollutantprocessassociation pollutantkey="31" pollutantname="Sulfur Dioxide (SO2)" processkey="2" processname="Start Exhaust"/>
 		<pollutantprocessassociation pollutantkey="32" pollutantname="Nitrogen Oxide (NO)" processkey="2" processname="Start Exhaust"/>
@@ -106,7 +102,6 @@ database county-inputs/washtenaw-county-timeagg/setup-timeagg.sql.]]></descripti
 		<pollutantprocessassociation pollutantkey="87" pollutantname="Volatile Organic Compounds" processkey="2" processname="Start Exhaust"/>
 		<pollutantprocessassociation pollutantkey="90" pollutantname="Atmospheric CO2" processkey="2" processname="Start Exhaust"/>
 		<pollutantprocessassociation pollutantkey="91" pollutantname="Total Energy Consumption" processkey="2" processname="Start Exhaust"/>
-		<pollutantprocessassociation pollutantkey="98" pollutantname="CO2 Equivalent" processkey="2" processname="Start Exhaust"/>
 	</pollutantprocessassociations>
 	<databaseselections>
 	</databaseselections>
