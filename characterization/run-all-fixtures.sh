@@ -159,6 +159,14 @@ declare -a SKIP_BY_DEFAULT=(
     # PreAggMONTH.sql collapse before TankTemperatureGenerator keeps it.
     "scale-county-timeagg-soak-day"
     "scale-county-timeagg-soak-month"
+    # scale-county-timeagg-soak-year: the same at aggregateBy Year (output
+    # Year), where PreAggYEAR.sql SUMS the collapsed rows by MonthWeighting.
+    "scale-county-timeagg-soak-year"
+    # scale-county-evap-species: every pollutant MOVES associates with the
+    # evaporative and refueling processes (11, 12, 13, 18, 19), NOT aggregated
+    # (July, weekdays, two hours); -timeagg-year-evap-species its Year twin.
+    "scale-county-evap-species"
+    "scale-county-timeagg-year-evap-species"
     # scale-county-outstep-hourday, -week, -dayagg: the 24-Hour Day and Portion of
     # Week output time steps (at aggregateBy Hour, 24-Hour Day, 24-Hour Day)
     # over the same county database. Skipped by default for the seed pass.
@@ -348,9 +356,9 @@ county_sql_for() {
             echo "${HERE}/county-inputs/washtenaw-userdb-hotelling-multiyear/setup-userdb-hotelling-multiyear.sql" ;;
         userdb-hotelling-threeyear|userdb-hotelling-threeyear-month)
             echo "${HERE}/county-inputs/washtenaw-userdb-hotelling-threeyear/setup-userdb-hotelling-threeyear.sql" ;;
-        scale-county-timeagg-day|scale-county-timeagg-month|scale-county-timeagg-year|scale-county-timeagg-processes-day|scale-county-timeagg-processes-month|scale-county-timeagg-processes-year|scale-county-outstep-hourday|scale-county-outstep-week|scale-county-outstep-dayagg|scale-county-timeagg-weekday|scale-county-timeagg-year-toxics|scale-county-timeagg-year-toxics-idle|scale-county-timeagg-year-pm|scale-county-timeagg-weekday-year|scale-county-start-species|scale-county-timeagg-year-start-species|scale-county-idle-species|scale-county-idle-nonhaptog|scale-county-timeagg-year-nonhaptog|scale-county-minor-offnet|scale-county-minor-running|scale-county-timeagg-year-minor-offnet|scale-county-timeagg-year-minor-running|scale-county-metals-novmt)
+        scale-county-timeagg-day|scale-county-timeagg-month|scale-county-timeagg-year|scale-county-timeagg-processes-day|scale-county-timeagg-processes-month|scale-county-timeagg-processes-year|scale-county-outstep-hourday|scale-county-outstep-week|scale-county-outstep-dayagg|scale-county-timeagg-weekday|scale-county-timeagg-year-toxics|scale-county-timeagg-year-toxics-idle|scale-county-timeagg-year-pm|scale-county-timeagg-weekday-year|scale-county-start-species|scale-county-timeagg-year-start-species|scale-county-idle-species|scale-county-idle-nonhaptog|scale-county-timeagg-year-nonhaptog|scale-county-minor-offnet|scale-county-minor-running|scale-county-timeagg-year-minor-offnet|scale-county-timeagg-year-minor-running|scale-county-metals-novmt|scale-county-evap-species|scale-county-timeagg-year-evap-species)
             echo "${HERE}/county-inputs/washtenaw-county-timeagg/setup-timeagg.sql" ;;
-        scale-county-timeagg-soak-day|scale-county-timeagg-soak-month)
+        scale-county-timeagg-soak-day|scale-county-timeagg-soak-month|scale-county-timeagg-soak-year)
             echo "${HERE}/county-inputs/washtenaw-county-timeagg/setup-timeagg.sql ${HERE}/county-inputs/washtenaw-county-timeagg/setup-soak-activity.sql" ;;
         scale-project|rates-project)
             echo "${HERE}/county-inputs/washtenaw-project/setup-project.sql" ;;
