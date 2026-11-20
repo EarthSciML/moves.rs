@@ -1,9 +1,12 @@
 -- setup-avft.sql -- a NON-DEFAULT AVFT (Alternative Vehicle Fuels &
--- Technologies) table for Washtenaw County, applied AFTER
--- county-inputs/washtenaw-county-timeagg/setup-timeagg.sql (run-all-fixtures.sh's
+-- Technologies) table for Washtenaw County, applied AFTER a county or project
+-- database that states AVFTTool's default projection (run-all-fixtures.sh's
 -- county_sql_for lists both; capture-county-snapshot.sh concatenates them).
 --
--- Serves fixtures: characterization/fixtures/scale-county-avft.xml.
+-- Serves fixtures: characterization/fixtures/scale-county-avft.xml (over
+-- setup-timeagg.sql) and characterization/fixtures/project-avft.xml (over
+-- county-inputs/washtenaw-project-offnetwork/setup-project-offnetwork.sql,
+-- where ProjectTAG reads the avft rows directly for hotellingHours).
 --
 -- WHY THIS RUN
 -- ------------
@@ -17,7 +20,7 @@
 --
 -- THE ROWS
 -- --------
--- setup-timeagg.sql fills `avft` with the default projection for every source
+-- The database under it fills `avft` with the default projection for every source
 -- type and model year. This file replaces the rows of the combinations it
 -- states and leaves every other row the projection. For each stated
 -- (sourceTypeID, modelYearID, fuelTypeID, engTechID) AVFTMasterLoopable.
