@@ -50,6 +50,15 @@
 --   R12    THC start, 52, effectiveness 1: do methane, NMHC and VOC, which the
 --          HC speciation writes FROM THC, inherit it?
 --   R13    NMHC (79) running, 52: a chained child retrofitted on its own.
+-- MOVESEngine.hasWrongHotellingTables queries five hotelling tables in EVERY input
+-- database a RunSpec names and refuses the run ("Old table definition found for
+-- hotellingHoursPerDay table of database washtenaw_cdb") when one is missing, so
+-- the user database carries them, empty. Under setup-county.sql they exist already.
+CREATE TABLE IF NOT EXISTS hotellingHoursPerDay LIKE movesdb20241112.hotellingHoursPerDay;
+CREATE TABLE IF NOT EXISTS hotellingHourFraction LIKE movesdb20241112.hotellingHourFraction;
+CREATE TABLE IF NOT EXISTS hotellingAgeFraction LIKE movesdb20241112.hotellingAgeFraction;
+CREATE TABLE IF NOT EXISTS hotellingActivityDistribution LIKE movesdb20241112.hotellingActivityDistribution;
+CREATE TABLE IF NOT EXISTS hotellingMonthAdjust LIKE movesdb20241112.hotellingMonthAdjust;
 CREATE TABLE IF NOT EXISTS onRoadRetrofit LIKE movesdb20241112.onRoadRetrofit;
 INSERT INTO onRoadRetrofit (pollutantID, processID, fuelTypeID, sourceTypeID, retrofitYearID, beginModelYearID, endModelYearID, cumFractionRetrofit, retrofitEffectiveFraction) VALUES
   (1, 1, 2, 62, 2012, 2000, 2010, 0.20, 0.90),
