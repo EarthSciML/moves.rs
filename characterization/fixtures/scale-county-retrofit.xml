@@ -1,0 +1,103 @@
+<runspec version="MOVES5.0.1">
+	<description><![CDATA[County-domain inventory (model_domain=SINGLE) for Washtenaw, 2020, August weekday hour 7 -- scale-county's
+timespan and county database (county-inputs/washtenaw-county/setup-county.sql) PLUS thirteen On-Road Retrofit programs
+(county-inputs/washtenaw-county-retrofit/setup-retrofit.sql), which MOVES applies
+automatically because onRoadRetrofit has rows.
+Single-unit short-haul trucks (gasoline and diesel), the diesel combination
+long-haul truck and the diesel transit bus; THC, CO, NOx, methane, NMHC, VOC and
+the PM2.5 total with its four SulfatePMCalculator species (EC, NonECPM, sulfate,
+water) at running and start exhaust; road types 1 and 4 (MOVES adds 2, 3 and 5).
+Captured for moves.esm PLAN.md section 7.3.79 (On-Road Retrofit).]]></description>
+	<models>
+		<model value="ONROAD"/>
+	</models>
+	<modelscale value="Inv"/>
+	<modeldomain value="SINGLE"/>
+	<geographicselections>
+		<geographicselection type="COUNTY" key="26161" description="MICHIGAN - Washtenaw County"/>
+	</geographicselections>
+	<timespan>
+		<year key="2020"/>
+		<month key="7"/>
+		<day id="5"/>
+		<beginhour key="6"/>
+		<endhour key="6"/>
+	</timespan>
+	<onroadvehicleselections>
+		<onroadvehicleselection fueltypeid="1" fueltypedesc="Gasoline" sourcetypeid="52" sourcetypename="Single Unit Short-haul Truck"/>
+		<onroadvehicleselection fueltypeid="2" fueltypedesc="Diesel Fuel" sourcetypeid="52" sourcetypename="Single Unit Short-haul Truck"/>
+		<onroadvehicleselection fueltypeid="2" fueltypedesc="Diesel Fuel" sourcetypeid="62" sourcetypename="Combination Long-haul Truck"/>
+		<onroadvehicleselection fueltypeid="2" fueltypedesc="Diesel Fuel" sourcetypeid="42" sourcetypename="Transit Bus"/>
+	</onroadvehicleselections>
+	<offroadvehicleselections>
+	</offroadvehicleselections>
+	<offroadvehiclesccs>
+	</offroadvehiclesccs>
+	<roadtypes>
+		<roadtype roadtypeid="1" roadtypename="Off-Network" modelCombination="M1"/>
+		<roadtype roadtypeid="4" roadtypename="Urban Restricted Access" modelCombination="M1"/>
+	</roadtypes>
+	<pollutantprocessassociations>
+		<pollutantprocessassociation pollutantkey="1" pollutantname="Total Gaseous Hydrocarbons" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="1" pollutantname="Total Gaseous Hydrocarbons" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="2" pollutantname="Carbon Monoxide (CO)" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="2" pollutantname="Carbon Monoxide (CO)" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="3" pollutantname="Oxides of Nitrogen (NOx)" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="3" pollutantname="Oxides of Nitrogen (NOx)" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="5" pollutantname="Methane (CH4)" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="5" pollutantname="Methane (CH4)" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="79" pollutantname="Non-Methane Hydrocarbons" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="79" pollutantname="Non-Methane Hydrocarbons" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="87" pollutantname="Volatile Organic Compounds" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="87" pollutantname="Volatile Organic Compounds" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="110" pollutantname="Primary Exhaust PM2.5 - Total" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="110" pollutantname="Primary Exhaust PM2.5 - Total" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="112" pollutantname="Elemental Carbon" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="112" pollutantname="Elemental Carbon" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="115" pollutantname="Sulfate Particulate" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="115" pollutantname="Sulfate Particulate" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="118" pollutantname="Composite - NonECPM" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="118" pollutantname="Composite - NonECPM" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="119" pollutantname="H2O (aerosol)" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="119" pollutantname="H2O (aerosol)" processkey="2" processname="Start Exhaust"/>
+	</pollutantprocessassociations>
+	<databaseselections>
+	</databaseselections>
+	<internalcontrolstrategies>
+	</internalcontrolstrategies>
+	<skipdomaindatabasevalidation selected="true"/>
+	<inputdatabase servername="" databasename="" description=""/>
+	<uncertaintyparameters uncertaintymodeenabled="false" numberofrunspersimulation="0" numberofsimulations="0"/>
+	<geographicoutputdetail description="COUNTY"/>
+	<outputemissionsbreakdownselection>
+	    <modelyear selected="true"/>
+	    <fueltype selected="true"/>
+	    <emissionprocess selected="true"/>
+	    <distinguishparticulates selected="true"/>
+	    <onroadoffroad selected="true"/>
+	    <roadtype selected="true"/>
+	    <sourceusetype selected="false"/>
+	    <movesvehicletype selected="false"/>
+	    <onroadscc selected="true"/>
+	    <offroadscc selected="false"/>
+	    <estimateuncertainty selected="false"/>
+	    <segment selected="false"/>
+	    <hpclass selected="false"/>
+	</outputemissionsbreakdownselection>
+	<outputdatabase servername="" databasename="out_scale_county_retrofit" description=""/>
+	<outputtimestep value="Hour"/>
+	<outputvmtdata value="false"/>
+	<outputsho value="false"/>
+	<outputsh value="false"/>
+	<outputshp value="false"/>
+	<outputshidling value="false"/>
+	<outputstarts value="false"/>
+	<outputpopulation value="false"/>
+	<scaleinputdatabase servername="" databasename="" description=""/>
+	<pmsize value="0"/>
+	<outputfactors>
+		<timefactors selected="true" units="Seconds"/>
+		<distancefactors selected="true" units="Miles"/>
+		<massfactors selected="true" units="Grams" energyunits="Million BTU"/>
+	</outputfactors>
+</runspec>
