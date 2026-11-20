@@ -209,6 +209,17 @@ declare -a SKIP_BY_DEFAULT=(
     # which the generator walks as thirty seconds of idling.
     "project-driveschedule"
     "project-zerospeed"
+    # scale-county-retrofit, rates-retrofit, userdb-retrofit-multiyear: thirteen
+    # On-Road Retrofit programs (county-inputs/washtenaw-county-retrofit/
+    # setup-retrofit.sql), in scale-county's county database, and as the user
+    # input database of a DEFAULT-domain Rates run and a two-year inventory.
+    # scale-county-retrofit-base needs scale-county's database; rates-retrofit-base
+    # needs nothing, and is skipped with its twin. Skipped for the seed pass.
+    "scale-county-retrofit"
+    "scale-county-retrofit-base"
+    "rates-retrofit"
+    "rates-retrofit-base"
+    "userdb-retrofit-multiyear"
     # error-*: deliberately invalid RunSpecs that are expected to fail parsing.
     # They are tested by the Rust regression suite's error_fixtures_return_expected_errors
     # test, not by canonical-MOVES runs.
@@ -348,8 +359,12 @@ county_sql_for() {
             echo "${HERE}/county-inputs/washtenaw-county/setup-hotelling.sql" ;;
         process-crankcase-start-single)
             echo "${HERE}/county-inputs/washtenaw-county/setup-starts.sql" ;;
-        scale-county)
+        scale-county|scale-county-retrofit-base)
             echo "${HERE}/county-inputs/washtenaw-county/setup-county.sql" ;;
+        scale-county-retrofit)
+            echo "${HERE}/county-inputs/washtenaw-county/setup-county.sql ${HERE}/county-inputs/washtenaw-county-retrofit/setup-retrofit.sql" ;;
+        rates-retrofit|userdb-retrofit-multiyear)
+            echo "${HERE}/county-inputs/washtenaw-county-retrofit/setup-retrofit.sql" ;;
         scale-county-idle-adjust|scale-county-idle-adjust-day|scale-county-idle-adjust-month|scale-county-idle-adjust-year)
             echo "${HERE}/county-inputs/washtenaw-county-idle-adjust/setup-idle-adjust.sql" ;;
         userdb-hotelling-multiyear|userdb-hotelling-multiyear-day|userdb-hotelling-multiyear-month|userdb-hotelling-multiyear-year)
