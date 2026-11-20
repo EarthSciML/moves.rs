@@ -360,6 +360,8 @@ county_sql_for() {
             echo "${HERE}/county-inputs/washtenaw-county-timeagg/setup-timeagg.sql" ;;
         scale-county-timeagg-soak-day|scale-county-timeagg-soak-month|scale-county-timeagg-soak-year)
             echo "${HERE}/county-inputs/washtenaw-county-timeagg/setup-timeagg.sql ${HERE}/county-inputs/washtenaw-county-timeagg/setup-soak-activity.sql" ;;
+        scale-county-avft)
+            echo "${HERE}/county-inputs/washtenaw-county-timeagg/setup-timeagg.sql ${HERE}/county-inputs/washtenaw-county-avft/setup-avft.sql" ;;
         scale-project|rates-project)
             echo "${HERE}/county-inputs/washtenaw-project/setup-project.sql" ;;
         project-links)
