@@ -1,0 +1,94 @@
+<runspec version="MOVES5.0.1">
+	<description><![CDATA[Rates-scale (MESOSCALE_LOOKUP) twin of userdb-lev: DEFAULT domain, Washtenaw, 2020, August weekday hour 7, with a
+USER INPUT DATABASE (<databaseselection> washtenaw_cdb) built EXACTLY as MOVES 5's
+LEV tool builds it (county-inputs/washtenaw-userdb-lev/setup-lev.sql: the
+MOVES5_MyLEVS_Template.sql of database/LEV_NLEVScripts/, keeping model-year groups
+1999-2003 and 2010-2017): one table, emissionRateByAge, holding emissionRateByAgeLEV's
+rows at those groups. MOVES merges user databases before the default database
+(INSERT IGNORE), so those rows replace the default rates at their keys. Gasoline
+passenger cars, passenger trucks and light commercial trucks (MOVES adds every
+other fuel); THC, CO, NOx and NMHC at running and start exhaust (userdb-lev's PM2.5 group is left out: a first capture with it failed in the container, "No space left on device" / "Unable to JAR the worker input files", while bundling into /opt/moves/sharedwork, which run-moves.sh does not bind to the host);
+road types 1 and 5. The 1990-2020 cohorts read LEV rates at 1999-2003 and 2010-2017
+and default rates at 1990-1998, 2004-2009 and 2018-2020. Captured for moves.esm
+PLAN.md section 7.3.82 (LEV): the rate tables are written from BaseRateOutput, which reads the same merged emissionRateByAge. <scaleinputdatabase> is deliberately left empty with a
+non-placeholder description, so the capture does not also name the user database as
+a domain database.]]></description>
+	<models>
+		<model value="ONROAD"/>
+	</models>
+	<modelscale value="Rates"/>
+	<modeldomain value="DEFAULT"/>
+	<geographicselections>
+		<geographicselection type="COUNTY" key="26161" description="MICHIGAN - Washtenaw County"/>
+	</geographicselections>
+	<timespan>
+		<year key="2020"/>
+		<month key="7"/>
+		<day id="5"/>
+		<beginhour key="6"/>
+		<endhour key="6"/>
+	</timespan>
+	<onroadvehicleselections>
+		<onroadvehicleselection fueltypeid="1" fueltypedesc="Gasoline" sourcetypeid="21" sourcetypename="Passenger Car"/>
+		<onroadvehicleselection fueltypeid="1" fueltypedesc="Gasoline" sourcetypeid="31" sourcetypename="Passenger Truck"/>
+		<onroadvehicleselection fueltypeid="1" fueltypedesc="Gasoline" sourcetypeid="32" sourcetypename="Light Commercial Truck"/>
+	</onroadvehicleselections>
+	<offroadvehicleselections>
+	</offroadvehicleselections>
+	<offroadvehiclesccs>
+	</offroadvehiclesccs>
+	<roadtypes>
+		<roadtype roadtypeid="1" roadtypename="Off-Network" modelCombination="M1"/>
+		<roadtype roadtypeid="5" roadtypename="Urban Unrestricted Access" modelCombination="M1"/>
+	</roadtypes>
+	<pollutantprocessassociations>
+		<pollutantprocessassociation pollutantkey="1" pollutantname="Total Gaseous Hydrocarbons" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="1" pollutantname="Total Gaseous Hydrocarbons" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="2" pollutantname="Carbon Monoxide (CO)" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="2" pollutantname="Carbon Monoxide (CO)" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="3" pollutantname="Oxides of Nitrogen (NOx)" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="3" pollutantname="Oxides of Nitrogen (NOx)" processkey="2" processname="Start Exhaust"/>
+		<pollutantprocessassociation pollutantkey="79" pollutantname="Non-Methane Hydrocarbons" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="79" pollutantname="Non-Methane Hydrocarbons" processkey="2" processname="Start Exhaust"/>
+	</pollutantprocessassociations>
+	<databaseselections>
+		<databaseselection servername="localhost" databasename="washtenaw_cdb" description="Washtenaw user input database: a LEV database built by MOVES5_MyLEVS_Template.sql (emissionRateByAge)"/>
+	</databaseselections>
+	<internalcontrolstrategies>
+	</internalcontrolstrategies>
+	<skipdomaindatabasevalidation selected="true"/>
+	<inputdatabase servername="" databasename="" description=""/>
+	<uncertaintyparameters uncertaintymodeenabled="false" numberofrunspersimulation="0" numberofsimulations="0"/>
+	<geographicoutputdetail description="COUNTY"/>
+	<outputemissionsbreakdownselection>
+	    <modelyear selected="true"/>
+	    <fueltype selected="true"/>
+	    <emissionprocess selected="true"/>
+	    <distinguishparticulates selected="true"/>
+	    <onroadoffroad selected="true"/>
+	    <roadtype selected="true"/>
+	    <sourceusetype selected="false"/>
+	    <movesvehicletype selected="false"/>
+	    <onroadscc selected="true"/>
+	    <offroadscc selected="false"/>
+	    <estimateuncertainty selected="false"/>
+	    <segment selected="false"/>
+	    <hpclass selected="false"/>
+	</outputemissionsbreakdownselection>
+	<outputdatabase servername="" databasename="out_rates_lev" description=""/>
+	<outputtimestep value="Hour"/>
+	<outputvmtdata value="false"/>
+	<outputsho value="false"/>
+	<outputsh value="false"/>
+	<outputshp value="false"/>
+	<outputshidling value="false"/>
+	<outputstarts value="false"/>
+	<outputpopulation value="false"/>
+	<scaleinputdatabase servername="" databasename="" description="none (DEFAULT domain)"/>
+	<pmsize value="0"/>
+	<outputfactors>
+		<timefactors selected="true" units="Seconds"/>
+		<distancefactors selected="true" units="Miles"/>
+		<massfactors selected="true" units="Grams" energyunits="Million BTU"/>
+	</outputfactors>
+</runspec>
