@@ -1,9 +1,10 @@
 -- setup-lev.sql -- a LEV input database, built EXACTLY as MOVES 5's LEV tool builds
 -- it, for the LEV capture of moves.esm PLAN.md §7.3.82.
 --
--- Serves fixture:
---   characterization/fixtures/userdb-lev.xml (DEFAULT domain; applied ALONE, as the
---   user input database the RunSpec names in <databaseselections>)
+-- Serves fixtures:
+--   characterization/fixtures/userdb-lev.xml and its Rates-scale twin rates-lev.xml
+--   (DEFAULT domain; applied ALONE, as the user input database the RunSpec names
+--   in <databaseselections>)
 --
 -- WHAT THIS IS. MOVES 5 has no run-time LEV strategy. Tools > "Build LEV Input
 -- Database" (gui/BuildLEVNLEV.java, BuildLEVAction.java) runs a COPY of
