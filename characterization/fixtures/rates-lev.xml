@@ -7,7 +7,7 @@ MOVES5_MyLEVS_Template.sql of database/LEV_NLEVScripts/, keeping model-year grou
 rows at those groups. MOVES merges user databases before the default database
 (INSERT IGNORE), so those rows replace the default rates at their keys. Gasoline
 passenger cars, passenger trucks and light commercial trucks (MOVES adds every
-other fuel); THC, CO, NOx, NMHC and the PM2.5 group at running and start exhaust;
+other fuel); THC, CO, NOx and NMHC at running and start exhaust (userdb-lev's PM2.5 group is left out: a first capture with it failed in the container, "No space left on device" / "Unable to JAR the worker input files", while bundling into /opt/moves/sharedwork, which run-moves.sh does not bind to the host);
 road types 1 and 5. The 1990-2020 cohorts read LEV rates at 1999-2003 and 2010-2017
 and default rates at 1990-1998, 2004-2009 and 2018-2020. Captured for moves.esm
 PLAN.md section 7.3.82 (LEV): the rate tables are written from BaseRateOutput, which reads the same merged emissionRateByAge. <scaleinputdatabase> is deliberately left empty with a
@@ -50,16 +50,6 @@ a domain database.]]></description>
 		<pollutantprocessassociation pollutantkey="3" pollutantname="Oxides of Nitrogen (NOx)" processkey="2" processname="Start Exhaust"/>
 		<pollutantprocessassociation pollutantkey="79" pollutantname="Non-Methane Hydrocarbons" processkey="1" processname="Running Exhaust"/>
 		<pollutantprocessassociation pollutantkey="79" pollutantname="Non-Methane Hydrocarbons" processkey="2" processname="Start Exhaust"/>
-		<pollutantprocessassociation pollutantkey="110" pollutantname="Primary Exhaust PM2.5 - Total" processkey="1" processname="Running Exhaust"/>
-		<pollutantprocessassociation pollutantkey="110" pollutantname="Primary Exhaust PM2.5 - Total" processkey="2" processname="Start Exhaust"/>
-		<pollutantprocessassociation pollutantkey="112" pollutantname="Elemental Carbon" processkey="1" processname="Running Exhaust"/>
-		<pollutantprocessassociation pollutantkey="112" pollutantname="Elemental Carbon" processkey="2" processname="Start Exhaust"/>
-		<pollutantprocessassociation pollutantkey="115" pollutantname="Sulfate Particulate" processkey="1" processname="Running Exhaust"/>
-		<pollutantprocessassociation pollutantkey="115" pollutantname="Sulfate Particulate" processkey="2" processname="Start Exhaust"/>
-		<pollutantprocessassociation pollutantkey="118" pollutantname="Composite - NonECPM" processkey="1" processname="Running Exhaust"/>
-		<pollutantprocessassociation pollutantkey="118" pollutantname="Composite - NonECPM" processkey="2" processname="Start Exhaust"/>
-		<pollutantprocessassociation pollutantkey="119" pollutantname="H2O (aerosol)" processkey="1" processname="Running Exhaust"/>
-		<pollutantprocessassociation pollutantkey="119" pollutantname="H2O (aerosol)" processkey="2" processname="Start Exhaust"/>
 	</pollutantprocessassociations>
 	<databaseselections>
 		<databaseselection servername="localhost" databasename="washtenaw_cdb" description="Washtenaw user input database: a LEV database built by MOVES5_MyLEVS_Template.sql (emissionRateByAge)"/>
