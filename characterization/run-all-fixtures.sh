@@ -375,12 +375,16 @@ county_sql_for() {
             echo "${HERE}/county-inputs/washtenaw-county-timeagg/setup-timeagg.sql" ;;
         scale-county-timeagg-soak-day|scale-county-timeagg-soak-month|scale-county-timeagg-soak-year)
             echo "${HERE}/county-inputs/washtenaw-county-timeagg/setup-timeagg.sql ${HERE}/county-inputs/washtenaw-county-timeagg/setup-soak-activity.sql" ;;
+        scale-county-avft)
+            echo "${HERE}/county-inputs/washtenaw-county-timeagg/setup-timeagg.sql ${HERE}/county-inputs/washtenaw-county-avft/setup-avft.sql" ;;
         scale-project|rates-project)
             echo "${HERE}/county-inputs/washtenaw-project/setup-project.sql" ;;
         project-links)
             echo "${HERE}/county-inputs/washtenaw-project-links/setup-project-links.sql" ;;
         project-offnetwork|project-hotelling|rates-project-evap)
             echo "${HERE}/county-inputs/washtenaw-project-offnetwork/setup-project-offnetwork.sql" ;;
+        project-avft)
+            echo "${HERE}/county-inputs/washtenaw-project-offnetwork/setup-project-offnetwork.sql ${HERE}/county-inputs/washtenaw-county-avft/setup-avft.sql" ;;
         project-crankcase|project-refueling|rates-project-chained|rates-project-evap-links)
             echo "${HERE}/county-inputs/washtenaw-project-crankcase/setup-project-crankcase.sql" ;;
         project-useromd|rates-project-useromd)
