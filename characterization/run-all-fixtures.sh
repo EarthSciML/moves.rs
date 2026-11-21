@@ -220,6 +220,11 @@ declare -a SKIP_BY_DEFAULT=(
     "rates-retrofit"
     "rates-retrofit-base"
     "userdb-retrofit-multiyear"
+    # userdb-lev: a LEV input database built exactly as MOVES 5's LEV tool builds
+    # it (county-inputs/washtenaw-userdb-lev/setup-lev.sql, the
+    # MOVES5_MyLEVS_Template.sql with a subset of model-year groups kept), as the
+    # user input database of a DEFAULT-domain inventory.
+    "userdb-lev"
     # error-*: deliberately invalid RunSpecs that are expected to fail parsing.
     # They are tested by the Rust regression suite's error_fixtures_return_expected_errors
     # test, not by canonical-MOVES runs.
@@ -365,6 +370,8 @@ county_sql_for() {
             echo "${HERE}/county-inputs/washtenaw-county/setup-county.sql ${HERE}/county-inputs/washtenaw-county-retrofit/setup-retrofit.sql" ;;
         rates-retrofit|userdb-retrofit-multiyear)
             echo "${HERE}/county-inputs/washtenaw-county-retrofit/setup-retrofit.sql" ;;
+        userdb-lev)
+            echo "${HERE}/county-inputs/washtenaw-userdb-lev/setup-lev.sql" ;;
         scale-county-idle-adjust|scale-county-idle-adjust-day|scale-county-idle-adjust-month|scale-county-idle-adjust-year)
             echo "${HERE}/county-inputs/washtenaw-county-idle-adjust/setup-idle-adjust.sql" ;;
         userdb-hotelling-multiyear|userdb-hotelling-multiyear-day|userdb-hotelling-multiyear-month|userdb-hotelling-multiyear-year)
