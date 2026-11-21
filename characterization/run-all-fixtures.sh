@@ -229,6 +229,9 @@ declare -a SKIP_BY_DEFAULT=(
     "userdb-lev"
     "rates-lev"
     "scale-county-lev"
+    # userdb-lev-2025: the unedited template (every LEV year) at 2025, a
+    # calendar year that reaches the LEV table's PM rows (model year 2025 only).
+    "userdb-lev-2025"
     # error-*: deliberately invalid RunSpecs that are expected to fail parsing.
     # They are tested by the Rust regression suite's error_fixtures_return_expected_errors
     # test, not by canonical-MOVES runs.
@@ -376,6 +379,8 @@ county_sql_for() {
             echo "${HERE}/county-inputs/washtenaw-county-retrofit/setup-retrofit.sql" ;;
         userdb-lev|rates-lev)
             echo "${HERE}/county-inputs/washtenaw-userdb-lev/setup-lev.sql" ;;
+        userdb-lev-2025)
+            echo "${HERE}/county-inputs/washtenaw-userdb-lev/setup-lev-all.sql" ;;
         scale-county-lev)
             echo "${HERE}/county-inputs/washtenaw-county/setup-county.sql ${HERE}/county-inputs/washtenaw-userdb-lev/setup-lev-county.sql" ;;
         scale-county-idle-adjust|scale-county-idle-adjust-day|scale-county-idle-adjust-month|scale-county-idle-adjust-year)
